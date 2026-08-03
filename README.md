@@ -6,12 +6,12 @@ Each directory below is a standalone Python project with its own package metadat
 
 | Project | Distribution | Status |
 | --- | --- | --- |
-| `environments/gsm8k_v1` | `gsm8k-v1` | pinned Hub implementation; framework/live qualification pending |
-| `environments/automationbench_v1` | `automationbench-v1` | native adapter migrated; live parity qualification pending |
-| `environments/mmlu_pro_v1` | `mmlu-pro-v1` | pinned Hub implementation; reference qualification pending |
-| `environments/ifeval_v1` | `ifeval-v1` | deterministic checker implementation; reference qualification pending |
-| `environments/reasoning_gym_v1` | `reasoning-gym-v1` | pinned procedural generator implementation; balanced qualification pending |
-| `environments/math_python_v1` | `math-python-v1` | pinned MATH loader and bounded Python tool; CarbonTeq OCI image published, lifecycle gate pending |
+| `environments/gsm8k_v1` | `gsm8k-v1` | pinned Hub implementation; framework/live qualification complete |
+| `environments/automationbench_v1` | `automationbench-v1` | native adapter migrated; live parity qualification complete |
+| `environments/mmlu_pro_v1` | `mmlu-pro-v1` | pinned Hub implementation; reference qualification complete |
+| `environments/ifeval_v1` | `ifeval-v1` | deterministic checker implementation; reference qualification complete |
+| `environments/reasoning_gym_v1` | `reasoning-gym-v1` | pinned procedural generator implementation; balanced qualification complete |
+| `environments/math_python_v1` | `math-python-v1` | pinned MATH loader and bounded subprocess tool; live qualification complete |
 
 GSM8K and MMLU-Pro load exact Hugging Face revisions and carry source row
 digests in task data. IFEval uses a typed deterministic port of Google's
@@ -20,9 +20,9 @@ scoring to its pinned upstream registry. Math Python loads the pinned MATH
 revision, verifies boxed answers with `math-verify`, and exposes a bounded,
 task-scoped child-interpreter tool. AutomationBench is the migrated native
 adapter for CarbonTeq's pinned wheel and preserves its simulated world,
-toolsets, and assertion scorer. None of these local implementation slices is a
-release capability claim until the later parity, image, framework, and live
-qualification gates pass.
+toolsets, and assertion scorer. The framework qualification uses the bounded
+subprocess/tool path for Math Python; its published OCI image is an optional
+artifact and is not required for the current release runtime.
 
 ## Install one environment
 

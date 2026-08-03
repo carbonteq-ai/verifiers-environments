@@ -110,7 +110,9 @@ def test_python_child_receives_only_safe_environment(monkeypatch: pytest.MonkeyP
     assert output == "absent\nNone"
 
 
-def test_balanced_order_is_deterministic_and_type_round_robin(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_balanced_order_is_deterministic_and_type_round_robin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     rows = [
         {"problem": f"p{idx}", "solution": f"\\boxed{{{idx}}}", "level": "1", "type": kind}
         for idx, kind in enumerate(("Algebra", "Geometry", "Algebra", "Geometry"))
@@ -127,5 +129,10 @@ def test_balanced_order_is_deterministic_and_type_round_robin(monkeypatch: pytes
         ).load()
     )
     assert [task.data.idx for task in first] == [task.data.idx for task in second]
-    assert [task.data.problem_type for task in first] == ["Algebra", "Geometry", "Algebra", "Geometry"]
+    assert [task.data.problem_type for task in first] == [
+        "Algebra",
+        "Geometry",
+        "Algebra",
+        "Geometry",
+    ]
     assert (PACKAGE_ROOT / "images" / "math-python" / "Containerfile").is_file()
