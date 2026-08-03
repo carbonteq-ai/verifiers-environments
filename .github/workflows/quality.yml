@@ -1,0 +1,72 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uvx --from ruff==0.16.1 ruff check scripts
+      - run: uvx --from ruff==0.16.1 ruff format --check scripts
+      - run: uv run --python 3.12 python scripts/check_boundaries.py
+
+  package:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: gsm8k_v1
+          - project: automationbench_v1
+          - project: mmlu_pro_v1
+          - project: ifeval_v1
+          - project: reasoning_gym_v1
+          - project: math_python_v1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.12"
+          cache-dependency-glob: environments/${{ matrix.project }}/uv.lock
+      - name: Validate ${{ matrix.project }}
+        working-directory: environments/${{ matrix.project }}
+        run: |
+          uv lock --check
+          uv sync --locked --python 3.12
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pyright
+          uv run pytest
+          uv build --wheel
+
+  combined-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.12"
+          cache-dependency-glob: environments/*/uv.lock
+      - name: Build all environment wheels
+        run: |
+          mkdir dist
+          for project in gsm8k_v1 automationbench_v1 mmlu_pro_v1 ifeval_v1 reasoning_gym_v1 math_python_v1; do
+            uv build --wheel --out-dir dist "environments/${project}"
+          done
+      - name: Install the combined wheel set
+        run: |
+          uv venv --python 3.12 .compat-venv
+          uv pip install --python .compat-venv/bin/python dist/*.whl
+          .compat-venv/bin/python scripts/verify_combined_install.py
