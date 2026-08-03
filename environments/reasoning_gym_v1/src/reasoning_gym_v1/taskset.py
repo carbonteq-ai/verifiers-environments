@@ -7,9 +7,10 @@ import json
 from collections.abc import Iterable
 from typing import Any, Literal, cast
 
-import reasoning_gym
 import verifiers.v1 as vf
 from pydantic import Field, field_validator
+
+import reasoning_gym
 
 REASONING_GYM_COMMIT = "49b07130b3fcd12f2d064bba7c43869543a0e7e7"
 DEFAULT_GENERATORS = (

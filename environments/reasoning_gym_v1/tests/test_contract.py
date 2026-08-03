@@ -18,6 +18,10 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert pyproject["project"]["name"] == "reasoning-gym-v1"
     assert pyproject["project"]["requires-python"] == ">=3.12,<3.14"
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
+    assert not any(
+        item.startswith("reasoning-gym @ ") for item in pyproject["project"]["dependencies"]
+    )
+    assert (PACKAGE_ROOT / "src/reasoning_gym/factory.py").is_file()
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
         "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"

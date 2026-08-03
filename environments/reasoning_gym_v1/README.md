@@ -11,6 +11,10 @@ ten declared generators: `leg_counting`, `products`, `letter_counting`,
 namespaces, and each task records its generator, seed, source commit, and row
 digest in `TaskData`.
 
+The wheel vendors the pinned `reasoning_gym` source at that commit. This keeps
+the v1 package independently installable and gives posttrain job packaging a
+portable, hash-locked dependency closure instead of a nested VCS requirement.
+
 This implementation is ready for package-level deterministic qualification; it
 is not yet a model baseline or framework catalog release. The package remains
 independent of posttrain and the other environment packages.
