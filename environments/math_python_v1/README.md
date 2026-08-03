@@ -11,8 +11,11 @@ symbolic-correctness metrics.
 Tasks expose a bounded, task-scoped Python MCP tool. Each cell is replayed in a
 fresh child interpreter with bounded time/output, accepted-cell state isolated
 through the Verifiers state channel, and a minimal environment without
-credentials. This is a local safety boundary; the release still requires the
-immutable Docker image and lifecycle qualification described by the framework
-plan, including success, error, timeout, cancellation, and process-exit cleanup.
+credentials. The test binding can deterministically round-robin rows by problem
+type with `order_seed` and `balance_by_type`; the train binding keeps the same
+source semantics but uses a stochastic host sampling policy. The image recipe
+is `images/math-python/Containerfile`; the release still requires publishing
+that image by digest and completing success, error, timeout, cancellation, and
+process-exit cleanup qualification described by the framework plan.
 
 The package remains independent of posttrain and the other environment packages.

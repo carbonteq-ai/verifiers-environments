@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Literal, cast
 
 import verifiers.v1 as vf
@@ -69,6 +69,8 @@ class MathPythonConfig(vf.TasksetConfig):
     split: Literal["train", "test"] = "test"
     start_index: int = Field(default=0, ge=0)
     num_tasks: int = Field(default=100, ge=1, le=12_500)
+    order_seed: int = Field(default=0, ge=0)
+    balance_by_type: bool = False
     python_tool: PythonToolsetConfig = Field(default_factory=PythonToolsetConfig)
 
 
@@ -84,10 +86,28 @@ class MathPythonTaskset(vf.Taskset[MathPythonTask, MathPythonConfig]):
             revision=self.config.revision,
             split=self.config.split,
         )
-        end = min(self.config.start_index + self.config.num_tasks, len(rows))
+        indices = list(range(len(rows)))
+        if self.config.balance_by_type:
+            groups: dict[str, list[int]] = {}
+            for idx, row in enumerate(rows):
+                row_map = cast(Mapping[str, object], row)
+                groups.setdefault(str(row_map.get("type", "")), []).append(idx)
+            for group in groups.values():
+                group.sort(
+                    key=lambda idx: hashlib.sha256(
+                        f"{self.config.order_seed}:{idx}".encode()
+                    ).hexdigest()
+                )
+            indices = [
+                group[offset]
+                for offset in range(max(map(len, groups.values()), default=0))
+                for group in groups.values()
+                if offset < len(group)
+            ]
+        end = min(self.config.start_index + self.config.num_tasks, len(indices))
         if self.config.start_index >= end:
             raise ValueError("start_index is outside the selected split")
-        for idx in range(self.config.start_index, end):
+        for idx in indices[self.config.start_index : end]:
             row = rows[idx]
             solution = str(row["solution"])
             answer = _boxed_answer(solution)

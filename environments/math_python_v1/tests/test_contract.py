@@ -73,3 +73,24 @@ def test_python_tool_replays_cells_and_isolates_state() -> None:
     assert tool.state.cells == ["value = 2", "value + 2"]
     isolated = PythonToolset(PythonToolsetConfig())
     assert asyncio.run(isolated.python("value")).startswith("error:")
+
+
+def test_balanced_order_is_deterministic_and_type_round_robin(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [
+        {"problem": f"p{idx}", "solution": f"\\boxed{{{idx}}}", "level": "1", "type": kind}
+        for idx, kind in enumerate(("Algebra", "Geometry", "Algebra", "Geometry"))
+    ]
+    monkeypatch.setattr("math_python_v1.taskset.load_dataset", lambda *args, **kwargs: rows)
+    first = list(
+        MathPythonTaskset(
+            MathPythonConfig(num_tasks=4, balance_by_type=True, order_seed=19),
+        ).load()
+    )
+    second = list(
+        MathPythonTaskset(
+            MathPythonConfig(num_tasks=4, balance_by_type=True, order_seed=19),
+        ).load()
+    )
+    assert [task.data.idx for task in first] == [task.data.idx for task in second]
+    assert [task.data.problem_type for task in first] == ["Algebra", "Geometry", "Algebra", "Geometry"]
+    assert (PACKAGE_ROOT / "images" / "math-python" / "Containerfile").is_file()

@@ -65,7 +65,7 @@ def _safe_environment() -> dict[str, str]:
 def _run_cells(cells: list[str], timeout_seconds: float) -> tuple[bool, str]:
     try:
         completed = subprocess.run(
-            [sys.executable, "-I", "-S", "-c", _CHILD_RUNNER],
+            [sys.executable, "-I", "-c", _CHILD_RUNNER],
             input=__import__("json").dumps(cells),
             text=True,
             capture_output=True,
