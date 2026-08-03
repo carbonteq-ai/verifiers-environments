@@ -7,10 +7,11 @@ from collections.abc import Iterable
 from typing import Any, ClassVar, Literal, cast
 
 import verifiers.v1 as vf
+from pydantic import Field
+
 from automationbench.domains import get_available_domains, get_domain_dataset
 from automationbench.rubric.registry import AssertionRegistry
 from automationbench.schema.world import WorldState
-from pydantic import Field
 
 from .api_tools import AutomationBenchApiToolset
 from .limited_tools import (

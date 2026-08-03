@@ -19,16 +19,12 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert pyproject["project"]["name"] == "automationbench-v1"
     assert pyproject["project"]["requires-python"] == ">=3.12,<3.14"
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
-    assert (
-        "carbonteq-automation-bench @ git+https://github.com/carbonteq-ai/AutomationBench.git@"
-        "908db2abd4a868acc37ab0850474bff653bea25c"
-    ) in pyproject["project"]["dependencies"]
-    automation = next(
-        package for package in lock["package"] if package["name"] == "carbonteq-automation-bench"
+    assert not any(
+        "carbonteq-automation-bench" in item for item in pyproject["project"]["dependencies"]
     )
-    assert automation["source"]["git"].endswith(
-        "?rev=908db2abd4a868acc37ab0850474bff653bea25c#908db2abd4a868acc37ab0850474bff653bea25c"
-    )
+    assert (PACKAGE_ROOT / "src/automationbench/schema/world.py").is_file()
+    assert (PACKAGE_ROOT / "src/automationbench/tools/zapier/meta.py").is_file()
+    assert not any(package["name"] == "carbonteq-automation-bench" for package in lock["package"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
         "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"

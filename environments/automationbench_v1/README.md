@@ -13,6 +13,13 @@ maintains the compatibility delta from upstream Zapier commit
 `d54dbebabdba6c6eda201694aee8ddcf36ccfc51`). The package's lock records the
 exact Verifiers commit and resolved dependency graph.
 
+The wheel vendors the CarbonTeq AutomationBench fork at commit
+`908db2abd4a868acc37ab0850474bff653bea25c`. Vendoring keeps this standalone
+Verifiers environment installable without a second VCS dependency and lets
+posttrain job packaging produce one hash-locked runtime closure. The vendored
+source remains under the fork's original `automationbench` import namespace;
+the v1 adapter is the only public environment namespace.
+
 The adapter owns only the v1 boundary:
 
 - typed task data and per-rollout world state;

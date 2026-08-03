@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import verifiers.v1 as vf
-from automationbench.schema.world import WorldState
 
+from automationbench.schema.world import WorldState
 from automationbench_v1.api_tools import AutomationBenchApiToolset
 from automationbench_v1.limited_tools import AutomationBenchLimitedToolset
 from automationbench_v1.scoring import score_world

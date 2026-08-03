@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import Any, get_type_hints
 
 import verifiers.v1 as vf
+
 from automationbench.schema.world import WorldState
 from automationbench.tools import ALL_TOOLS
 

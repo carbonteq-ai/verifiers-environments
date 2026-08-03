@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import verifiers.v1 as vf
+from pydantic import Field
+
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.meta import execute_tool as upstream_execute_tool
 from automationbench.tools.zapier.meta import search_tools as upstream_search_tools
-from pydantic import Field
 
 
 class AutomationBenchState(vf.State):
