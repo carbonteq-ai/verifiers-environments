@@ -21,7 +21,14 @@ process-exit cleanup qualification described by the framework plan.
 The package image is published in the CarbonTeq OCI registry at
 `registry.lan/carbonteq/math-python-v1@sha256:67624f5e71f8a5c89d25bc6c42370eb6e71b8569788aa818e5d3fe8585f15f15`.
 Use this digest, not the publication tag, when an image reference is required.
-The image publication does not remove the remaining success, error, timeout,
-cancellation, and process-exit lifecycle qualification requirement.
+The image publication does not by itself wire the image into a host runtime;
+the release still requires an explicit provider-managed sandbox decision.
+
+The package's bounded subprocess/tool path now has regression coverage for
+success, error, timeout, process exit, state non-commit, and secret filtering.
+The image smoke covers non-root execution and explicit timeout/cancellation
+cleanup. Posttrain currently qualifies this package through the bounded tool
+path; an image-backed Verifiers Docker runtime requires a provider-managed
+sandbox contract and must not be inferred from the image publication alone.
 
 The package remains independent of posttrain and the other environment packages.

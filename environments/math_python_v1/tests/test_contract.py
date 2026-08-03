@@ -8,6 +8,7 @@ import pytest
 import verifiers.v1 as vf
 
 from math_python_v1 import MathPythonConfig, MathPythonTaskset, PythonToolset, PythonToolsetConfig
+from math_python_v1.servers.python import _run_cells
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,6 +74,40 @@ def test_python_tool_replays_cells_and_isolates_state() -> None:
     assert tool.state.cells == ["value = 2", "value + 2"]
     isolated = PythonToolset(PythonToolsetConfig())
     assert asyncio.run(isolated.python("value")).startswith("error:")
+
+
+def test_python_tool_error_does_not_commit_state() -> None:
+    tool = PythonToolset(PythonToolsetConfig())
+
+    assert asyncio.run(tool.python("raise ValueError('bad cell')")).startswith("error:")
+    assert tool.state.cells == []
+    assert len(tool.state.errors) == 1
+
+
+def test_python_child_timeout_is_bounded() -> None:
+    ok, output = _run_cells(["while True: pass"], timeout_seconds=0.05)
+
+    assert not ok
+    assert output == "timed out after 0.05s"
+
+
+def test_python_child_exit_is_reported_without_leaking_state() -> None:
+    ok, output = _run_cells(["__import__('os')._exit(17)"], timeout_seconds=1)
+
+    assert not ok
+    assert output == "child exited with status 17"
+
+
+def test_python_child_receives_only_safe_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MATH_PYTHON_TEST_SECRET", "must-not-cross-boundary")
+
+    ok, output = _run_cells(
+        ["print(__import__('os').environ.get('MATH_PYTHON_TEST_SECRET', 'absent'))"],
+        timeout_seconds=1,
+    )
+
+    assert ok
+    assert output == "absent\nNone"
 
 
 def test_balanced_order_is_deterministic_and_type_round_robin(monkeypatch: pytest.MonkeyPatch) -> None:
