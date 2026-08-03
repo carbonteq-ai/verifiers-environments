@@ -11,7 +11,7 @@ Each directory below is a standalone Python project with its own package metadat
 | `environments/mmlu_pro_v1` | `mmlu-pro-v1` | pinned Hub implementation; reference qualification pending |
 | `environments/ifeval_v1` | `ifeval-v1` | deterministic checker implementation; reference qualification pending |
 | `environments/reasoning_gym_v1` | `reasoning-gym-v1` | pinned procedural generator implementation; balanced qualification pending |
-| `environments/math_python_v1` | `math-python-v1` | pinned MATH loader and bounded Python tool; image/live sandbox gate pending |
+| `environments/math_python_v1` | `math-python-v1` | pinned MATH loader and bounded Python tool; CarbonTeq OCI image published, lifecycle gate pending |
 
 GSM8K and MMLU-Pro load exact Hugging Face revisions and carry source row
 digests in task data. IFEval uses a typed deterministic port of Google's
