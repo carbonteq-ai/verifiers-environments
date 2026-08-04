@@ -61,6 +61,7 @@ def test_boxed_math_verification_and_task_scoped_toolset(monkeypatch: pytest.Mon
     assert task.data.answer == "4"
     assert task.data.system_prompt is not None
     assert "\\boxed{...}" in task.data.system_prompt
+    assert "Do not repeat" in task.data.system_prompt
     assert task.data.source_revision == "0530c78699ea5e8eb5530600900e1f328b48acad"
     assert task.tools == (PythonToolset,)
     assert state_cls(type(task)) is PythonState

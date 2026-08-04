@@ -16,8 +16,9 @@ from math_python_v1.servers import PythonState, PythonToolset, PythonToolsetConf
 MATH_REPOSITORY = "DigitalLearningGmbH/MATH-lighteval"
 MATH_REVISION = "0530c78699ea5e8eb5530600900e1f328b48acad"
 MATH_SYSTEM_PROMPT = (
-    "Solve the problem step by step. You may use the Python tool to check your work. "
-    "Put the final answer inside \\boxed{...}."
+    "Solve the problem with concise, essential reasoning. Do not repeat or re-check a completed "
+    "derivation. Use the Python tool early when it is useful. Put the final answer inside "
+    "\\boxed{...}."
 )
 
 
