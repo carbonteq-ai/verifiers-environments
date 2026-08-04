@@ -105,3 +105,7 @@ class PythonToolset(vf.Toolset[PythonToolsetConfig, PythonState]):
 
 
 __all__ = ["PythonState", "PythonToolset", "PythonToolsetConfig"]
+
+
+if __name__ == "__main__":
+    PythonToolset.run()

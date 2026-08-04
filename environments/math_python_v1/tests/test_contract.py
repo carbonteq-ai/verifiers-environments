@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
+import sys
+import time
 import tomllib
 from pathlib import Path
 
@@ -108,6 +112,31 @@ def test_python_child_receives_only_safe_environment(monkeypatch: pytest.MonkeyP
 
     assert ok
     assert output == "absent\nNone"
+
+
+def test_python_tool_server_module_reports_its_port(tmp_path: Path) -> None:
+    port_file = tmp_path / "mcp-port"
+    env = {
+        **os.environ,
+        "MCP_PORT_FILE": str(port_file),
+        "VF_CONFIG": PythonToolsetConfig().model_dump_json(),
+    }
+    process = subprocess.Popen(
+        [sys.executable, "-m", "math_python_v1.servers.python"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not port_file.is_file() and process.poll() is None:
+            time.sleep(0.05)
+        assert process.poll() is None, process.stderr.read() if process.stderr is not None else ""
+        assert port_file.read_text(encoding="utf-8").strip().isdigit()
+    finally:
+        process.terminate()
+        process.wait(timeout=10)
 
 
 def test_balanced_order_is_deterministic_and_type_round_robin(
