@@ -16,9 +16,10 @@ from math_python_v1.servers import PythonState, PythonToolset, PythonToolsetConf
 MATH_REPOSITORY = "DigitalLearningGmbH/MATH-lighteval"
 MATH_REVISION = "0530c78699ea5e8eb5530600900e1f328b48acad"
 MATH_SYSTEM_PROMPT = (
-    "Solve the problem with concise, essential reasoning. Do not repeat or re-check a completed "
-    "derivation. Use the Python tool early when it is useful. Put the final answer inside "
-    "\\boxed{...}."
+    "Solve the problem with concise, essential reasoning. Keep the reasoning under 2,000 words. "
+    "Use the Python tool within the first 1,000 words when it is useful. Once you have a candidate "
+    "answer, verify it at most once, stop immediately, and put the final answer inside "
+    "\\boxed{...}. Never repeat a completed derivation."
 )
 
 
