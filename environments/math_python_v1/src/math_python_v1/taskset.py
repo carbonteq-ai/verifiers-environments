@@ -11,10 +11,14 @@ import verifiers.v1 as vf
 from datasets import load_dataset
 from pydantic import Field
 
-from math_python_v1.servers import PythonToolset, PythonToolsetConfig
+from math_python_v1.servers import PythonState, PythonToolset, PythonToolsetConfig
 
 MATH_REPOSITORY = "DigitalLearningGmbH/MATH-lighteval"
 MATH_REVISION = "0530c78699ea5e8eb5530600900e1f328b48acad"
+MATH_SYSTEM_PROMPT = (
+    "Solve the problem step by step. You may use the Python tool to check your work. "
+    "Put the final answer inside \\boxed{...}."
+)
 
 
 def _boxed_answer(solution: str) -> str:
@@ -39,7 +43,7 @@ class MathPythonTaskConfig(vf.TaskConfig):
     python_tool: PythonToolsetConfig = Field(default_factory=PythonToolsetConfig)
 
 
-class MathPythonTask(vf.Task[MathPythonData, vf.State, vf.TaskConfig]):
+class MathPythonTask(vf.Task[MathPythonData, PythonState, MathPythonTaskConfig]):
     tools = (cast(type[vf.Toolset], PythonToolset),)
 
     def _verification(self, trace: vf.Trace) -> float:
@@ -74,7 +78,10 @@ class MathPythonConfig(vf.TasksetConfig):
     python_tool: PythonToolsetConfig = Field(default_factory=PythonToolsetConfig)
 
 
-class MathPythonTaskset(vf.Taskset[MathPythonTask, MathPythonConfig]):
+# Verifiers' Taskset bound keeps State invariant even though runtime state specialization is valid.
+class MathPythonTaskset(
+    vf.Taskset[MathPythonTask, MathPythonConfig]  # pyright: ignore[reportInvalidTypeArguments]
+):
     def load(self) -> Iterable[MathPythonTask]:
         if self.config.repository != MATH_REPOSITORY or self.config.revision != MATH_REVISION:
             raise ValueError(
@@ -130,6 +137,7 @@ class MathPythonTaskset(vf.Taskset[MathPythonTask, MathPythonConfig]):
                 idx=idx,
                 name=f"{self.config.split}:{idx}",
                 prompt=problem,
+                system_prompt=MATH_SYSTEM_PROMPT,
                 answer=answer,
                 solution=solution,
                 level=level,
@@ -145,6 +153,7 @@ class MathPythonTaskset(vf.Taskset[MathPythonTask, MathPythonConfig]):
 __all__ = [
     "MATH_REPOSITORY",
     "MATH_REVISION",
+    "MATH_SYSTEM_PROMPT",
     "MathPythonConfig",
     "MathPythonData",
     "MathPythonTask",

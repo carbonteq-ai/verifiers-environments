@@ -10,8 +10,15 @@ from pathlib import Path
 
 import pytest
 import verifiers.v1 as vf
+from verifiers.v1.state import state_cls
 
-from math_python_v1 import MathPythonConfig, MathPythonTaskset, PythonToolset, PythonToolsetConfig
+from math_python_v1 import (
+    MathPythonConfig,
+    MathPythonTaskset,
+    PythonState,
+    PythonToolset,
+    PythonToolsetConfig,
+)
 from math_python_v1.servers.python import _run_cells
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -52,8 +59,11 @@ def test_boxed_math_verification_and_task_scoped_toolset(monkeypatch: pytest.Mon
 
     [task] = environment.taskset.select(1)
     assert task.data.answer == "4"
+    assert task.data.system_prompt is not None
+    assert "\\boxed{...}" in task.data.system_prompt
     assert task.data.source_revision == "0530c78699ea5e8eb5530600900e1f328b48acad"
     assert task.tools == (PythonToolset,)
+    assert state_cls(type(task)) is PythonState
     [tool_server] = task.tool_servers()
     assert isinstance(tool_server, PythonToolset)
 
