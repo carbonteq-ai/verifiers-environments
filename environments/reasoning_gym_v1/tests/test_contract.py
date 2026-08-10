@@ -6,7 +6,12 @@ from pathlib import Path
 
 import verifiers.v1 as vf
 
-from reasoning_gym_v1 import DEFAULT_GENERATORS, ReasoningGymConfig, ReasoningGymTaskset
+from reasoning_gym_v1 import (
+    DEFAULT_GENERATORS,
+    REASONING_GYM_SYSTEM_PROMPT,
+    ReasoningGymConfig,
+    ReasoningGymTaskset,
+)
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,6 +54,9 @@ def test_declarative_env_config_discovers_balanced_tasks_and_native_scores() -> 
         task.data.source_commit == "49b07130b3fcd12f2d064bba7c43869543a0e7e7" for task in tasks
     )
     assert len({task.data.row_digest for task in tasks}) == len(tasks)
+    assert all(task.data.system_prompt == REASONING_GYM_SYSTEM_PROMPT for task in tasks)
+    assert "verify it at most once" in REASONING_GYM_SYSTEM_PROMPT
+    assert "Never repeat" in REASONING_GYM_SYSTEM_PROMPT
 
     task = tasks[0]
     trace = vf.Trace(task=vf.TraceTask(type=type(task).__name__, data=task.data))

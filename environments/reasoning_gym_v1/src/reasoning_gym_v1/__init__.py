@@ -3,6 +3,7 @@
 from .taskset import (
     DEFAULT_GENERATORS,
     REASONING_GYM_COMMIT,
+    REASONING_GYM_SYSTEM_PROMPT,
     ReasoningGymConfig,
     ReasoningGymData,
     ReasoningGymTask,
@@ -13,6 +14,7 @@ from .taskset import (
 __all__ = [
     "DEFAULT_GENERATORS",
     "REASONING_GYM_COMMIT",
+    "REASONING_GYM_SYSTEM_PROMPT",
     "ReasoningGymConfig",
     "ReasoningGymData",
     "ReasoningGymTask",

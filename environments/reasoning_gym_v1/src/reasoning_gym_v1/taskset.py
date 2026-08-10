@@ -13,6 +13,12 @@ from pydantic import Field, field_validator
 import reasoning_gym
 
 REASONING_GYM_COMMIT = "49b07130b3fcd12f2d064bba7c43869543a0e7e7"
+REASONING_GYM_SYSTEM_PROMPT = (
+    "Solve the problem with concise, essential reasoning. Follow any answer-format instructions in "
+    "the problem exactly. Once you have a candidate answer, verify it at most once, stop immediately, "
+    "and provide the final answer. Never repeat a completed derivation or continue reasoning after the "
+    "answer is known."
+)
 DEFAULT_GENERATORS = (
     "leg_counting",
     "products",
@@ -116,6 +122,7 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
                 "seed": self.config.seed_start,
                 "ordinal": generator_index,
                 "question": prompt,
+                "system_prompt": REASONING_GYM_SYSTEM_PROMPT,
                 "answer": answer_text,
                 "metadata": metadata,
                 "source_commit": REASONING_GYM_COMMIT,
@@ -129,6 +136,7 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
                 idx=ordinal,
                 name=f"{self.config.split}:{generator}:{generator_index}",
                 prompt=prompt,
+                system_prompt=REASONING_GYM_SYSTEM_PROMPT,
                 generator=generator,
                 seed=self.config.seed_start,
                 ordinal=generator_index,
@@ -146,6 +154,7 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
 __all__ = [
     "DEFAULT_GENERATORS",
     "REASONING_GYM_COMMIT",
+    "REASONING_GYM_SYSTEM_PROMPT",
     "ReasoningGymConfig",
     "ReasoningGymData",
     "ReasoningGymTask",

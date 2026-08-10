@@ -9,7 +9,11 @@ ten declared generators: `leg_counting`, `products`, `letter_counting`,
 `number_sorting`, `knights_knaves`, `syllogism`, `shortest_path`, `graph_color`,
 `countdown`, and `zebra_puzzles`. Train and evaluation use disjoint seed
 namespaces, and each task records its generator, seed, source commit, and row
-digest in `TaskData`.
+digest in `TaskData`. Every task also carries a bounded-reasoning system prompt:
+follow the generator's requested answer format, verify a candidate at most
+once, stop when the answer is known, and never repeat a completed derivation.
+This keeps long-thinking policies from turning simple procedural tasks into
+length-truncated, untrainable rollouts without changing native scoring.
 
 The wheel vendors the pinned `reasoning_gym` source at that commit. This keeps
 the v1 package independently installable and gives posttrain job packaging a
