@@ -31,4 +31,12 @@ cleanup. Posttrain currently qualifies this package through the bounded tool
 path; an image-backed Verifiers Docker runtime requires a provider-managed
 sandbox contract and must not be inferred from the image publication alone.
 
+Task selection can filter exact MATH `level` and `type` values before applying
+the deterministic type-balanced order. This supports policy-relative
+qualification strata such as Levels 2–4 without changing the held-out source
+revision or relying on a fragile contiguous row range.
+Rows without the terminal boxed answer required by the symbolic verifier are
+excluded before ordering, so a malformed source row cannot fail a job after it
+has already started.
+
 The package remains independent of posttrain and the other environment packages.

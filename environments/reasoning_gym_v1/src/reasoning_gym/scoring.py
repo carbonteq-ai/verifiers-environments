@@ -128,9 +128,9 @@ def _mathrm_to_text(s: str) -> str:
 
 def cascade_score(
     answer: str,
-    expected: str,
+    expected: str | None,
     dataset: Optional["ProceduralDataset"] = None,
-    entry: Optional[dict[str, Any]] = None,
+    entry: dict[str, Any] | None = None,
 ) -> float:
     """Apply the multi-step scoring cascade.
 
@@ -143,7 +143,7 @@ def cascade_score(
 
     Args:
         answer:   The model's predicted answer string.
-        expected: The gold / oracle answer string.
+        expected: The gold / oracle answer string, when the task has one.
         dataset:  Optional :class:`ProceduralDataset` whose ``score_answer``
                   should be tried first.
         entry:    The dataset entry dict (must contain at least ``"answer"``).
@@ -174,6 +174,12 @@ def cascade_score(
                 best = max(best, score)
             except Exception:
                 pass
+
+    # Structured-answer tasks can keep their oracle entirely in metadata. In
+    # that case the dataset-native verifier above is authoritative and there is
+    # no textual value on which the generic fallback matchers can operate.
+    if not isinstance(expected, str):
+        return best
 
     # Steps 2-5: string / float / math cascade
     for score in (

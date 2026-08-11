@@ -15,6 +15,22 @@ once, stop when the answer is known, and never repeat a completed derivation.
 This keeps long-thinking policies from turning simple procedural tasks into
 length-truncated, untrainable rollouts without changing native scoring.
 
+Scoring always gives the selected generator's native verifier first authority.
+Generators such as `graph_color` keep a structured oracle in task metadata
+rather than a textual `answer`; for those tasks the cascade returns the native
+score and does not apply string, numeric, or symbolic fallback matchers. This
+preserves valid JSON-solution tasks without inventing a string oracle.
+
+Binary syllogisms use a strict terminal-decision verifier. Reasoning may precede
+the answer, but the response must end in one unambiguous `Yes` or `No`; merely
+mentioning an oracle label no longer earns length-dependent partial credit.
+
+Online-RL curricula can select `reward_mode: boxed_exact`. In that mode the
+task prompt requires one final `\\boxed{...}` answer, only the box is passed to
+the generator's native verifier, and native partial scores are reduced to an
+exact `0` or `1`. This prevents explanation length and incidental oracle text
+from becoming reward components while preserving each generator's verifier.
+
 The wheel vendors the pinned `reasoning_gym` source at that commit. This keeps
 the v1 package independently installable and gives posttrain job packaging a
 portable, hash-locked dependency closure instead of a nested VCS requirement.

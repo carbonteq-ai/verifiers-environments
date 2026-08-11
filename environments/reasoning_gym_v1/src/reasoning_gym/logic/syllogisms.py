@@ -1,5 +1,6 @@
 """Syllogism reasoning task generator"""
 
+import re
 from dataclasses import dataclass
 from random import Random
 from typing import Optional
@@ -445,6 +446,27 @@ class SyllogismDataset(ProceduralDataset):
         """Generate a single syllogism task"""
         rng = Random(self.seed + idx)
         return self._generate_syllogism(rng, idx)
+
+    def score_answer(self, answer: Optional[str], entry: dict) -> float:
+        """Score the explicit terminal Yes/No decision.
+
+        The generic decimal scorer gives partial credit whenever the oracle
+        string occurs anywhere in a response.  For a binary logic task that is
+        exploitable (for example, ``"Yes No"`` earns credit for both labels)
+        and turns response length into an unintended reward component.  Keep
+        free-form reasoning, but require its final decision to be unambiguous.
+        """
+        if not isinstance(answer, str):
+            return 0.0
+        match = re.search(
+            r"(?i)(?:^|[\n.!?]\s+|\banswer\s*[:=-]\s*|\\boxed\s*\{\s*)"
+            r"\**(yes|no)\**\s*\}?\s*[.!?]?\s*$",
+            answer,
+        )
+        if match is None:
+            return 0.0
+        expected = entry.get("answer")
+        return 1.0 if isinstance(expected, str) and match.group(1).casefold() == expected.casefold() else 0.0
 
 
 class SyllogismCurriculum(BaseCurriculum):

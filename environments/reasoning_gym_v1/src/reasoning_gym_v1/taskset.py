@@ -19,6 +19,11 @@ REASONING_GYM_SYSTEM_PROMPT = (
     "and provide the final answer. Never repeat a completed derivation or continue reasoning after the "
     "answer is known."
 )
+REASONING_GYM_BOXED_SYSTEM_PROMPT = (
+    "Solve the problem with concise, essential reasoning. Verify a candidate answer at most once and "
+    "stop when the answer is known. End with exactly one final answer inside \\boxed{...}; keep all "
+    "reasoning outside the box and never put multiple candidate answers in it."
+)
 DEFAULT_GENERATORS = (
     "leg_counting",
     "products",
@@ -31,6 +36,17 @@ DEFAULT_GENERATORS = (
     "countdown",
     "zebra_puzzles",
 )
+COLDSTART_CANDIDATE_GENERATORS = (
+    "basic_arithmetic",
+    "chain_sum",
+    "fraction_simplification",
+    "base_conversion",
+    "prime_factorization",
+    "simple_equations",
+    "propositional_logic",
+    "calendar_arithmetic",
+)
+SUPPORTED_GENERATORS = DEFAULT_GENERATORS + COLDSTART_CANDIDATE_GENERATORS
 
 
 class ReasoningGymData(vf.TaskData):
@@ -49,6 +65,7 @@ class ReasoningGymTaskConfig(vf.TaskConfig):
     generator: str
     generator_config: dict[str, Any] = Field(default_factory=dict)
     source_commit: str = REASONING_GYM_COMMIT
+    reward_mode: Literal["native", "boxed_exact"] = "native"
 
 
 class ReasoningGymTask(vf.Task[ReasoningGymData, vf.State, vf.TaskConfig]):
@@ -62,7 +79,14 @@ class ReasoningGymTask(vf.Task[ReasoningGymData, vf.State, vf.TaskConfig]):
     def _score(self, trace: vf.Trace) -> float:
         dataset = self._dataset()
         entry = {"answer": self.data.answer, "metadata": self.data.metadata}
-        return float(dataset.score_answer_cascade(trace.last_reply, entry))
+        task_config = cast(ReasoningGymTaskConfig, self.config)
+        answer = trace.last_reply
+        if task_config.reward_mode == "boxed_exact":
+            answer = vf.extract_boxed_answer(answer, strict=True).strip()
+            if not answer:
+                return 0.0
+            return float(dataset.score_answer_cascade(answer, entry) >= 0.99)
+        return float(dataset.score_answer_cascade(answer, entry))
 
     @vf.metric
     async def native_score(self, trace: vf.Trace) -> float:
@@ -82,13 +106,14 @@ class ReasoningGymConfig(vf.TasksetConfig):
     train_seed_start: int = Field(default=0, ge=0, le=2**32 - 1)
     eval_seed_start: int = Field(default=1_000_000, ge=0, le=2**32 - 1)
     difficulty: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    reward_mode: Literal["native", "boxed_exact"] = "native"
 
     @field_validator("generators")
     @classmethod
     def _validate_generators(cls, values: tuple[str, ...]) -> tuple[str, ...]:
         if not values:
             raise ValueError("generators must contain at least one generator")
-        unknown = sorted(set(values) - set(DEFAULT_GENERATORS))
+        unknown = sorted(set(values) - set(SUPPORTED_GENERATORS))
         if unknown:
             raise ValueError(f"unsupported generators: {unknown}")
         if len(set(values)) != len(values):
@@ -108,6 +133,11 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
         return reasoning_gym.create_dataset(generator, **config)
 
     def load(self) -> Iterable[ReasoningGymTask]:
+        system_prompt = (
+            REASONING_GYM_BOXED_SYSTEM_PROMPT
+            if self.config.reward_mode == "boxed_exact"
+            else REASONING_GYM_SYSTEM_PROMPT
+        )
         datasets = {name: self._dataset(name) for name in self.config.generators}
         for ordinal in range(self.config.examples_per_generator * len(self.config.generators)):
             generator = self.config.generators[ordinal % len(self.config.generators)]
@@ -122,7 +152,7 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
                 "seed": self.config.seed_start,
                 "ordinal": generator_index,
                 "question": prompt,
-                "system_prompt": REASONING_GYM_SYSTEM_PROMPT,
+                "system_prompt": system_prompt,
                 "answer": answer_text,
                 "metadata": metadata,
                 "source_commit": REASONING_GYM_COMMIT,
@@ -136,7 +166,7 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
                 idx=ordinal,
                 name=f"{self.config.split}:{generator}:{generator_index}",
                 prompt=prompt,
-                system_prompt=REASONING_GYM_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 generator=generator,
                 seed=self.config.seed_start,
                 ordinal=generator_index,
@@ -147,14 +177,18 @@ class ReasoningGymTaskset(vf.Taskset[ReasoningGymTask, ReasoningGymConfig]):
             task_config = ReasoningGymTaskConfig(
                 generator=generator,
                 generator_config=self.config.difficulty.get(generator, {}),
+                reward_mode=self.config.reward_mode,
             )
             yield ReasoningGymTask(data, task_config)
 
 
 __all__ = [
+    "COLDSTART_CANDIDATE_GENERATORS",
     "DEFAULT_GENERATORS",
+    "REASONING_GYM_BOXED_SYSTEM_PROMPT",
     "REASONING_GYM_COMMIT",
     "REASONING_GYM_SYSTEM_PROMPT",
+    "SUPPORTED_GENERATORS",
     "ReasoningGymConfig",
     "ReasoningGymData",
     "ReasoningGymTask",

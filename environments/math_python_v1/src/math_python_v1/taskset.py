@@ -9,7 +9,7 @@ from typing import Literal, cast
 
 import verifiers.v1 as vf
 from datasets import load_dataset
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from math_python_v1.servers import PythonState, PythonToolset, PythonToolsetConfig
 
@@ -77,7 +77,18 @@ class MathPythonConfig(vf.TasksetConfig):
     num_tasks: int = Field(default=100, ge=1, le=12_500)
     order_seed: int = Field(default=0, ge=0)
     balance_by_type: bool = False
+    levels: tuple[str, ...] = ()
+    problem_types: tuple[str, ...] = ()
     python_tool: PythonToolsetConfig = Field(default_factory=PythonToolsetConfig)
+
+    @field_validator("levels", "problem_types")
+    @classmethod
+    def _unique_nonempty_values(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not value.strip() for value in values):
+            raise ValueError("filters must not contain empty values")
+        if len(set(values)) != len(values):
+            raise ValueError("filters must not contain duplicates")
+        return values
 
 
 # Verifiers' Taskset bound keeps State invariant even though runtime state specialization is valid.
@@ -95,11 +106,32 @@ class MathPythonTaskset(
             revision=self.config.revision,
             split=self.config.split,
         )
-        indices = list(range(len(rows)))
+        indices: list[int] = []
+        for idx, row in enumerate(rows):
+            row_map = cast(Mapping[str, object], row)
+            level_matches = (
+                not self.config.levels or str(row_map.get("level", "")) in self.config.levels
+            )
+            type_matches = (
+                not self.config.problem_types
+                or str(row_map.get("type", "")) in self.config.problem_types
+            )
+            if not (level_matches and type_matches):
+                continue
+            # Selection is a reliability boundary: a source row without the
+            # verifier's required terminal answer must never make an otherwise
+            # valid long-running job fail when the row is reached later.
+            try:
+                _boxed_answer(str(row_map.get("solution", "")))
+            except ValueError:
+                continue
+            indices.append(idx)
+        if not indices:
+            raise ValueError("MATH filters selected no rows")
         if self.config.balance_by_type:
             groups: dict[str, list[int]] = {}
-            for idx, row in enumerate(rows):
-                row_map = cast(Mapping[str, object], row)
+            for idx in indices:
+                row_map = cast(Mapping[str, object], rows[idx])
                 groups.setdefault(str(row_map.get("type", "")), []).append(idx)
             for group in groups.values():
                 group.sort(

@@ -178,3 +178,66 @@ def test_balanced_order_is_deterministic_and_type_round_robin(
         "Geometry",
     ]
     assert (PACKAGE_ROOT / "images" / "math-python" / "Containerfile").is_file()
+
+
+def test_level_and_type_filters_apply_before_balanced_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {
+            "problem": f"p{idx}",
+            "solution": f"\\boxed{{{idx}}}",
+            "level": level,
+            "type": kind,
+        }
+        for idx, (level, kind) in enumerate(
+            (
+                ("Level 1", "Algebra"),
+                ("Level 2", "Algebra"),
+                ("Level 3", "Geometry"),
+                ("Level 4", "Algebra"),
+                ("Level 5", "Geometry"),
+            )
+        )
+    ]
+    monkeypatch.setattr("math_python_v1.taskset.load_dataset", lambda *args, **kwargs: rows)
+
+    tasks = list(
+        MathPythonTaskset(
+            MathPythonConfig(
+                num_tasks=3,
+                levels=("Level 2", "Level 3", "Level 4"),
+                problem_types=("Algebra", "Geometry"),
+                balance_by_type=True,
+                order_seed=7,
+            )
+        ).load()
+    )
+
+    assert {task.data.level for task in tasks} == {"Level 2", "Level 3", "Level 4"}
+    assert [task.data.problem_type for task in tasks] == ["Algebra", "Geometry", "Algebra"]
+    assert {task.data.idx for task in tasks} == {1, 2, 3}
+
+
+def test_selection_excludes_rows_without_a_boxed_ground_truth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {
+            "problem": "invalid",
+            "solution": "no terminal answer",
+            "level": "Level 2",
+            "type": "Algebra",
+        },
+        {"problem": "valid", "solution": "\\boxed{2}", "level": "Level 2", "type": "Algebra"},
+    ]
+    monkeypatch.setattr("math_python_v1.taskset.load_dataset", lambda *args, **kwargs: rows)
+
+    [task] = list(
+        MathPythonTaskset(
+            MathPythonConfig(num_tasks=1, levels=("Level 2",)),
+        ).load()
+    )
+
+    assert task.data.idx == 1
+    assert task.data.answer == "2"
