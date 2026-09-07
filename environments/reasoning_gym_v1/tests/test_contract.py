@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import cast
 
 import verifiers.v1 as vf
+from verifiers.v1.utils.loaders import load_environment, resolve_env_config
 
 from reasoning_gym_v1 import (
     COLDSTART_CANDIDATE_GENERATORS,
@@ -34,26 +35,26 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert (PACKAGE_ROOT / "src/reasoning_gym/factory.py").is_file()
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"
+        "?rev=b2e4e8157783b2c0dffc7821044c87f29f1c3ccf#b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
     )
 
 
 def test_declarative_env_config_discovers_balanced_tasks_and_native_scores() -> None:
-    config = vf.EnvConfig.model_validate(
+    config = resolve_env_config(
         {
             "taskset": {
                 "id": "reasoning-gym-v1",
                 "split": "eval",
                 "examples_per_generator": 1,
             },
-            "harness": {"id": "null", "runtime": {"type": "subprocess"}},
+            "agent": {"harness": {"id": "null"}, "runtime": {"type": "subprocess"}},
         }
     )
-    environment = vf.Environment(config)
+    environment = load_environment(config)
     assert isinstance(environment.taskset, ReasoningGymTaskset)
     assert isinstance(environment.taskset.config, ReasoningGymConfig)
 
-    tasks = environment.taskset.select(len(DEFAULT_GENERATORS))
+    tasks = list(environment.taskset.load())[: len(DEFAULT_GENERATORS)]
     assert [task.data.generator for task in tasks] == list(DEFAULT_GENERATORS)
     assert all(
         task.data.source_commit == "49b07130b3fcd12f2d064bba7c43869543a0e7e7" for task in tasks
@@ -64,9 +65,16 @@ def test_declarative_env_config_discovers_balanced_tasks_and_native_scores() -> 
     assert "Never repeat" in REASONING_GYM_SYSTEM_PROMPT
 
     task = tasks[0]
-    trace = vf.Trace(task=vf.TraceTask(type=type(task).__name__, data=task.data))
+    trace = vf.Trace(
+        agent=vf.AgentInfo(config=vf.AgentConfig()),
+        task=vf.TraceTask(type=type(task).__name__, data=task.data),
+    )
     asyncio.run(task.score(trace))
-    assert trace.rewards["native_reward"] == 0.0
+    assert trace.reward == 0.0
+    reward = trace.rewards["native_reward"]
+    assert reward is not None
+    assert reward.score == 0.0
+    assert reward.weight == 1.0
     assert trace.metrics["native_score"] == 0.0
 
 
@@ -81,7 +89,7 @@ def test_structured_answer_task_uses_native_scorer_without_text_oracle() -> None
     taskset = ReasoningGymTaskset(
         ReasoningGymConfig(split="train", generators=("graph_color",), examples_per_generator=1)
     )
-    task = taskset.select(1)[0]
+    task = next(iter(taskset.load()))
     valid_answer = json.dumps(task.data.metadata["possible_answer"])
 
     valid_trace = cast(vf.Trace, SimpleNamespace(last_reply=valid_answer))
@@ -96,7 +104,7 @@ def test_syllogism_scores_only_the_terminal_yes_no_decision() -> None:
     taskset = ReasoningGymTaskset(
         ReasoningGymConfig(split="train", generators=("syllogism",), examples_per_generator=1)
     )
-    task = taskset.select(1)[0]
+    task = next(iter(taskset.load()))
     expected = task.data.answer
     assert expected in {"Yes", "No"}
     incorrect = "No" if expected == "Yes" else "Yes"
@@ -125,7 +133,7 @@ def test_boxed_exact_mode_requires_one_exact_final_answer() -> None:
             reward_mode="boxed_exact",
         )
     )
-    task = taskset.select(1)[0]
+    task = next(iter(taskset.load()))
     expected = task.data.answer
     assert isinstance(expected, str)
     assert "chain_sum" in COLDSTART_CANDIDATE_GENERATORS
@@ -147,7 +155,7 @@ def test_coldstart_candidate_bank_is_deterministic_and_boxed() -> None:
         examples_per_generator=1,
         reward_mode="boxed_exact",
     )
-    tasks = ReasoningGymTaskset(config).select(len(COLDSTART_CANDIDATE_GENERATORS))
+    tasks = list(ReasoningGymTaskset(config).load())[: len(COLDSTART_CANDIDATE_GENERATORS)]
 
     assert tuple(task.data.generator for task in tasks) == COLDSTART_CANDIDATE_GENERATORS
     assert len({task.data.row_digest for task in tasks}) == len(tasks)

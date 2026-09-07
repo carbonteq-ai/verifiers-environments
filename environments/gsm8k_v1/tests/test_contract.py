@@ -32,7 +32,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"
+        "?rev=b2e4e8157783b2c0dffc7821044c87f29f1c3ccf#b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
     )
 
 
@@ -120,12 +120,19 @@ def test_reward_and_gold_validation_use_runtime_verifier(monkeypatch: pytest.Mon
     [task] = GSM8KTaskset(
         GSM8KConfig(dataset_repo="fixture/gsm8k", dataset_revision="a" * 40)
     ).load()
-    trace = vf.Trace(task=vf.TraceTask(type=type(task).__name__, data=task.data))
+    trace = vf.Trace(
+        agent=vf.AgentInfo(config=vf.AgentConfig()),
+        task=vf.TraceTask(type=type(task).__name__, data=task.data),
+    )
     runtime = FakeRuntime()
 
     asyncio.run(task.score(trace, runtime=cast(vf.Runtime, runtime)))
 
-    assert trace.rewards == {"correct": 1.0}
+    assert trace.reward == 1.0
+    reward = trace.rewards["correct"]
+    assert reward is not None
+    assert reward.score == 1.0
+    assert reward.weight == 1.0
     assert asyncio.run(task.validate(cast(vf.Runtime, runtime)))
     assert len(runtime.calls) == 2
     assert runtime.calls[0][1] == ["2", ""]

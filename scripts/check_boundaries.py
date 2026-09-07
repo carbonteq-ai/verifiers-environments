@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENVIRONMENTS = ROOT / "environments"
-VERIFIERS_REVISION = "284a868d6a9022109b749710672a0460e8a996d4"
+VERIFIERS_REVISION = "b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
 PACKAGES = {
     "gsm8k_v1": "gsm8k-v1",
     "automationbench_v1": "automationbench-v1",

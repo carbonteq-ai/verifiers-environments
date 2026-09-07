@@ -48,6 +48,11 @@ class MathPythonTaskConfig(vf.TaskConfig):
 class MathPythonTask(vf.Task[MathPythonData, PythonState, MathPythonTaskConfig]):
     tools = (cast(type[vf.Toolset], PythonToolset),)
 
+    @classmethod
+    def toolsets(cls, config: MathPythonTaskConfig) -> list[vf.Toolset]:
+        """Construct the task-scoped Python runtime through the native v0.3 API."""
+        return cast(list[vf.Toolset], [PythonToolset(config.python_tool)])
+
     def _verification(self, trace: vf.Trace) -> float:
         task_config = cast(MathPythonTaskConfig, self.config)
         return vf.verify_boxed_math_answer(

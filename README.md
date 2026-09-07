@@ -7,7 +7,7 @@ Each directory below is a standalone Python project with its own package metadat
 | Project | Distribution | Status |
 | --- | --- | --- |
 | `environments/gsm8k_v1` | `gsm8k-v1` | pinned Hub implementation; framework/live qualification complete |
-| `environments/automationbench_v1` | `automationbench-v1` | native adapter migrated; live parity qualification complete |
+| `environments/automationbench_v1` | `automationbench-v1` | v0.3.1 migration and episode judge candidate; immutable live qualification pending |
 | `environments/mmlu_pro_v1` | `mmlu-pro-v1` | pinned Hub implementation; reference qualification complete |
 | `environments/ifeval_v1` | `ifeval-v1` | deterministic checker implementation; reference qualification complete |
 | `environments/reasoning_gym_v1` | `reasoning-gym-v1` | pinned procedural generator implementation; balanced qualification complete |

@@ -66,6 +66,7 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     tools: vf.ToolsetConfig = Field(default_factory=vf.ToolsetConfig)
     toolset: Literal["zapier", "limited_zapier", "api"] = "zapier"
     search_top_k: int = 20
+    allowed_tools: tuple[str, ...] = ()
 
 
 class AutomationBenchTask(
@@ -76,18 +77,29 @@ class AutomationBenchTask(
     )
 
     def tool_servers(self) -> list[vf.Toolset]:
-        task_config = cast(AutomationBenchTaskConfig, self.config)
+        """Legacy runtime entry point retained during the native API migration."""
+        return self.toolsets(
+            AutomationBenchTaskConfig.model_validate(
+                {
+                    **self.config.model_dump(),
+                    "allowed_tools": self.data.zapier_tools,
+                }
+            )
+        )
+
+    @classmethod
+    def toolsets(cls, task_config: AutomationBenchTaskConfig) -> list[vf.Toolset]:
         if task_config.toolset == "api":
             return cast(list[vf.Toolset], [AutomationBenchApiToolset(task_config.tools)])
         if task_config.toolset == "limited_zapier":
             limited_config = AutomationBenchLimitedToolsetConfig.model_validate(
                 {
                     **task_config.tools.model_dump(mode="python"),
-                    "allowed_tools": self.data.zapier_tools,
+                    "allowed_tools": task_config.allowed_tools,
                 }
             )
             return cast(list[vf.Toolset], [AutomationBenchLimitedToolset(limited_config)])
-        return super().tool_servers()
+        return cast(list[vf.Toolset], [AutomationBenchToolset(task_config.tools)])
 
     async def setup(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         del runtime
@@ -145,6 +157,7 @@ class AutomationBenchTask(
 
 class AutomationBenchConfig(vf.TasksetConfig):
     domains: list[Domain] = Field(default_factory=lambda: ["simple"])
+    task_names: list[str] = Field(default_factory=list)
     task: AutomationBenchTaskConfig = Field(default_factory=AutomationBenchTaskConfig)
 
 
@@ -154,6 +167,10 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
         unknown = set(self.config.domains) - available
         if unknown:
             raise ValueError(f"unknown AutomationBench domains: {', '.join(sorted(unknown))}")
+        requested_names = self.config.task_names
+        if len(requested_names) != len(set(requested_names)):
+            raise ValueError("AutomationBench task_names must be unique")
+        requested = set(requested_names)
         tasks: list[AutomationBenchTask] = []
         index = 0
         for domain in self.config.domains:
@@ -167,22 +184,30 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
                 initial_state = _strip_none(info.get("initial_state", {}))
                 assertions = tuple(_strip_none(item) for item in info.get("assertions", []))
                 zapier_tools = tuple(str(item) for item in info.get("zapier_tools", []))
+                task_name = str(raw.get("task") or f"{domain}-{index}")
+                if requested and task_name not in requested:
+                    index += 1
+                    continue
                 tasks.append(
                     AutomationBenchTask(
                         AutomationBenchData(
                             idx=index,
-                            name=str(raw.get("task") or f"{domain}-{index}"),
+                            name=task_name,
                             prompt=prompt,
                             domain=domain,
-                            task_name=str(raw.get("task") or f"{domain}-{index}"),
+                            task_name=task_name,
                             initial_state=initial_state,
                             assertions=assertions,
                             zapier_tools=zapier_tools,
                         ),
-                        self.config.task,
+                        self.config.task.model_copy(update={"allowed_tools": zapier_tools}),
                     )
                 )
                 index += 1
+        found = {task.data.task_name for task in tasks}
+        missing = requested - found
+        if missing:
+            raise ValueError(f"unknown AutomationBench task_names: {', '.join(sorted(missing))}")
         return tasks
 
 

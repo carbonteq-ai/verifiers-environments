@@ -5,6 +5,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 import verifiers.v1 as vf
 
 from automationbench.schema.world import WorldState
@@ -31,7 +32,7 @@ def test_distribution_metadata_supports_both_online_rl_python_capsules() -> None
 
 def test_simple_taskset_preserves_typed_world_and_assertions() -> None:
     taskset = AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"]))
-    task = taskset.select(1)[0]
+    task = next(iter(taskset.load()))
 
     assert task.data.task_name == "simple.email_sf_contact_phone_update"
     assert task.data.zapier_tools == (
@@ -45,10 +46,32 @@ def test_simple_taskset_preserves_typed_world_and_assertions() -> None:
     assert prompt[0].content.startswith("You are a workflow automation agent")
 
 
+def test_taskset_can_freeze_an_explicit_cross_domain_task_mix() -> None:
+    config = AutomationBenchConfig(
+        domains=["simple", "finance"],
+        task_names=["simple.gmail_weekly_status", "finance.quarterly_tax_estimate"],
+    )
+    tasks = AutomationBenchTaskset(config).load()
+    assert [task.data.task_name for task in tasks] == [
+        "simple.gmail_weekly_status",
+        "finance.quarterly_tax_estimate",
+    ]
+    assert [task.data.idx for task in tasks] == [62, 286]
+
+
+def test_taskset_rejects_duplicate_or_unknown_frozen_task_names() -> None:
+    with pytest.raises(ValueError, match="must be unique"):
+        AutomationBenchTaskset(
+            AutomationBenchConfig(task_names=["simple.gmail_weekly_status"] * 2)
+        ).load()
+    with pytest.raises(ValueError, match="unknown AutomationBench task_names"):
+        AutomationBenchTaskset(AutomationBenchConfig(task_names=["simple.not_a_task"])).load()
+
+
 def test_migrated_simple_task_matches_legacy_contract_snapshot() -> None:
     """Pin the former in-repository adapter's stable task-facing contract."""
 
-    task = AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).select(1)[0]
+    task = next(iter(AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).load()))
 
     assert task.data.name == "simple.email_sf_contact_phone_update"
     prompt = cast(Any, task.data.prompt)
@@ -92,7 +115,7 @@ def test_migrated_simple_task_matches_legacy_contract_snapshot() -> None:
 
 
 def test_dense_and_strict_scores_use_upstream_assertion_registry() -> None:
-    task = AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).select(1)[0]
+    task = next(iter(AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).load()))
     initial = task.data.initial_state
     before = score_world(world=initial, initial_state=initial, assertions=task.data.assertions)
     assert before.partial_credit == 0.0
@@ -111,7 +134,7 @@ def test_dense_and_strict_scores_use_upstream_assertion_registry() -> None:
 
 
 def test_default_toolset_matches_upstream_zapier_meta_tools() -> None:
-    task = AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).select(1)[0]
+    task = next(iter(AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).load()))
     state = AutomationBenchState(
         world=task.data.initial_state, initial_state=task.data.initial_state
     )
@@ -130,7 +153,7 @@ def test_default_toolset_matches_upstream_zapier_meta_tools() -> None:
 
 
 def test_optional_api_toolset_searches_and_mutates_per_rollout_state() -> None:
-    task = AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).select(1)[0]
+    task = next(iter(AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).load()))
     state = AutomationBenchState(
         world=task.data.initial_state, initial_state=task.data.initial_state
     )
@@ -154,8 +177,8 @@ def test_limited_zapier_mode_exposes_and_executes_only_task_tools() -> None:
         domains=["simple"],
         task=AutomationBenchTaskConfig(toolset="limited_zapier"),
     )
-    task = AutomationBenchTaskset(config).select(1)[0]
-    [toolset] = task.tool_servers()
+    task = next(iter(AutomationBenchTaskset(config).load()))
+    [toolset] = task.toolsets(AutomationBenchTaskConfig.model_validate(task.config.model_dump()))
     assert isinstance(toolset, AutomationBenchLimitedToolset)
     assert toolset.config.allowed_tools == task.data.zapier_tools
 
@@ -170,8 +193,9 @@ def test_limited_zapier_mode_exposes_and_executes_only_task_tools() -> None:
 
 
 def test_task_setup_and_finalize_put_evaluation_detail_on_trace() -> None:
-    task = AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).select(1)[0]
+    task = next(iter(AutomationBenchTaskset(AutomationBenchConfig(domains=["simple"])).load()))
     trace = vf.Trace(
+        agent=vf.AgentInfo(config=vf.AgentConfig()),
         task=vf.TraceTask(type=type(task).__name__, data=task.data),
         state=AutomationBenchState(),
     )

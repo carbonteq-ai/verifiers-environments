@@ -40,6 +40,44 @@ environment packages.
 
 ## Validate and run
 
+### Native v0.3.1 runtime and turn-judge release candidate
+
+Version 0.3.0 migrates native `Task.toolsets(config)` and `Toolset.register`,
+pins the package and lock to the maintained Verifiers v0.3.1 commit, and adds
+the optional public turn-quality judge described below. Do not publish or claim
+the candidate as qualified until the all-six-wheel compatibility gate and live
+managed qualification have passed from the immutable release commit.
+
+The optional exported `AutomationBenchTurnJudge` is discovered through native
+`taskset.task.judges` with id `automationbench-v1`. Its
+`TurnQualityConfig` requires immutable `code_revision` and `model_revision`,
+plus the composition host's `model`, `base_url`, `api_key_var` and sampling.
+It has bounded attempts and a per-attempt timeout, uses retrospective trajectory
+context, and preserves raw judge outputs and input/scorer digests in trace info.
+It never loads a model or chooses a device. The configurable rubric combines
+five reasoning-quality dimensions internally; none becomes a trainer field.
+Episode scope instead emits seven independent whole-trajectory components for
+explicit consumer projection; it does not average them into one environment
+reward.
+
+Outputs are generic `quality` assessments and explicit `erroneous_turn_ids`
+under `info.posttrain_turn_rewards`. These do not add to the native
+`partial_credit` reward. Consumers explicitly choose turn rewards, a mean/sum
+trajectory reduction, or error-turn projection. Error labels are independent
+from quality ratings. Invalid or timed-out assessments fail after bounded retry,
+never become valid zero. Native structured outputs constrain verdict syntax;
+coverage and score validity are still checked locally. Explicit abstention and
+inapplicability retain distinct statuses and do not retry or invent a reward.
+
+`context_scope="retrospective"` rates turns with the full trajectory;
+`context_scope="prefix"` makes a separate bounded assessment per turn using only
+the prefix through that turn. This setting changes the scorer identity. Multiple
+plugins use distinct `annotation_key` values and namespaced scorer digests.
+There is no mutable score cache: reassessment requires a new namespace or trace,
+and existing assessments cannot be overwritten. Twenty-seven candidate tests
+cover these contracts. The all-six-wheel compatibility gate passes locally;
+live managed qualification from the immutable release commit remains open.
+
 ```bash
 uv lock --check
 uv sync --locked --python 3.12
@@ -56,14 +94,14 @@ OpenAI-compatible endpoint is available:
 ```bash
 LOCAL_INFERENCE_API_KEY=EMPTY \
 uv run eval automationbench-v1 \
-  --harness.id null \
+  --agent.harness.id null --agent.runtime.type subprocess \
   --taskset.domains simple \
   --model Qwen/Qwen3.5-2B \
   --client.base-url http://127.0.0.1:8000/v1 \
   --client.api-key-var LOCAL_INFERENCE_API_KEY \
   --num-tasks 1 --num-rollouts 1 --max-concurrent 1 \
   --sampling.max-tokens 2048 --sampling.temperature 0 \
-  --max-turns 50 --max-total-tokens 8192 \
+  --agent.max-turns 50 --agent.max-total-tokens 8192 \
   --rich false --push false --output-dir /tmp/automationbench-v1
 ```
 

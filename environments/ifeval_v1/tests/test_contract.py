@@ -9,6 +9,7 @@ from typing import cast
 
 import pytest
 import verifiers.v1 as vf
+from verifiers.v1.utils.loaders import load_environment, resolve_env_config
 
 from ifeval_v1 import (
     CHECKERS,
@@ -36,7 +37,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"
+        "?rev=b2e4e8157783b2c0dffc7821044c87f29f1c3ccf#b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
     )
 
 
@@ -79,13 +80,13 @@ def test_strict_and_loose_metrics_are_named_and_deterministic() -> None:
 
 
 def test_declarative_env_config_resolves_without_loading_network_data() -> None:
-    config = vf.EnvConfig.model_validate(
+    config = resolve_env_config(
         {
             "taskset": {"id": "ifeval-v1"},
-            "harness": {"id": "null", "runtime": {"type": "subprocess"}},
+            "agent": {"harness": {"id": "null"}, "runtime": {"type": "subprocess"}},
         }
     )
-    environment = vf.Environment(config)
+    environment = load_environment(config)
     assert isinstance(environment.taskset, IFEvalTaskset)
     assert isinstance(environment.taskset.config, IFEvalConfig)
     assert environment.taskset.config.logical_purpose == "evaluation"
@@ -100,7 +101,7 @@ def test_config_rejects_training_split() -> None:
 def test_pinned_hub_split_has_541_unique_rows_and_all_checkers() -> None:
     if os.environ.get("RUN_ENVIRONMENT_NETWORK_TESTS") != "1":
         pytest.skip("set RUN_ENVIRONMENT_NETWORK_TESTS=1 for the pinned Hub gate")
-    tasks = IFEvalTaskset(IFEvalConfig()).select()
+    tasks = list(IFEvalTaskset(IFEvalConfig()).load())
     assert len(tasks) == 541
     assert len({task.data.key for task in tasks}) == 541
     assert {instruction for task in tasks for instruction in task.data.instruction_id_list} == set(

@@ -9,6 +9,7 @@ from typing import cast
 
 import pytest
 import verifiers.v1 as vf
+from verifiers.v1.utils.loaders import load_environment, resolve_env_config
 
 from mmlu_pro_v1 import (
     DATASET_REVISION,
@@ -33,7 +34,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"
+        "?rev=b2e4e8157783b2c0dffc7821044c87f29f1c3ccf#b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
     )
 
 
@@ -101,13 +102,13 @@ def test_prompt_removes_only_literal_na_and_keeps_demo_ids() -> None:
 
 
 def test_declarative_env_config_resolves_without_loading_network_data() -> None:
-    config = vf.EnvConfig.model_validate(
+    config = resolve_env_config(
         {
             "taskset": {"id": "mmlu-pro-v1"},
-            "harness": {"id": "null", "runtime": {"type": "subprocess"}},
+            "agent": {"harness": {"id": "null"}, "runtime": {"type": "subprocess"}},
         }
     )
-    environment = vf.Environment(config)
+    environment = load_environment(config)
     assert isinstance(environment.taskset, MMLUProTaskset)
     assert isinstance(environment.taskset.config, MMLUProConfig)
 
@@ -117,7 +118,7 @@ def test_pinned_hub_splits_have_reference_row_counts() -> None:
     if os.environ.get("RUN_ENVIRONMENT_NETWORK_TESTS") != "1":
         pytest.skip("set RUN_ENVIRONMENT_NETWORK_TESTS=1 for the pinned Hub gate")
     taskset = MMLUProTaskset(MMLUProConfig())
-    tasks = taskset.select(1)
+    tasks = list(taskset.load())[:1]
     assert len(tasks) == 1
     assert len(list(taskset._load_split("validation"))) == 70
     assert len(list(taskset._load_split("test"))) == 12032

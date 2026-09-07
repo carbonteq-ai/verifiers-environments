@@ -9,7 +9,7 @@ declarative loader compatibility without those external services.
 
 from __future__ import annotations
 
-import verifiers.v1 as vf
+from verifiers.v1.utils.loaders import load_environment, resolve_env_config
 
 TASKSET_IDS = (
     "automationbench-v1",
@@ -23,13 +23,16 @@ TASKSET_IDS = (
 
 def main() -> None:
     for taskset_id in TASKSET_IDS:
-        config = vf.EnvConfig.model_validate(
+        config = resolve_env_config(
             {
                 "taskset": {"id": taskset_id},
-                "harness": {"id": "null", "runtime": {"type": "subprocess"}},
+                "agent": {
+                    "harness": {"id": "null"},
+                    "runtime": {"type": "subprocess"},
+                },
             }
         )
-        environment = vf.Environment(config)
+        environment = load_environment(config)
         print(f"activated {taskset_id}: {type(environment.taskset).__name__}")
 
 

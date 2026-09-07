@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 import verifiers.v1 as vf
 from verifiers.v1.state import state_cls
+from verifiers.v1.utils.loaders import load_environment, resolve_env_config
 
 from math_python_v1 import (
     MathPythonConfig,
@@ -33,7 +34,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=284a868d6a9022109b749710672a0460e8a996d4#284a868d6a9022109b749710672a0460e8a996d4"
+        "?rev=b2e4e8157783b2c0dffc7821044c87f29f1c3ccf#b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
     )
 
 
@@ -47,17 +48,17 @@ def test_boxed_math_verification_and_task_scoped_toolset(monkeypatch: pytest.Mon
         }
     ]
     monkeypatch.setattr("math_python_v1.taskset.load_dataset", lambda *args, **kwargs: rows)
-    config = vf.EnvConfig.model_validate(
+    config = resolve_env_config(
         {
             "taskset": {"id": "math-python-v1", "num_tasks": 1},
-            "harness": {"id": "null", "runtime": {"type": "subprocess"}},
+            "agent": {"harness": {"id": "null"}, "runtime": {"type": "subprocess"}},
         }
     )
-    environment = vf.Environment(config)
+    environment = load_environment(config)
     assert isinstance(environment.taskset, MathPythonTaskset)
     assert isinstance(environment.taskset.config, MathPythonConfig)
 
-    [task] = environment.taskset.select(1)
+    [task] = list(environment.taskset.load())
     assert task.data.answer == "4"
     assert task.data.system_prompt is not None
     assert "\\boxed{...}" in task.data.system_prompt
@@ -67,10 +68,13 @@ def test_boxed_math_verification_and_task_scoped_toolset(monkeypatch: pytest.Mon
     assert task.data.source_revision == "0530c78699ea5e8eb5530600900e1f328b48acad"
     assert task.tools == (PythonToolset,)
     assert state_cls(type(task)) is PythonState
-    [tool_server] = task.tool_servers()
+    [tool_server] = task.toolsets(task.config)
     assert isinstance(tool_server, PythonToolset)
 
-    trace = vf.Trace(task=vf.TraceTask(type=type(task).__name__, data=task.data))
+    trace = vf.Trace(
+        agent=vf.AgentInfo(config=vf.AgentConfig()),
+        task=vf.TraceTask(type=type(task).__name__, data=task.data),
+    )
     trace.nodes = [
         vf.MessageNode(
             parent=None,
@@ -79,7 +83,11 @@ def test_boxed_math_verification_and_task_scoped_toolset(monkeypatch: pytest.Mon
         )
     ]
     asyncio.run(task.score(trace))
-    assert trace.rewards["math_reward"] == 1.0
+    assert trace.reward == 1.0
+    reward = trace.rewards["math_reward"]
+    assert reward is not None
+    assert reward.score == 1.0
+    assert reward.weight == 1.0
     assert trace.metrics["parse_success"] == 1.0
     assert trace.metrics["symbolic_correctness"] == 1.0
 
