@@ -44,7 +44,8 @@ environment packages.
 
 Version 0.3.0 migrates native `Task.toolsets(config)` and `Toolset.register`,
 pins the package and lock to CarbonTeq's maintained Verifiers v0.3.1 fork at
-`8e8f3042481c0996a58c3de0f86d55406725b6c1`, and adds the optional public
+`b126760eadbbbbfff6eb7badca845925ee20a885`, based on current upstream main,
+and adds the optional public
 turn-quality judge described below. The fork adds host-owned policy-client
 injection while preserving upstream client resolution by default. Do not
 publish or claim the candidate as qualified until the all-six-wheel
