@@ -9,7 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENVIRONMENTS = ROOT / "environments"
-VERIFIERS_REVISION = "b2e4e8157783b2c0dffc7821044c87f29f1c3ccf"
+VERIFIERS_REVISION = "36eac9d5e04ef29b584b6fa4f027af00cd76ea19"
+VERIFIERS_REPOSITORY = "https://github.com/carbonteq-ai/verifiers.git"
 PACKAGES = {
     "gsm8k_v1": "gsm8k-v1",
     "automationbench_v1": "automationbench-v1",
@@ -67,9 +68,7 @@ def validate_package(module: str, distribution: str) -> list[str]:
         failures.append(f"{module}: requires-python must be >=3.12,<3.14")
 
     dependencies = tuple(project.get("dependencies", ()))
-    expected = (
-        "verifiers @ git+https://github.com/PrimeIntellect-ai/verifiers.git@" + VERIFIERS_REVISION
-    )
+    expected = f"verifiers @ git+{VERIFIERS_REPOSITORY}@{VERIFIERS_REVISION}"
     if expected not in dependencies:
         failures.append(f"{module}: must depend on exact pinned Verifiers")
     forbidden_dependency_fragments = (

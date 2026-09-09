@@ -1,6 +1,6 @@
 # CarbonTeq Verifiers environments
 
-This repository contains framework-neutral [Verifiers](https://github.com/PrimeIntellect-ai/verifiers) v1 task environments maintained by CarbonTeq.
+This repository contains framework-neutral Verifiers v1 task environments maintained by CarbonTeq. Every package selects the same immutable revision of the [CarbonTeq Verifiers fork](https://github.com/carbonteq-ai/verifiers), whose ledger records the retained upstream base and generic runtime seams.
 
 Each directory below is a standalone Python project with its own package metadata, dependency lock, tests, version, and wheel. There is no root runtime package and installing one environment does not install its siblings.
 
