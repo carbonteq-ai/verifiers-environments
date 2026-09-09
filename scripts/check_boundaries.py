@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENVIRONMENTS = ROOT / "environments"
-VERIFIERS_REVISION = "36eac9d5e04ef29b584b6fa4f027af00cd76ea19"
+VERIFIERS_REVISION = "1f6793f7d46e8a650a54b2a585193b4010578fa6"
 VERIFIERS_REPOSITORY = "https://github.com/carbonteq-ai/verifiers.git"
 PACKAGES = {
     "gsm8k_v1": "gsm8k-v1",
