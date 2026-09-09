@@ -40,17 +40,17 @@ environment packages.
 
 ## Validate and run
 
-### Native v0.3.1 runtime and turn-judge release candidate
+### Native v0.3.2 development runtime and turn-judge release candidate
 
 Version 0.3.0 migrates native `Task.toolsets(config)` and `Toolset.register`,
-pins the package and lock to CarbonTeq's maintained Verifiers v0.3.1 fork at
+pins the package and lock to CarbonTeq's maintained Verifiers v0.3.2 development fork at
 `36eac9d5e04ef29b584b6fa4f027af00cd76ea19`, based on current upstream main,
 and adds the optional public
 turn-quality judge described below. The fork adds host-owned policy-client
 injection while preserving upstream client resolution by default. Do not
-publish or claim the candidate as qualified until the all-six-wheel
-compatibility gate and live managed qualification have passed from the
-immutable release commit.
+publish or claim the candidate as fully qualified until live managed
+qualification passes from the immutable release commit. The all-six-wheel
+compatibility gate passes at the repository revision containing this file.
 
 The optional exported `AutomationBenchTurnJudge` is discovered through native
 `taskset.task.judges` with id `automationbench-v1`. Its
