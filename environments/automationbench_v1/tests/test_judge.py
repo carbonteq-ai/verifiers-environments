@@ -285,12 +285,30 @@ def test_episode_judge_retries_only_its_bounded_attempts(monkeypatch):
         raise TimeoutError("unavailable")
 
     monkeypatch.setattr(judge, "complete", complete)
-    with pytest.raises(ValueError, match="no rewards admitted"):
+    with pytest.raises(ValueError, match="last_error=TimeoutError: unavailable"):
         asyncio.run(judge.score(_task(), trace))
     assert [item["status"] for item in trace.info["posttrain_episode_reward_attempts"]] == [
         "failed",
         "failed",
     ]
+    assert trace.info["posttrain_episode_reward_attempts"][-1]["error"] == {
+        "type": "TimeoutError",
+        "message": "unavailable",
+    }
+
+
+def test_episode_judge_redacts_credentials_from_retained_failure(monkeypatch):
+    judge = _judge(attempts=1)
+    trace = _trace(vf.UserMessage(content="Do the task."))
+
+    async def complete(*args, **kwargs):
+        raise RuntimeError("Authorization: Bearer sk-or-v1-secret-token upstream failed")
+
+    monkeypatch.setattr(judge, "complete", complete)
+    with pytest.raises(ValueError, match=r"Authorization: Bearer \[REDACTED\]"):
+        asyncio.run(judge.score(_task(), trace))
+    retained = trace.info["posttrain_episode_reward_attempts"][0]["error"]["message"]
+    assert "secret-token" not in retained
 
 
 def test_tool_observations_are_losslessly_compacted_with_digest(monkeypatch):

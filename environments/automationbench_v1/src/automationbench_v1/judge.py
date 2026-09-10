@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 from typing import Any, Literal
 
 import verifiers.v1 as vf
@@ -34,6 +35,31 @@ from .episode_prompt import (
 from .limited_tools import selected_tool_definitions
 
 CONTEXT_PROJECTION = "automationbench-judge-context@2"
+MAX_RETAINED_ERROR_CHARACTERS = 500
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;]+"),
+    re.compile(r"(?i)(api[_-]?key\s*[:=]\s*)[^\s,;]+"),
+    re.compile(r"\bsk-or-v1-[A-Za-z0-9_-]+\b"),
+)
+
+
+def _safe_error(error: Exception) -> dict[str, Any]:
+    """Retain an actionable bounded diagnosis without persisting credentials."""
+
+    message = " ".join(str(error).split()) or type(error).__name__
+    for pattern in _SECRET_PATTERNS:
+        message = pattern.sub(
+            lambda match: f"{match.group(1)}[REDACTED]" if match.lastindex else "[REDACTED]",
+            message,
+        )
+    detail: dict[str, Any] = {
+        "type": type(error).__name__,
+        "message": message[:MAX_RETAINED_ERROR_CHARACTERS],
+    }
+    status_code = getattr(error, "status_code", None)
+    if isinstance(status_code, int) and not isinstance(status_code, bool):
+        detail["status_code"] = status_code
+    return detail
 
 
 def project_tool_observation(content: str) -> str:
@@ -222,9 +248,18 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
                 attempt["status"] = "cancelled"
                 raise
             except Exception as error:  # noqa: BLE001
-                attempt["error_type"] = type(error).__name__
+                failure = _safe_error(error)
+                attempt["error"] = failure
+                # Compatibility for existing trace readers. New readers should
+                # use the structured error record above.
+                attempt["error_type"] = failure["type"]
                 attempt["status"] = "invalid_output" if isinstance(error, ValueError) else "failed"
-        raise ValueError("episode judge exhausted bounded attempts; no rewards admitted")
+        last_error = attempts[-1].get("error", {})
+        raise ValueError(
+            "episode judge exhausted bounded attempts; no rewards admitted; "
+            f"last_error={last_error.get('type', 'unknown')}: "
+            f"{last_error.get('message', 'unavailable')}"
+        )
 
 
 __all__ = ["AutomationBenchEpisodeJudge", "EpisodeQualityConfig", "project_tool_observation"]
