@@ -1,6 +1,6 @@
 """Native Verifiers v1 AutomationBench taskset."""
 
-from .judge import AutomationBenchTurnJudge
+from .judge import AutomationBenchEpisodeJudge
 from .taskset import AutomationBenchTaskset
 
-__all__ = ["AutomationBenchTaskset", "AutomationBenchTurnJudge"]
+__all__ = ["AutomationBenchEpisodeJudge", "AutomationBenchTaskset"]

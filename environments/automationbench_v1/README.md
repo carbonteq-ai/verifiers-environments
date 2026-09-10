@@ -40,47 +40,39 @@ environment packages.
 
 ## Validate and run
 
-### Native v0.3.2 development runtime and turn-judge release candidate
+### Native v0.3.2 development runtime and episode-judge release candidate
 
-Version 0.3.0 migrates native `Task.toolsets(config)` and `Toolset.register`,
-pins the package and lock to CarbonTeq's maintained Verifiers v0.3.2 development fork at
-`1f6793f7d46e8a650a54b2a585193b4010578fa6`, based on current upstream main,
-and adds the optional public
-turn-quality judge described below. The fork adds host-owned policy-client
-injection while preserving upstream client resolution by default. Do not
-publish or claim the candidate as fully qualified until live managed
-qualification passes from the immutable release commit. The all-six-wheel
-compatibility gate passes at the repository revision containing this file.
+Version 0.4.0 uses CarbonTeq's maintained Verifiers v0.3.2 development fork at
+`1f6793f7d46e8a650a54b2a585193b4010578fa6`, based on current upstream main.
+The fork adds host-owned policy-client injection while preserving upstream
+client resolution by default. Do not publish or claim the candidate as fully
+qualified until live managed qualification passes from the immutable release
+commit.
 
-The optional exported `AutomationBenchTurnJudge` is discovered through native
-`taskset.task.judges` with id `automationbench-v1`. Its
-`TurnQualityConfig` requires immutable `code_revision` and `model_revision`,
-plus the composition host's `model`, `base_url`, `api_key_var` and sampling.
-It has bounded attempts and a per-attempt timeout, uses retrospective trajectory
-context, and preserves raw judge outputs and input/scorer digests in trace info.
-It never loads a model or chooses a device. The configurable rubric combines
-five reasoning-quality dimensions internally; none becomes a trainer field.
-Episode scope instead emits seven independent whole-trajectory components for
-explicit consumer projection; it does not average them into one environment
-reward.
+The optional exported `AutomationBenchEpisodeJudge` is discovered through
+native `taskset.task.judges` with id `automationbench-v1`. Its
+`EpisodeQualityConfig` requires immutable `code_revision` and
+`model_revision`, plus the composition host's `model`, `base_url`,
+`api_key_var`, and sampling configuration. It has bounded attempts and a
+per-attempt timeout, always assesses the complete trajectory, and preserves raw
+judge outputs and input/scorer digests in trace info. It never loads a model or
+chooses a device.
 
-Outputs are generic `quality` assessments and explicit `erroneous_turn_ids`
-under `info.posttrain_turn_rewards`. These do not add to the native
-`partial_credit` reward. Consumers explicitly choose turn rewards, a mean/sum
-trajectory reduction, or error-turn projection. Error labels are independent
-from quality ratings. Invalid or timed-out assessments fail after bounded retry,
-never become valid zero. Native structured outputs constrain verdict syntax;
-coverage and score validity are still checked locally. Explicit abstention and
-inapplicability retain distinct statuses and do not retry or invent a reward.
+There is one versioned rubric and one output contract. The judge reconstructs
+material task requirements, then emits seven independent episode components:
+five reasoning-quality dimensions, action quality, and answer quality. Those
+components are stored under `info.episode_reward/*` for an explicit consumer
+projection; they are not averaged inside the environment and do not implicitly
+change AutomationBench's native `partial_credit` reward. The model-facing wire
+schema uses bounded integer message indexes, which are validated and normalized
+to stable native-trace message IDs before admission.
 
-`context_scope="retrospective"` rates turns with the full trajectory;
-`context_scope="prefix"` makes a separate bounded assessment per turn using only
-the prefix through that turn. This setting changes the scorer identity. Multiple
-plugins use distinct `annotation_key` values and namespaced scorer digests.
-There is no mutable score cache: reassessment requires a new namespace or trace,
-and existing assessments cannot be overwritten. Twenty-seven candidate tests
-cover these contracts. The all-six-wheel compatibility gate passes locally;
-live managed qualification from the immutable release commit remains open.
+The former turn-level rubric, turn annotations, prefix/retrospective switch,
+and dual turn/episode schema are not part of the v0.4 public API. Invalid,
+timed-out, or structurally inconsistent assessments exhaust a bounded retry and
+never become a manufactured zero. Twenty-one candidate tests cover these
+contracts. The all-six-wheel compatibility gate passes locally; live managed
+qualification from the immutable release commit remains open.
 
 ```bash
 uv lock --check
