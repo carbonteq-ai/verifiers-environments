@@ -65,7 +65,9 @@ components are stored under `info.episode_reward/*` for an explicit consumer
 projection; they are not averaged inside the environment and do not implicitly
 change AutomationBench's native `partial_credit` reward. The model-facing wire
 schema uses bounded integer message indexes, which are validated and normalized
-to stable native-trace message IDs before admission.
+to stable native-trace message IDs before admission. Repeated valid indexes are
+collapsed in first-seen order because duplicate citations add no meaning;
+negative or out-of-range indexes remain invalid and cannot become rewards.
 
 The former turn-level rubric, turn annotations, prefix/retrospective switch,
 and dual turn/episode schema are not part of the v0.4 public API. Invalid,

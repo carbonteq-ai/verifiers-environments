@@ -28,7 +28,8 @@ AutomationBench v0.4 exposes one whole-episode judge contract. It reconstructs
 material task requirements and independently scores five reasoning dimensions,
 action quality, and answer quality. Its model-facing schema uses bounded integer
 message indexes and normalizes them to stable native-trace message IDs before
-the rewards are admitted. The former combined turn/episode judge was removed:
+the rewards are admitted; redundant valid citations are de-duplicated while
+out-of-range citations remain invalid. The former combined turn/episode judge was removed:
 mixing its turn rubric with the episode schema caused constrained decoders to
 expand rubric instructions as fake task requirements and exhaust large output
 budgets. Real captured-request replay on Spark-X2.5-4B is retained by the

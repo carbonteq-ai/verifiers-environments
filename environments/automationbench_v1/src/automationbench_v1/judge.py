@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from typing import Any
+from typing import Any, Literal
 
 import verifiers.v1 as vf
 from pydantic import Field, FiniteFloat
@@ -20,8 +20,14 @@ from .episode_prompt import (
     EPISODE_PROMPT_VERSION,
     EPISODE_RUBRICS,
     GENERAL_EPISODE_JUDGE_SYSTEM_PROMPT,
+    MODEL_NATIVE_FRAME_REQUEST,
+    MODEL_NATIVE_REVIEW_REQUEST,
+    MODEL_NATIVE_VERDICT_REQUEST,
+    EpisodeAssessmentFrame,
+    EpisodeVocabularyProfile,
     WireEpisodeVerdict,
     build_episode_judge_messages,
+    model_native_frame_request,
     normalize_wire_verdict,
     validate_episode_verdict,
 )
@@ -54,6 +60,18 @@ class EpisodeQualityConfig(vf.JudgeConfig):
     attempts: int = Field(default=2, ge=1, le=3)
     timeout_seconds: float = Field(default=60.0, gt=0, le=900, allow_inf_nan=False)
     input_budget_tokens: int = Field(ge=1)
+    # The model-native frame preserves the fixed wire verdict but lets the
+    # selected judge organize each episode in vocabulary it finds natural.
+    # Direct mode remains the explicit compatibility contract for prior runs.
+    assessment_protocol: Literal[
+        "direct@1", "model-native-frame@1", "model-native-frame-review@1"
+    ] = "direct@1"
+    # A model's own explanation of the domain-general judging task. This is
+    # prompt phrasing only; it cannot replace framework-owned semantics or the
+    # machine-validatable verdict schema.
+    vocabulary_profile: EpisodeVocabularyProfile | None = None
+    assessment_frame_max_tokens: int = Field(default=2048, ge=256, le=4096)
+    assessment_review_max_tokens: int = Field(default=4096, ge=256, le=8192)
     # The output does not implicitly add another native trajectory reward.
     weight: FiniteFloat = 0.0
 
@@ -79,6 +97,18 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
             "context_projection": CONTEXT_PROJECTION,
             "input_budget_tokens": self.config.input_budget_tokens,
             "episode_rubrics": EPISODE_RUBRICS,
+            "assessment_protocol": self.config.assessment_protocol,
+            "assessment_frame_max_tokens": self.config.assessment_frame_max_tokens,
+            "assessment_frame_schema": EpisodeAssessmentFrame.model_json_schema(),
+            "assessment_frame_request": MODEL_NATIVE_FRAME_REQUEST,
+            "vocabulary_profile": (
+                self.config.vocabulary_profile.model_dump(mode="json")
+                if self.config.vocabulary_profile is not None
+                else None
+            ),
+            "assessment_verdict_request": MODEL_NATIVE_VERDICT_REQUEST,
+            "assessment_review_request": MODEL_NATIVE_REVIEW_REQUEST,
+            "assessment_review_max_tokens": self.config.assessment_review_max_tokens,
         }
         return hashlib.sha256(
             json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
@@ -121,7 +151,57 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
             attempts.append(attempt)
             try:
                 async with asyncio.timeout(self.config.timeout_seconds):
-                    response = await self.complete(messages, trace=trace, schema=WireEpisodeVerdict)
+                    verdict_messages = messages
+                    if self.config.assessment_protocol in {
+                        "model-native-frame@1",
+                        "model-native-frame-review@1",
+                    }:
+                        frame_messages = messages + [
+                            vf.UserMessage(
+                                content=model_native_frame_request(self.config.vocabulary_profile)
+                            )
+                        ]
+                        attempt["assessment_frame_messages"] = [
+                            message.model_dump(mode="json", exclude_none=True)
+                            for message in frame_messages
+                        ]
+                        frame_response = await self.complete(
+                            frame_messages,
+                            trace=trace,
+                            schema=EpisodeAssessmentFrame,
+                            max_tokens=self.config.assessment_frame_max_tokens,
+                        )
+                        attempt["assessment_frame_raw_response"] = frame_response.text
+                        frame = EpisodeAssessmentFrame.model_validate_json(frame_response.text)
+                        attempt["assessment_frame"] = frame.model_dump(mode="json")
+                        verdict_messages = frame_messages + [
+                            vf.AssistantMessage(content=frame_response.text),
+                            vf.UserMessage(content=MODEL_NATIVE_VERDICT_REQUEST),
+                        ]
+                    response = await self.complete(
+                        verdict_messages, trace=trace, schema=WireEpisodeVerdict
+                    )
+                    if self.config.assessment_protocol == "model-native-frame-review@1":
+                        attempt["provisional_raw_response"] = response.text
+                        # The provisional verdict is not admitted. Validating
+                        # its shape only guarantees that the model reviews a
+                        # complete machine-readable draft rather than free-form
+                        # text.
+                        WireEpisodeVerdict.model_validate_json(response.text)
+                        review_messages = verdict_messages + [
+                            vf.AssistantMessage(content=response.text),
+                            vf.UserMessage(content=MODEL_NATIVE_REVIEW_REQUEST),
+                        ]
+                        attempt["assessment_review_messages"] = [
+                            message.model_dump(mode="json", exclude_none=True)
+                            for message in review_messages
+                        ]
+                        response = await self.complete(
+                            review_messages,
+                            trace=trace,
+                            schema=WireEpisodeVerdict,
+                            max_tokens=self.config.assessment_review_max_tokens,
+                        )
                 attempt["raw_response"] = response.text
                 wire_verdict = WireEpisodeVerdict.model_validate_json(response.text)
                 verdict = normalize_wire_verdict(wire_verdict, message_ids)
