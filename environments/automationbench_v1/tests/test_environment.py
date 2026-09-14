@@ -59,6 +59,22 @@ def test_taskset_can_freeze_an_explicit_cross_domain_task_mix() -> None:
     assert [task.data.idx for task in tasks] == [62, 286]
 
 
+def test_task_identity_is_stable_across_fresh_world_instances() -> None:
+    config = AutomationBenchConfig(
+        domains=["finance"],
+        task_names=["finance.ap_aging_report"],
+    )
+
+    first = AutomationBenchTaskset(config).load()[0]
+    second = AutomationBenchTaskset(config).load()[0]
+
+    transformed = first.with_system_prompt("runtime renderer system prompt")
+
+    assert first.key == second.key == "finance.ap_aging_report"
+    assert transformed.key == first.key
+    assert transformed.hash != first.hash
+
+
 def test_taskset_rejects_duplicate_or_unknown_frozen_task_names() -> None:
     with pytest.raises(ValueError, match="must be unique"):
         AutomationBenchTaskset(

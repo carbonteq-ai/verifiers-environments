@@ -76,6 +76,18 @@ class AutomationBenchTask(
         tuple[type[vf.Toolset], ...], (AutomationBenchToolset,)
     )
 
+    @property
+    def key(self) -> str:
+        """Use the dataset task name as identity across fresh world instances.
+
+        Some AutomationBench state factories assign new internal record IDs each
+        time the taskset is loaded. Those IDs belong in the content hash for
+        provenance, but they must not split repeated evaluations of the same
+        dataset task into different logical task identities.
+        """
+
+        return self.data.task_name
+
     def tool_servers(self) -> list[vf.Toolset]:
         """Legacy runtime entry point retained during the native API migration."""
         return self.toolsets(
