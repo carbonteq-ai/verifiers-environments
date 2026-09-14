@@ -32,7 +32,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=1f6793f7d46e8a650a54b2a585193b4010578fa6#1f6793f7d46e8a650a54b2a585193b4010578fa6"
+        "?rev=84ab782391bbfe1ac4f4ca32fa612e56d01b5b81#84ab782391bbfe1ac4f4ca32fa612e56d01b5b81"
     )
 
 
