@@ -32,6 +32,60 @@ def _strip_none(value: Any) -> Any:
     return value
 
 
+SPREADSHEET_DISCOVERY_TOOL = "google_drive_find_multiple_files"
+
+
+def _with_spreadsheet_discovery(
+    tools: tuple[str, ...], prompt: Any, initial_state: dict[str, Any]
+) -> tuple[str, ...]:
+    """Give limited_zapier tasks a way to find the spreadsheets their Sheets tools need.
+
+    The upstream tool lists for every HR task and a few marketing tasks offer only
+    Sheets tools that take a spreadsheet ID, while the prompt never names that ID
+    and no tool can list spreadsheets, so the policy can only guess IDs. Drive file
+    search returns spreadsheets (all of them when the query matches none) and does
+    not change any scored state, so adding it makes those tasks solvable without
+    touching the benchmark data.
+    """
+
+    if not any(tool.startswith("google_sheets_") for tool in tools):
+        return tools
+    if any(tool.startswith("google_drive_find") for tool in tools):
+        return tools
+    spreadsheets = initial_state.get("google_sheets", {}).get("spreadsheets", [])
+    ids = [str(sheet["id"]) for sheet in spreadsheets if sheet.get("id")]
+    text = str(prompt)
+    if not ids or all(sheet_id in text for sheet_id in ids):
+        return tools
+    return (*tools, SPREADSHEET_DISCOVERY_TOOL)
+
+
+UPSTREAM_TURN_BUDGET_SENTENCE = (
+    "You have a budget of ~50 tool-using turns — favor parallel tool calls and avoid duplicate searches. "
+)
+
+
+def _with_turn_budget(prompt: Any, turn_budget: int) -> Any:
+    """Replace the upstream "~50 turns" system sentence with the budget the harness enforces.
+
+    Every upstream domain prompt carries the same sentence, while training harnesses
+    stop episodes much earlier. Stating the real budget, and asking for brief thinking,
+    keeps the policy from planning for turns or reply length it will never get.
+    """
+
+    replacement = (
+        f"You have a budget of {turn_budget} tool-using turns — favor parallel tool calls, avoid duplicate "
+        "searches, keep your thinking brief, and act as soon as you have enough information. "
+    )
+    if not isinstance(prompt, list) or not prompt or not isinstance(prompt[0], dict):
+        raise ValueError("AutomationBench turn budget requires a message-list prompt")
+    system = prompt[0]
+    content = system.get("content")
+    if system.get("role") != "system" or not isinstance(content, str) or UPSTREAM_TURN_BUDGET_SENTENCE not in content:
+        raise ValueError("AutomationBench system prompt does not contain the upstream turn-budget sentence")
+    return [{**system, "content": content.replace(UPSTREAM_TURN_BUDGET_SENTENCE, replacement)}, *prompt[1:]]
+
+
 def _service_for_name(name: str) -> str | None:
     fields = sorted(
         (str(field) for field in WorldState.model_fields if field != "meta"),
@@ -67,6 +121,8 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     toolset: Literal["zapier", "limited_zapier", "api"] = "zapier"
     search_top_k: int = 20
     allowed_tools: tuple[str, ...] = ()
+    # None keeps the upstream "~50 turns" system prompt.
+    turn_budget: int | None = Field(default=None, gt=0)
 
 
 class AutomationBenchTask(
@@ -193,9 +249,13 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
                     info = json.loads(info)
                 info = _strip_none(info)
                 prompt = raw.get("prompt")
+                if self.config.task.turn_budget is not None:
+                    prompt = _with_turn_budget(prompt, self.config.task.turn_budget)
                 initial_state = _strip_none(info.get("initial_state", {}))
                 assertions = tuple(_strip_none(item) for item in info.get("assertions", []))
                 zapier_tools = tuple(str(item) for item in info.get("zapier_tools", []))
+                if self.config.task.toolset == "limited_zapier":
+                    zapier_tools = _with_spreadsheet_discovery(zapier_tools, prompt, initial_state)
                 task_name = str(raw.get("task") or f"{domain}-{index}")
                 if requested and task_name not in requested:
                     index += 1

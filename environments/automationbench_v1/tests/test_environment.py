@@ -226,3 +226,48 @@ def test_task_setup_and_finalize_put_evaluation_detail_on_trace() -> None:
     assert trace.reward == 1.0
     assert trace.metrics["task_completed_correctly"] == 1.0
     assert trace.info["automationbench"]["assertions"][0]["passed"] is True
+
+
+def test_limited_zapier_adds_spreadsheet_search_when_ids_are_undiscoverable() -> None:
+    config = AutomationBenchConfig(
+        domains=["hr", "simple"],
+        task_names=["hr.docusign_nda_collection", "simple.email_sf_contact_phone_update"],
+        task=AutomationBenchTaskConfig(toolset="limited_zapier"),
+    )
+    hr_task, simple_task = AutomationBenchTaskset(config).load()
+    assert hr_task.data.zapier_tools[-1] == "google_drive_find_multiple_files"
+    assert "google_drive_find_multiple_files" not in simple_task.data.zapier_tools
+
+    [toolset] = hr_task.toolsets(AutomationBenchTaskConfig.model_validate(hr_task.config.model_dump()))
+    assert isinstance(toolset, AutomationBenchLimitedToolset)
+    assert toolset.config.allowed_tools == hr_task.data.zapier_tools
+    toolset._inert_state = AutomationBenchState(
+        world=hr_task.data.initial_state,
+        initial_state=hr_task.data.initial_state,
+    )
+    found = toolset.invoke("google_drive_find_multiple_files", title="NDA compliance tracker")
+    assert "ss_nda_tracker" in found
+    worksheet = toolset.invoke("google_sheets_find_worksheet", spreadsheet="ss_nda_tracker", title="Status")
+    assert '"success": true' in worksheet
+
+
+def test_default_toolset_keeps_upstream_tool_lists() -> None:
+    config = AutomationBenchConfig(domains=["hr"], task_names=["hr.docusign_nda_collection"])
+    [task] = AutomationBenchTaskset(config).load()
+    assert "google_drive_find_multiple_files" not in task.data.zapier_tools
+
+
+def test_turn_budget_replaces_the_upstream_fifty_turn_sentence_in_every_domain() -> None:
+    domains: list[Any] = ["simple", "sales", "marketing", "operations", "support", "finance", "hr"]
+    budgeted = AutomationBenchTaskset(
+        AutomationBenchConfig(domains=domains, task=AutomationBenchTaskConfig(turn_budget=12))
+    ).load()
+    upstream = AutomationBenchTaskset(AutomationBenchConfig(domains=domains)).load()
+    assert len(budgeted) == len(upstream) == 800
+    for task, original in zip(budgeted, upstream, strict=True):
+        system = cast(Any, task.data.prompt)[0].content
+        assert "~50 tool-using turns" not in system
+        assert "You have a budget of 12 tool-using turns" in system
+        assert "keep your thinking brief" in system
+        assert "~50 tool-using turns" in cast(Any, original.data.prompt)[0].content
+        assert task.data.task_name == original.data.task_name
