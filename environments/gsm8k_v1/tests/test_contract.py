@@ -4,7 +4,6 @@ import asyncio
 import hashlib
 import json
 import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -32,7 +31,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any("posttrain" in item for item in pyproject["project"]["dependencies"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=0cee0a075ddf1883498be0fde34155655cb19146#0cee0a075ddf1883498be0fde34155655cb19146"
+        "?rev=cdd2ec7614131545df66484f9de11250daf16065#cdd2ec7614131545df66484f9de11250daf16065"
     )
 
 
@@ -94,24 +93,7 @@ How many apples?"""
     assert task.data.row_digest == hashlib.sha256(canonical.encode()).hexdigest()
 
 
-@dataclass(frozen=True)
-class FakeProgramResult:
-    exit_code: int
-    stdout: str
-    stderr: str = ""
-
-
-class FakeRuntime:
-    def __init__(self, stdout: str = "1.0\n") -> None:
-        self.stdout = stdout
-        self.calls: list[tuple[bytes, list[str]]] = []
-
-    async def run_uv_script(self, script: bytes, args: list[str]) -> FakeProgramResult:
-        self.calls.append((script, args))
-        return FakeProgramResult(exit_code=0, stdout=self.stdout)
-
-
-def test_reward_and_gold_validation_use_runtime_verifier(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reward_and_gold_validation_score_in_process(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         taskset_module,
         "load_dataset",
@@ -124,19 +106,32 @@ def test_reward_and_gold_validation_use_runtime_verifier(monkeypatch: pytest.Mon
         agent=vf.AgentInfo(config=vf.AgentConfig()),
         task=vf.TraceTask(type=type(task).__name__, data=task.data),
     )
-    runtime = FakeRuntime()
 
-    asyncio.run(task.score(trace, runtime=cast(vf.Runtime, runtime)))
+    asyncio.run(task.score(trace, runtime=cast(vf.Runtime, object())))
 
-    assert trace.reward == 1.0
+    # An empty reply scores zero; the gold answer validates without any runtime work.
     reward = trace.rewards["correct"]
     assert reward is not None
-    assert reward.score == 1.0
+    assert reward.score == 0.0
     assert reward.weight == 1.0
-    assert asyncio.run(task.validate(cast(vf.Runtime, runtime)))
-    assert len(runtime.calls) == 2
-    assert runtime.calls[0][1] == ["2", ""]
-    assert runtime.calls[1][1] == ["2", "#### 2"]
+    assert asyncio.run(task.validate(cast(vf.Runtime, object())))
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ("1 + 1 is two.\n#### 2", 1.0),
+        ("#### 2.0", 1.0),
+        ("First #### 3, corrected: #### 2", 1.0),
+        ("#### 3", 0.0),
+        ("<think>#### 2</think>So the answer is\n#### 5", 0.0),
+        ("<think>still thinking #### 2", 0.0),
+        ("2", 1.0),
+        ("", 0.0),
+    ],
+)
+def test_score_answer_uses_the_final_answer_after_reasoning(reply: str, expected: float) -> None:
+    assert taskset_module.score_answer(reply, "2") == expected
 
 
 @pytest.mark.network
