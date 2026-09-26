@@ -20,6 +20,13 @@ from .limited_tools import (
 )
 from .scoring import ScoreSnapshot, score_world
 from .tools import AutomationBenchState, AutomationBenchToolset
+from .turn_rewards import (
+    PROGRESS_KEY,
+    TURN_EVIDENCE_KEY,
+    AutomationBenchTurnRewardConfig,
+    record_progress,
+    turn_evidence,
+)
 
 type Domain = Literal["simple", "sales", "marketing", "operations", "support", "finance", "hr"]
 
@@ -123,6 +130,8 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     allowed_tools: tuple[str, ...] = ()
     # None keeps the upstream "~50 turns" system prompt.
     turn_budget: int | None = Field(default=None, gt=0)
+    # None records no per-turn rewards; SAMPO selects them explicitly.
+    turn_rewards: AutomationBenchTurnRewardConfig | None = None
 
 
 class AutomationBenchTask(
@@ -191,6 +200,18 @@ class AutomationBenchTask(
             assertions=state.assertions,
         )
 
+    @vf.stop
+    async def record_turn_progress(self, trace: vf.Trace) -> bool:
+        """Score the live world before each model call; never ends the rollout.
+
+        Every tool call of the previous turn has already updated the world here,
+        so the entry after ``trace.num_turns`` turns is that turn's outcome.
+        """
+
+        if cast(AutomationBenchTaskConfig, self.config).turn_rewards is not None:
+            record_progress(trace.info, trace.num_turns, lambda: self._snapshot(trace).partial_credit)
+        return False
+
     async def finalize(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         del runtime
         snapshot = self._snapshot(trace)
@@ -200,6 +221,34 @@ class AutomationBenchTask(
             "assertions": list(snapshot.assertion_results),
             "end_state": snapshot.end_state,
         }
+        turn_rewards = cast(AutomationBenchTaskConfig, self.config).turn_rewards
+        if turn_rewards is not None:
+            # A final text-only reply or a turn/token limit sends no further model
+            # request, so the last turn's outcome is recorded here.
+            record_progress(trace.info, trace.num_turns, lambda: snapshot.partial_credit)
+            self._attach_turn_evidence(trace, turn_rewards)
+
+    def _attach_turn_evidence(self, trace: vf.Trace, config: AutomationBenchTurnRewardConfig) -> None:
+        branches = trace.branches
+        if len(branches) != 1:
+            return  # Posttrain trains one branch; compacted episodes carry no turn rewards
+        nodes = branches[0].nodes
+        turns = [node.message for node in nodes if node.sampled and node.message.role == "assistant"]
+        if not turns:
+            return
+        tool_results = {
+            node.message.tool_call_id: node.message.content for node in nodes if node.message.role == "tool"
+        }
+        trace.info[TURN_EVIDENCE_KEY] = turn_evidence(
+            trace_id=trace.id,
+            turns=turns,
+            tool_results=tool_results,
+            progress=trace.info[PROGRESS_KEY],
+            config=config,
+        )
+        digests = dict(trace.info.get("posttrain_scorer_digests") or {})
+        digests[TURN_EVIDENCE_KEY] = config.scorer_digest
+        trace.info["posttrain_scorer_digests"] = digests
 
     @vf.reward(weight=1.0)
     async def partial_credit(self, trace: vf.Trace) -> float:
