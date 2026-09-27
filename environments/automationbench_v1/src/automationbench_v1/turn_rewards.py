@@ -8,9 +8,11 @@ model call the task scores the live world and appends the result to
 record into Posttrain's turn evidence (projection ``assistant-turns@1``).
 
 The reward for assistant turn *k* is the change in partial credit its tool calls
-caused, minus ``tool_failure_penalty`` for each of its tool calls that failed.
-Summed over an episode it equals the final partial credit minus the partial
-credit of the untouched world, minus the penalties.
+caused, minus ``tool_failure_penalty`` for each of its tool calls that was a
+mistake (see ``tool_mistakes``): rejected arguments, an unknown tool or an ID
+that was never returned. A search that finds nothing is not penalized. Summed
+over an episode it equals the final partial credit minus the partial credit of
+the untouched world, minus the penalties.
 """
 
 from __future__ import annotations
@@ -21,6 +23,8 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from .tool_mistakes import classify_tool_result, is_mistake
 
 PROGRESS_KEY = "automationbench_turn_progress"
 TURN_EVIDENCE_KEY = "posttrain_turn_rewards"
@@ -39,7 +43,8 @@ class AutomationBenchTurnRewardConfig(BaseModel):
     def scorer_digest(self) -> str:
         identity = {
             "scorer": "automationbench-turn-progress",
-            "version": 1,
+            # 2: only mistakes are penalized; empty searches no longer are.
+            "version": 2,
             "tool_failure_penalty": self.tool_failure_penalty,
         }
         encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"))
@@ -105,13 +110,15 @@ def turn_evidence(
     for index, message in enumerate(turns):
         current = credit_after.get(index + 1, previous)
         calls = getattr(message, "tool_calls", None) or []
-        failures = sum(
+        answered = [call for call in calls if call.id in tool_results]
+        failures = sum(1 for call in answered if tool_result_failed(tool_results[call.id]))
+        mistakes = sum(
             1
-            for call in calls
-            if call.id in tool_results and tool_result_failed(tool_results[call.id])
+            for call in answered
+            if is_mistake(classify_tool_result(getattr(call, "name", None), tool_results[call.id]))
         )
         progress_value = current - previous
-        reward = progress_value - config.tool_failure_penalty * failures
+        reward = progress_value - config.tool_failure_penalty * mistakes
         assessments.append(
             {
                 "turn_id": f"assistant-{index}",
@@ -119,6 +126,7 @@ def turn_evidence(
                     {"name": TURN_REWARD, "status": "valid", "value": reward},
                     {"name": "assertion_progress", "status": "valid", "value": progress_value},
                     {"name": "tool_failures", "status": "valid", "value": float(failures)},
+                    {"name": "tool_mistakes", "status": "valid", "value": float(mistakes)},
                 ],
                 "evidence_ref": f"{trace_id}#{PROGRESS_KEY}/{index + 1}",
             }

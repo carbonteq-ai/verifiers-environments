@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import functools
 import inspect
+import json
+import types
 from collections.abc import Callable
-from typing import Any, cast, get_type_hints
+from typing import Any, Union, cast, get_args, get_origin, get_type_hints
 
 import verifiers.v1 as vf
 from pydantic import ConfigDict, create_model
@@ -16,6 +18,24 @@ from automationbench.tools import ALL_TOOLS
 from .tools import AutomationBenchState
 
 _ZAPIER_TOOLS = {tool.__name__: tool for tool in ALL_TOOLS}
+
+# FastMCP decodes a JSON-looking string argument into an object unless the
+# parameter is declared exactly ``str``. A tool that takes ``fields_json: str |
+# None`` then rejects the object the model never sent. Such parameters accept
+# the decoded object at the MCP boundary and get their JSON string back before
+# the tool runs; the schema shown to the model still says string.
+_DECODED = str | dict[str, Any] | list[Any] | None
+
+
+def _optional_string_parameters(func: Callable[..., Any]) -> frozenset[str]:
+    names = set()
+    for name, hint in get_type_hints(func).items():
+        if get_origin(hint) in (Union, types.UnionType) and set(get_args(hint)) == {
+            str,
+            type(None),
+        }:
+            names.add(name)
+    return frozenset(names)
 
 
 def selected_tool_definitions(names: tuple[str, ...]) -> list[dict[str, Any]]:
@@ -72,6 +92,9 @@ class AutomationBenchLimitedToolset(
             func = _ZAPIER_TOOLS[tool_name]
         except KeyError as error:
             raise ValueError(f"unknown AutomationBench tool {tool_name!r}") from error
+        for name in _optional_string_parameters(func):
+            if isinstance(kwargs.get(name), dict | list):
+                kwargs[name] = json.dumps(kwargs[name])
         world = WorldState.model_validate(self.state.world)
         cleaned = {
             key: value
@@ -84,7 +107,12 @@ class AutomationBenchLimitedToolset(
 
     def _tool_wrapper(self, tool_name: str, func: Callable[..., Any]) -> Callable[..., Any]:
         signature = inspect.signature(func)
-        visible = [parameter for name, parameter in signature.parameters.items() if name != "world"]
+        widened = _optional_string_parameters(func)
+        visible = [
+            parameter.replace(annotation=_DECODED) if name in widened else parameter
+            for name, parameter in signature.parameters.items()
+            if name != "world"
+        ]
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -92,7 +120,9 @@ class AutomationBenchLimitedToolset(
 
         wrapper.__signature__ = signature.replace(parameters=visible)  # type: ignore[attr-defined]
         wrapper.__annotations__ = {
-            name: value for name, value in get_type_hints(func).items() if name != "world"
+            name: (_DECODED if name in widened else value)
+            for name, value in get_type_hints(func).items()
+            if name != "world"
         }
         return wrapper
 
