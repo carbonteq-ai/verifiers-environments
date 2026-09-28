@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from automationbench.schema.salesforce import Email, generate_salesforce_id
 from automationbench.schema.world import WorldState
+from automationbench.tools.zapier.action_utils import values_match
 from automationbench.tools.zapier.types import register_metadata
 
 # Map Salesforce object types to WorldState collection names
@@ -156,7 +157,9 @@ def salesforce_find_records(
     Args:
         object: Salesforce object type. Valid types: Contact, Account, Lead,
             Opportunity, Campaign, Case, Event, Task, Note, CampaignMember, User
-        searchField: Field name to search by. Common fields per object:
+        searchField: Field name to search by. When omitted, searchValue is
+            matched against every text field (Name, Email, Subject, ...).
+            Common fields per object:
             - Contact: Email, Name, FirstName, LastName, AccountId, Title, Phone, OwnerId
             - Account: Name, Industry, OwnerId
             - Lead: Email, Name, FirstName, LastName, Company, Status, OwnerId
@@ -166,13 +169,14 @@ def salesforce_find_records(
             - Case: Subject, Status, AccountId, ContactId, Priority
             - User: Name, Email, IsActive
             - Task/Event: Subject, WhatId, WhoId, OwnerId, Status
-        searchValue: Value to search for (case-insensitive, supports partial match)
+        searchValue: Value to search for (case-insensitive, supports partial match;
+            numbers match regardless of formatting, e.g. "175000" matches 175000.0)
         searchResults: "first" for first match, "all" for all matches (default: "first")
 
     Returns:
-        JSON string with matching record(s) or empty results.
+        JSON string with matching record(s), count returned and total_count matching.
     """
-    object = object or object_type or ""
+    object = _canonical_object_type(object or object_type or "")
     collection_name = OBJECT_TYPE_MAP.get(object)
     if collection_name is None:
         return json.dumps(
@@ -203,6 +207,10 @@ def salesforce_find_records(
     fields_to_try.append(to_snake_case(searchField))  # snake_case version
 
     for record in collection:
+        if not searchField:
+            if not searchValue or _any_field_matches(record, searchValue):
+                matches.append(record)
+            continue
         # Try each field name until we find one that exists
         attr_value = None
         matched_field = None
@@ -227,43 +235,61 @@ def salesforce_find_records(
                     matched_field = field_name
                     break
 
-        if attr_value is not None:
-            # Special handling for _is_active: convert "Active"/"Inactive"/"true"/"false" to bool
-            if matched_field == "_is_active":
-                if isinstance(searchValue, str):
-                    sv = searchValue.lower()
-                    search_bool = sv in ("active", "true")
-                else:
-                    search_bool = bool(searchValue)
-                if attr_value == search_bool:
-                    matches.append(record)
-            # Case-insensitive string comparison, also support partial match with "contains"
-            elif isinstance(attr_value, str) and isinstance(searchValue, str):
-                if attr_value.lower() == searchValue.lower():
-                    matches.append(record)
-                # Also check if the search value is contained in the field (for partial matches)
-                elif searchValue.lower() in attr_value.lower():
-                    matches.append(record)
-            elif attr_value == searchValue:
+        if attr_value is None:
+            continue
+        # Special handling for _is_active: convert "Active"/"Inactive"/"true"/"false" to bool
+        if matched_field == "_is_active":
+            if isinstance(searchValue, str):
+                search_bool = searchValue.strip().lower() in ("active", "true")
+            else:
+                search_bool = bool(searchValue)
+            if attr_value == search_bool:
                 matches.append(record)
+        elif _value_matches(attr_value, searchValue):
+            matches.append(record)
 
-    if not matches:
-        return json.dumps({"results": [], "count": 0})
-
+    total = len(matches)
     if searchResults == "first":
-        return json.dumps(
-            {
-                "results": [matches[0].to_display_dict()],
-                "count": 1,
-            }
-        )
-    else:
-        return json.dumps(
-            {
-                "results": [r.to_display_dict() for r in matches],
-                "count": len(matches),
-            }
-        )
+        matches = matches[:1]
+    return json.dumps(
+        {
+            "results": [r.to_display_dict() for r in matches],
+            "count": len(matches),
+            "total_count": total,
+        }
+    )
+
+
+def _canonical_object_type(name: str) -> str:
+    """Map "opportunity", "Opportunities" or " Contact " onto the canonical type name."""
+    cleaned = str(name).strip()
+    if cleaned in OBJECT_TYPE_MAP:
+        return cleaned
+    lowered = cleaned.lower()
+    for canonical, collection in OBJECT_TYPE_MAP.items():
+        if lowered in (canonical.lower(), collection.lower(), collection.lower().replace("_", "")):
+            return canonical
+    return cleaned
+
+
+def _value_matches(actual: Any, wanted: Any) -> bool:
+    """Case-insensitive equality or substring for text; formatting-blind for numbers/dates."""
+    if wanted is None or wanted == "":
+        return False
+    if isinstance(actual, str):
+        text = str(wanted).strip().lower()
+        return values_match(actual, wanted) or (bool(text) and text in actual.lower())
+    if hasattr(actual, "isoformat"):
+        return actual.isoformat().startswith(str(wanted).strip())
+    return values_match(actual, wanted)
+
+
+def _any_field_matches(record: Any, wanted: Any) -> bool:
+    for value in record.to_display_dict().values():
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            if _value_matches(value, wanted):
+                return True
+    return False
 
 
 register_metadata(

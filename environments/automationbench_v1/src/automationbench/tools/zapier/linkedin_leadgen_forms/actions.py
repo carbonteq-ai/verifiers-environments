@@ -9,7 +9,10 @@ import json
 from typing import Any, Dict, List, Optional
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -281,7 +284,7 @@ def linkedin_leadgen_forms_list_accounts(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_accounts", params)
+    records = find_records(app_state, "list_accounts", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -316,7 +319,7 @@ def linkedin_leadgen_forms_list_company_audiences(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_company_audiences", params)
+    records = find_records(app_state, "list_company_audiences", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -351,7 +354,7 @@ def linkedin_leadgen_forms_list_contact_audiences(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_contact_audiences", params)
+    records = find_records(app_state, "list_contact_audiences", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -388,7 +391,7 @@ def linkedin_leadgen_forms_list_conversions(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_conversions", params)
+    records = find_records(app_state, "list_conversions", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -425,7 +428,7 @@ def linkedin_leadgen_forms_list_events(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_events", params)
+    records = find_records(app_state, "list_events", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -458,7 +461,7 @@ def linkedin_leadgen_forms_list_forms(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_forms", params)
+    records = find_records(app_state, "list_forms", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -493,7 +496,7 @@ def linkedin_leadgen_forms_list_organizations(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_organizations", params)
+    records = find_records(app_state, "list_organizations", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -530,7 +533,7 @@ def linkedin_leadgen_forms_organic_form_response(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organic_form_response", params)
+    records = find_records(app_state, "organic_form_response", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -715,7 +718,7 @@ def linkedin_leadgen_forms_sponsored_form_response(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("sponsored_form_response", params)
+    records = find_records(app_state, "sponsored_form_response", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

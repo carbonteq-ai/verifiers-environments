@@ -9,7 +9,10 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -26,7 +29,7 @@ def basecamp3_account(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("account", params)
+    records = find_records(app_state, "account", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -61,7 +64,7 @@ def basecamp3_activity(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("activity", params)
+    records = find_records(app_state, "activity", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -96,7 +99,7 @@ def basecamp3_activity_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("activity_v2", params)
+    records = find_records(app_state, "activity_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -127,7 +130,7 @@ def basecamp3_campfire(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("campfire", params)
+    records = find_records(app_state, "campfire", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -243,7 +246,7 @@ def basecamp3_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("comment", params)
+    records = find_records(app_state, "comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -377,7 +380,7 @@ def basecamp3_find_todo(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_todo", params)
+    records = find_records(app_state, "find_todo", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -469,7 +472,7 @@ def basecamp3_folder(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("folder", params)
+    records = find_records(app_state, "folder", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -504,7 +507,7 @@ def basecamp3_list_todos(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_todos", params)
+    records = find_records(app_state, "list_todos", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -618,7 +621,7 @@ def basecamp3_message_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("message_board", params)
+    records = find_records(app_state, "message_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -737,7 +740,7 @@ def basecamp3_message_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("message_v2", params)
+    records = find_records(app_state, "message_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -934,7 +937,7 @@ def basecamp3_project_template(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("project_template", params)
+    records = find_records(app_state, "project_template", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -965,7 +968,7 @@ def basecamp3_schedule(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("schedule", params)
+    records = find_records(app_state, "schedule", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1073,7 +1076,7 @@ def basecamp3_schedule_entry_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("schedule_entry_v2", params)
+    records = find_records(app_state, "schedule_entry_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1106,7 +1109,7 @@ def basecamp3_sub_folder(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("sub_folder", params)
+    records = find_records(app_state, "sub_folder", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1328,7 +1331,7 @@ def basecamp3_todo_completed(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("todo_completed", params)
+    records = find_records(app_state, "todo_completed", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1457,7 +1460,7 @@ def basecamp3_todo_list_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("todo_list_v2", params)
+    records = find_records(app_state, "todo_list_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1488,7 +1491,7 @@ def basecamp3_todo_set(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("todo_set", params)
+    records = find_records(app_state, "todo_set", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1523,7 +1526,7 @@ def basecamp3_todo_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("todo_v2", params)
+    records = find_records(app_state, "todo_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

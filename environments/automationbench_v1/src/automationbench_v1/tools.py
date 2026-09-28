@@ -9,9 +9,10 @@ from typing import Any, cast, get_type_hints
 import verifiers.v1 as vf
 from pydantic import ConfigDict, Field, create_model
 
-from automationbench.schema.world import WorldState
 from automationbench.tools import ALL_TOOLS
 from automationbench.tools.zapier.meta import ToolRegistry
+
+from .world_codec import dump_world, load_world
 
 
 class _PortableToolRegistry(ToolRegistry):
@@ -75,9 +76,9 @@ class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState])
     def execute_tool(self, tool_name: str, arguments: str) -> str:
         """Execute a tool found by ``search_tools`` against this rollout's world."""
 
-        world = WorldState.model_validate(self.state.world)
+        world = load_world(self.state.world)
         result = _registry().execute(tool_name, arguments, world=world)
-        self.state.world = world.model_dump(mode="json")
+        self.state.world = dump_world(world)
         return result
 
 

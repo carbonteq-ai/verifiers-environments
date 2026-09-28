@@ -13,10 +13,10 @@ from typing import Any, Union, cast, get_args, get_origin, get_type_hints
 import verifiers.v1 as vf
 from pydantic import ConfigDict, create_model
 
-from automationbench.schema.world import WorldState
 from automationbench.tools import ALL_TOOLS
 
 from .tools import AutomationBenchState
+from .world_codec import dump_world, load_world
 
 _ZAPIER_TOOLS = {tool.__name__: tool for tool in ALL_TOOLS}
 
@@ -131,14 +131,14 @@ class AutomationBenchLimitedToolset(
         for name in _optional_string_parameters(func):
             if isinstance(kwargs.get(name), dict | list):
                 kwargs[name] = _string_argument(kwargs[name], name in json_parameters)
-        world = WorldState.model_validate(self.state.world)
+        world = load_world(self.state.world)
         cleaned = {
             key: value
             for key, value in kwargs.items()
             if not (isinstance(value, dict) and not value)
         }
         result = func(*args, world=world, **cleaned)
-        self.state.world = world.model_dump(mode="json")
+        self.state.world = dump_world(world)
         return result
 
     def _tool_wrapper(self, tool_name: str, func: Callable[..., Any]) -> Callable[..., Any]:

