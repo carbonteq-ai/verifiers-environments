@@ -14,7 +14,10 @@ maintains the compatibility delta from upstream Zapier commit
 exact Verifiers commit and resolved dependency graph.
 
 The wheel vendors the CarbonTeq AutomationBench fork at commit
-`908db2abd4a868acc37ab0850474bff653bea25c`. Vendoring keeps this standalone
+`e193bce99af1ea7cca272644a2b3a1676a587b4a` (branch `codex/tool-fidelity-fixes`): 1.0.5.post1 plus
+tool-fidelity fixes, so tools do what their names and parameters promise and
+return no template sample data (see the fork's `CARBONTEQ_FORK.md`). Graders
+and task data are unchanged. Vendoring keeps this standalone
 Verifiers environment installable without a second VCS dependency and lets
 posttrain job packaging produce one hash-locked runtime closure. The vendored
 source remains under the fork's original `automationbench` import namespace;
@@ -33,11 +36,18 @@ The adapter owns only the v1 boundary:
 - trace metadata containing assertion results and the final world state; and
 - optional per-turn rewards for step-level training (see below).
 
-The dependency is the public CarbonTeq AutomationBench fork at immutable merge
-commit `908db2abd4a868acc37ab0850474bff653bea25c`; no private package index or
+The dependency is the public CarbonTeq AutomationBench fork at immutable
+commit `e193bce99af1ea7cca272644a2b3a1676a587b4a`; no private package index or
 credential is required to build this environment library. The package is
 independent of posttrain, Trackio, trainers, serving systems, and the other
 environment packages.
+
+The adapter keeps the world as JSON between tool calls and rebuilds it for
+each call and for scoring (`world_codec.py`). Google Sheets' private record of
+updated rows travels with it, so `google_sheets_row_updated` and
+`google_sheets_row_not_updated` assertions see updates made by earlier calls
+(before 0.5.0 they never did). Lists sent for comma-separated string
+parameters arrive as `"a,b"`; parameters documented as JSON get JSON text.
 
 ## Per-turn rewards
 

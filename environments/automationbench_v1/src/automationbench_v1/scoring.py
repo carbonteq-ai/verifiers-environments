@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from automationbench.rubric import partial_credit, task_completed_correctly
-from automationbench.schema.world import WorldState
+
+from .world_codec import dump_world, load_world
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +31,7 @@ def score_world(
 
     state: dict[str, Any] = {
         "info": {"assertions": [dict(item) for item in assertions]},
-        "world": WorldState.model_validate(world),
+        "world": load_world(world),
         "initial_state": initial_state,
     }
     dense = float(partial_credit(state))
@@ -45,7 +46,7 @@ def score_world(
         assertions_scored=len(scored),
         assertions_excluded=len(results) - len(scored),
         assertion_results=results,
-        end_state=state["world"].model_dump(mode="json"),
+        end_state=dump_world(state["world"]),
     )
 
 

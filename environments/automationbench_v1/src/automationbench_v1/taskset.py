@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Iterable
 from typing import Any, ClassVar, Literal, cast
 
@@ -19,6 +20,13 @@ from .limited_tools import (
     AutomationBenchLimitedToolsetConfig,
 )
 from .scoring import ScoreSnapshot, score_world
+from .tool_mistakes import (
+    EMPTY_RESULT,
+    MISTAKES,
+    AutomationBenchMistakePenaltyConfig,
+    classify_tool_result,
+    is_mistake,
+)
 from .tools import AutomationBenchState, AutomationBenchToolset
 from .turn_rewards import (
     PROGRESS_KEY,
@@ -67,9 +75,7 @@ def _with_spreadsheet_discovery(
     return (*tools, SPREADSHEET_DISCOVERY_TOOL)
 
 
-UPSTREAM_TURN_BUDGET_SENTENCE = (
-    "You have a budget of ~50 tool-using turns — favor parallel tool calls and avoid duplicate searches. "
-)
+UPSTREAM_TURN_BUDGET_SENTENCE = "You have a budget of ~50 tool-using turns — favor parallel tool calls and avoid duplicate searches. "
 
 
 def _with_turn_budget(prompt: Any, turn_budget: int) -> Any:
@@ -88,9 +94,18 @@ def _with_turn_budget(prompt: Any, turn_budget: int) -> Any:
         raise ValueError("AutomationBench turn budget requires a message-list prompt")
     system = prompt[0]
     content = system.get("content")
-    if system.get("role") != "system" or not isinstance(content, str) or UPSTREAM_TURN_BUDGET_SENTENCE not in content:
-        raise ValueError("AutomationBench system prompt does not contain the upstream turn-budget sentence")
-    return [{**system, "content": content.replace(UPSTREAM_TURN_BUDGET_SENTENCE, replacement)}, *prompt[1:]]
+    if (
+        system.get("role") != "system"
+        or not isinstance(content, str)
+        or UPSTREAM_TURN_BUDGET_SENTENCE not in content
+    ):
+        raise ValueError(
+            "AutomationBench system prompt does not contain the upstream turn-budget sentence"
+        )
+    return [
+        {**system, "content": content.replace(UPSTREAM_TURN_BUDGET_SENTENCE, replacement)},
+        *prompt[1:],
+    ]
 
 
 def _service_for_name(name: str) -> str | None:
@@ -132,6 +147,8 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     turn_budget: int | None = Field(default=None, gt=0)
     # None records no per-turn rewards; SAMPO selects them explicitly.
     turn_rewards: AutomationBenchTurnRewardConfig | None = None
+    # None adds no penalty; training selects one to discourage tool mistakes.
+    mistake_penalty: AutomationBenchMistakePenaltyConfig | None = None
 
 
 class AutomationBenchTask(
@@ -209,7 +226,9 @@ class AutomationBenchTask(
         """
 
         if cast(AutomationBenchTaskConfig, self.config).turn_rewards is not None:
-            record_progress(trace.info, trace.num_turns, lambda: self._snapshot(trace).partial_credit)
+            record_progress(
+                trace.info, trace.num_turns, lambda: self._snapshot(trace).partial_credit
+            )
         return False
 
     async def finalize(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
@@ -228,16 +247,22 @@ class AutomationBenchTask(
             record_progress(trace.info, trace.num_turns, lambda: snapshot.partial_credit)
             self._attach_turn_evidence(trace, turn_rewards)
 
-    def _attach_turn_evidence(self, trace: vf.Trace, config: AutomationBenchTurnRewardConfig) -> None:
+    def _attach_turn_evidence(
+        self, trace: vf.Trace, config: AutomationBenchTurnRewardConfig
+    ) -> None:
         branches = trace.branches
         if len(branches) != 1:
             return  # Posttrain trains one branch; compacted episodes carry no turn rewards
         nodes = branches[0].nodes
-        turns = [node.message for node in nodes if node.sampled and node.message.role == "assistant"]
+        turns = [
+            node.message for node in nodes if node.sampled and node.message.role == "assistant"
+        ]
         if not turns:
             return
         tool_results = {
-            node.message.tool_call_id: node.message.content for node in nodes if node.message.role == "tool"
+            node.message.tool_call_id: node.message.content
+            for node in nodes
+            if node.message.role == "tool"
         }
         trace.info[TURN_EVIDENCE_KEY] = turn_evidence(
             trace_id=trace.id,
@@ -253,6 +278,28 @@ class AutomationBenchTask(
     @vf.reward(weight=1.0)
     async def partial_credit(self, trace: vf.Trace) -> float:
         return self._snapshot(trace).partial_credit
+
+    @vf.reward(weight=1.0)
+    async def tool_mistake_penalty(self, trace: vf.Trace) -> float:
+        """Minus the capped mistake penalty when one is selected; zero otherwise."""
+
+        config = cast(AutomationBenchTaskConfig, self.config).mistake_penalty
+        if config is None:
+            return 0.0
+        return -config.penalty(
+            sum(count for kind, count in _tool_outcomes(trace).items() if is_mistake(kind))
+        )
+
+    @vf.metric
+    async def tool_outcome_metrics(self, trace: vf.Trace) -> dict[str, float]:
+        outcomes = _tool_outcomes(trace)
+        return {
+            "tool_mistakes": float(
+                sum(count for kind, count in outcomes.items() if is_mistake(kind))
+            ),
+            "tool_empty_results": float(outcomes.get(EMPTY_RESULT, 0)),
+            **{f"tool_{kind}": float(outcomes.get(kind, 0)) for kind in sorted(MISTAKES)},
+        }
 
     @vf.metric
     async def outcome_metrics(self, trace: vf.Trace) -> dict[str, float]:
@@ -270,6 +317,25 @@ class AutomationBenchTask(
         for assertion in self.data.assertions:
             AssertionRegistry.check(world, dict(assertion))
         return True
+
+
+def _tool_outcomes(trace: vf.Trace) -> Counter[str]:
+    """Count each kind of failed tool result across the episode's sampled branch."""
+
+    outcomes: Counter[str] = Counter()
+    for branch in trace.branches[:1]:
+        names: dict[str, str | None] = {}
+        for node in branch.nodes:
+            message = node.message
+            if message.role == "assistant":
+                for call in getattr(message, "tool_calls", None) or []:
+                    names[call.id] = getattr(call, "name", None)
+            elif message.role == "tool":
+                call_id = getattr(message, "tool_call_id", None)
+                kind = classify_tool_result(names.get(call_id or ""), message.content)
+                if kind is not None:
+                    outcomes[kind] += 1
+    return outcomes
 
 
 class AutomationBenchConfig(vf.TasksetConfig):
