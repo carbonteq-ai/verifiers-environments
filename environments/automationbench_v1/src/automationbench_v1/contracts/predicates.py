@@ -579,9 +579,19 @@ _SPLIT_TOKEN = re.compile(r"\w+")
 # (PMT-2026-0402, 2026-02-01) or fraction-like code (1/2). Digit groups end in
 # a digit, so a trailing list comma ("$8,420, no") is punctuation. An adjacent
 # k/m/b magnitude suffix is captured (see ``_magnitude``).
+# A per-period unit after "/" ("$89/mo", "$1,200/year") does not hide the amount.
+_PERIOD_UNITS = r"(?:mo|mos|month|months|yr|yrs|year|years|wk|week|day|hr|hour|qtr|quarter|annum)"
 _NUMBER = re.compile(
-    r"(?<![\w.,$:/-])(?<!\w-)-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?(?![\w:/])(?!-\d)(?![.,]\d)"
+    # Start: not glued to a word/number, except a dollar amount right after
+    # "<digit>-" or "<digit>/" (the second end of "$2,790.00-$3,267.00").
+    r"(?:(?<![\w.,$:/-])(?<!\w-)|(?<=\d[-/])(?=\$))"
+    r"-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?"
+    # End: "/" only before a period unit or another dollar amount ("$89/$99").
+    r"(?![\w:])(?!/(?!\$|" + _PERIOD_UNITS + r"\b))(?!-\d)(?![.,]\d)",
+    re.IGNORECASE,
 )
+_PERIOD_SUFFIX = re.compile(r"(?:\s*/\s*|\s+per\s+)" + _PERIOD_UNITS + r"\.?$", re.IGNORECASE)
+_MAGNITUDE_TARGET = re.compile(r"(-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?)([kKmMbB])")
 _MAGNITUDE = {"k": 1000, "m": 1000000, "b": 1000000000}
 
 
@@ -655,6 +665,32 @@ class _Term:
     sole: bool = False
 
 
+def _target_amount(value, format):
+    """A mention target amount and the text it was read from.
+
+    Beyond the strict format, a target may carry a per-period suffix
+    ("$299/mo", "$89 per month": the amount is 299/89 and the suffix is
+    dropped from the reformatting comparison) or an exact magnitude suffix
+    ("$4.2M" = 4200000; ``k`` always, ``m``/``b`` only dollar-marked).
+    """
+    try:
+        return _decimal(value, format), value
+    except _Unavailable:
+        if type(value) is not str or len(value) > 256:
+            raise
+    text = value.strip()
+    core = _PERIOD_SUFFIX.sub("", text)
+    magnitude = _MAGNITUDE_TARGET.fullmatch(core)
+    if magnitude is not None:
+        body, suffix = magnitude.groups()
+        if suffix not in "kK" and "$" not in body:
+            raise _Unavailable("value_decimal_format_unavailable")
+        return _decimal(body, format) * _MAGNITUDE[suffix.lower()], core
+    if core == text:
+        raise _Unavailable("value_decimal_format_unavailable")
+    return _decimal(core, format), core
+
+
 def _prepare(term: MentionTerm, context: Mapping):
     """Return (_Term | None, reason, paths); None means the term is unknown."""
     if term.mode == "date":
@@ -671,8 +707,10 @@ def _prepare(term: MentionTerm, context: Mapping):
             expected = Fraction(str(value.canonical_value))
         else:
             try:
-                expected = (clock_minutes(value) if term.mode == "clock_time"
-                            else _decimal(value, term.format))
+                if term.mode == "clock_time":
+                    expected = clock_minutes(value)
+                else:
+                    expected, source_text = _target_amount(value, term.format)
             except _Unavailable:
                 return None, "predicate_mentions_value_unavailable", paths
         literal = ""

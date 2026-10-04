@@ -124,3 +124,51 @@ def test_zendesk_scope_reconciles_sparse_public_state():
     source = run_operations({}, [])
     source["task_evidence"]["initial"] = {}
     assert zendesk_evidence(source).complete
+
+
+# --- Item 2: amount ranges, per-period suffixes and target magnitudes -------
+
+
+def _mention(text, value, mode="amount", fmt="usd_string", sole=False):
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    raw = {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body"], "domain": "string"},
+           "value": {"kind": "literal", "value": value}, "mode": mode, "format": fmt}
+    if sole:
+        raw["sole"] = True
+    return evaluate_predicate(parse_predicate(raw), {"effect": {"body": text}}).value
+
+
+@pytest.mark.parametrize("text,value,sole,expected", [
+    ("Grand total: $2,790.00-$3,267.00", "$3,267.00", False, True),
+    ("Grand total: $2,790.00-$3,267.00", "$2,790.00", True, False),
+    ("Grand total: $2,790.00–$3,267.00", "$2,790.00", True, False),
+    ("Either $89/$99", "$99", False, True),
+    ("Either $89/$99", "$89", True, False),
+    ("Renewal amount: $89/mo", "$89", False, True),
+    ("Renewal amount: $89/month", "$89", True, True),
+    ("Renewal amount: $1,200/yr", "$1,200", False, True),
+    ("Renewal amount: $89 per month", "$89", False, True),
+    ("Due 3/5/2026", "$3", False, False),
+    ("Ref 2026-05-01", "$5", False, False),
+])
+def test_unspaced_ranges_and_period_suffixes_read_every_amount(text, value, sole, expected):
+    assert _mention(text, value, sole=sole) is expected
+
+
+@pytest.mark.parametrize("text,value,mode,expected", [
+    ("Plan: $299/mo", "$299/mo", "amount", True),
+    ("Plan: $299 per month", "$299 per month", "amount", True),
+    ("Plan: $300/mo", "$299/mo", "amount", False),
+    ("Plan: $299/mo", "$299/mo", "amount_reformatted", False),   # same text is not reformatted
+    ("Plan: 299 dollars", "$299/mo", "amount_reformatted", True),
+    ("Valued at $4.2M", "$4.2M", "amount", True),
+    ("Valued at $4,200,000", "$4.2M", "amount", True),
+    ("Valued at $4,200,000", "$4.2M", "amount_reformatted", True),
+    ("Valued at $4.2M", "$4.2M", "amount_reformatted", False),
+    ("Valued at $4,250,000", "$4.2M", "amount", False),
+    ("Valued at $4.2M", "4.2M", "amount", None),                  # bare m target stays unknown
+    ("Valued at $4.2M", "$4.2M/mo extra", "amount", None),
+])
+def test_targets_with_period_or_magnitude_suffixes_are_readable(text, value, mode, expected):
+    assert _mention(text, value, mode=mode) is expected
