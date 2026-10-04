@@ -271,6 +271,27 @@ class Proven(Frozen):
     arg: Predicate
 
 
+class Present(Frozen):
+    """The field resolves to a non-null value.
+
+    True for any non-null value; false for an explicit null, or when the path
+    is decidably absent inside a known effect record (``effect.*`` /
+    ``joined.*``: a missing key, a missing list index such as
+    ``signers[1]`` with one signer, or a null container on the way); unknown
+    when the root (the record itself) is unavailable, when a key is missing
+    from any other root (rows, lookups, requests), or when a scalar sits where
+    a container is expected.
+    """
+
+    op: Literal["present"]
+    value: FieldValue
+
+
+# Roots whose records are complete captured snapshots, so a missing key or
+# index is decidably absent rather than unread.
+_KNOWN_RECORD_ROOTS = frozenset({"effect", "joined"})
+
+
 class Exists(Frozen):
     """Some member of a declared closed population satisfies ``where``.
 
@@ -288,7 +309,7 @@ class Exists(Frozen):
 
 
 type Predicate = Annotated[
-    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven | Exists,
+    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven | Exists | Present,
     Field(discriminator="op"),
 ]
 Junction.model_rebuild()
@@ -402,6 +423,34 @@ def resolve_operand(operand: Operand, context: Mapping) -> tuple[bool, Any, tupl
     return True, value, (operand.path,)
 
 
+def _present(path: Path, context: Mapping) -> PredicateResult:
+    paths = (path,)
+    if not isinstance(context, Mapping) or path[0] not in context:
+        return PredicateResult(None, "predicate_field_unavailable", paths)
+    known_record = path[0] in _KNOWN_RECORD_ROOTS
+    value: Any = context[path[0]]
+    for part in path[1:]:
+        if value is None:
+            break
+        if isinstance(part, int):
+            if not isinstance(value, (list, tuple)):
+                return PredicateResult(None, "predicate_field_unavailable", paths)
+            if part >= len(value):
+                return PredicateResult(False if known_record else None,
+                                       "predicate_field_absent" if known_record else "predicate_field_unavailable", paths)
+            value = value[part]
+        else:
+            if not isinstance(value, Mapping):
+                return PredicateResult(None, "predicate_field_unavailable", paths)
+            if part not in value:
+                return PredicateResult(False if known_record else None,
+                                       "predicate_field_absent" if known_record else "predicate_field_unavailable", paths)
+            value = value[part]
+    if value is None:
+        return PredicateResult(False, "predicate_field_null", paths)
+    return PredicateResult(True, "predicate_field_present", paths)
+
+
 def _scalar(value: Any) -> bool:
     return type(value) in {str, bool, int, type(None)} or (
         type(value) is float and math.isfinite(value)
@@ -455,6 +504,8 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
         return _mentions_together(predicate, context)
     if isinstance(predicate, Exists):
         return _exists(predicate, context)
+    if isinstance(predicate, Present):
+        return _present(predicate.value.path, context)
     if isinstance(predicate, Proven):
         result = _evaluate(predicate.arg, context)
         return PredicateResult(result.value is True, "predicate_proven" if result.value else "predicate_not_proven",
@@ -473,6 +524,19 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
                 return PredicateResult(None, "predicate_derived_operation_unavailable", paths)
             value = boolean.canonical_value == raw
             return PredicateResult(value if predicate.op == "eq" else not value, "predicate_decided", paths)
+        # A decimal derivation (days_between, arithmetic) against a plain
+        # number compares numerically; strings never acquire number semantics.
+        derived, raw = (left, right) if isinstance(left, ValueResult) else (right, left)
+        if (isinstance(derived, ValueResult) and not isinstance(raw, ValueResult)
+                and derived.kind in {"decimal", "day_count"} and type(raw) in {int, float}
+                and predicate.op != "in"):
+            x, y = Decimal(str(derived.canonical_value)), Decimal(str(raw))
+            if derived is right:
+                x, y = y, x
+            ordering = (x > y) - (x < y)
+            value = {"eq": ordering == 0, "ne": ordering != 0, "lt": ordering < 0, "lte": ordering <= 0,
+                     "gt": ordering > 0, "gte": ordering >= 0}[predicate.op]
+            return PredicateResult(value, "predicate_decided", paths)
         # Typed derivations are compared explicitly on both sides. Raw strings
         # and numeric literals must not silently acquire date/money semantics.
         if not isinstance(left, ValueResult) or not isinstance(right, ValueResult) or left.kind != right.kind:

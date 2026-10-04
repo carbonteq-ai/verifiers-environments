@@ -267,3 +267,55 @@ def test_xero_record_writes_use_a_single_declared_identity_field():
     assert RecordWriteSource.model_validate({**spec, "kind": "create"}).model_dump(mode="json")["identity_paths"]
     plain = RecordWriteSource.model_validate({"service": "zoom", "collection": ["meetings"], "kind": "create"})
     assert "identity_paths" not in plain.model_dump(mode="json")
+
+
+# --- Item 5 / D6: present predicate; decimal derivations vs number literals -
+
+
+def _evaluate(raw, context):
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    return evaluate_predicate(parse_predicate(raw), context).value
+
+
+def _present(*path):
+    return {"op": "present", "value": {"kind": "field", "path": list(path)}}
+
+
+@pytest.mark.parametrize("path,expected", [
+    (("effect", "record", "params", "due_on"), True),
+    (("effect", "record", "params", "assignee"), False),          # Asana omits unset params
+    (("effect", "record", "params", "notes"), False),             # explicit null
+    (("effect", "record", "signers", 0, "email"), True),
+    (("effect", "record", "signers", 1, "email"), False),         # decidably absent index
+    (("effect", "record", "cc", 0), False),                       # null container
+    (("effect", "record", "name", "first"), None),                # scalar where a mapping is expected
+    (("joined", "record_id"), True),
+    (("request", "Owner"), None),                                  # missing key in a row: unread
+    (("request", "Blank"), False),
+    (("lookup_row", "Rank"), None),                                # unavailable record
+])
+def test_present_is_three_valued(path, expected):
+    context = {"effect": {"record": {"name": "Task", "params": {"due_on": "2026-03-01", "notes": None},
+                                     "signers": [{"email": "a@example.com"}], "cc": None}},
+               "joined": {"record_id": "X"}, "request": {"Blank": None}}
+    assert _evaluate(_present(*path), context) is expected
+
+
+def test_present_rejects_non_field_operands_and_composes():
+    with pytest.raises(ValueError):
+        _evaluate({"op": "present", "value": {"kind": "literal", "value": 1}}, {})
+    context = {"effect": {"record": {"params": {}}}}
+    assert _evaluate({"op": "not", "arg": _present("effect", "record", "params", "assignee")}, context) is True
+
+
+@pytest.mark.parametrize("op,number,expected", [("eq", 31, True), ("lte", 30, False), ("gt", 30.5, True), ("ne", 31, False)])
+def test_decimal_derivations_compare_with_plain_numbers(op, number, expected):
+    days = {"kind": "derived", "expression": {"kind": "days_between",
+            "start": {"kind": "input", "format": "iso_date", "literal": "2026-01-01"},
+            "end": {"kind": "input", "format": "iso_date", "literal": "2026-02-01"}}}
+    raw = {"op": op, "left": days, "right": {"kind": "literal", "value": number}}
+    assert _evaluate(raw, {}) is expected
+    mirror = {"lt": "gt", "lte": "gte", "gt": "lt", "gte": "lte", "eq": "eq", "ne": "ne"}[op]
+    assert _evaluate({"op": mirror, "left": {"kind": "literal", "value": number}, "right": days}, {}) is expected
+    assert _evaluate({"op": op, "left": days, "right": {"kind": "literal", "value": "31"}}, {}) is None
