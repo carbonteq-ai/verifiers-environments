@@ -18,7 +18,7 @@ from pydantic import StrictBool, StrictInt, StrictStr, TypeAdapter, model_valida
 from automationbench.schema.hubspot import HubSpotContact, HubSpotDeal
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel, Identifier
@@ -403,7 +403,7 @@ def capture_hubspot_evidence(source: Mapping, spec: HubSpotObjectSource) -> HubS
     try:
         if any(not isinstance(source.get(key), (tuple, list)) for key in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("hubspot_execution_inventory_unavailable")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
         initial = _initial(source, index, spec)
         for item in index.occurrences:
             try:

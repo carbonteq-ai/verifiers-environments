@@ -21,10 +21,10 @@ from automationbench_v1.contracts.slack_reads import SlackReadSource, capture_sl
 # --- D4: two harm guards firing on one call ---------------------------------
 
 
-def _two_guard_contract(channels=("harm", "harm")):
+def _two_guard_contract(channels=("harm", "harm"), raw=False):
     first, second = declaration(), declaration()
     second["check_id"], second["signal_id"] = "prohibited-provision-again", "access.prohibited_again"
-    return load_contract(canonical_json({
+    return (dict if raw else lambda value: load_contract(canonical_json(value)))({
         "schema_version": 1,
         "manifest_id": "native-two-guard-fixture",
         "revision": "1",
@@ -43,7 +43,7 @@ def _two_guard_contract(channels=("harm", "harm")):
         "checks": [first, second],
         "credit": [{"check": first["check_id"], "policy": "per_effect_negative@1", "channel": channels[0]},
                    {"check": second["check_id"], "policy": "per_effect_negative@1", "channel": channels[1]}],
-    }))
+    })
 
 
 @pytest.mark.parametrize("channels", [("harm", "harm"), ("harm", "harm_b")])
@@ -319,3 +319,97 @@ def test_decimal_derivations_compare_with_plain_numbers(op, number, expected):
     mirror = {"lt": "gt", "lte": "gte", "gt": "lt", "gte": "lte", "eq": "eq", "ne": "ne"}[op]
     assert _evaluate({"op": mirror, "left": {"kind": "literal", "value": number}, "right": days}, {}) is expected
     assert _evaluate({"op": op, "left": days, "right": {"kind": "literal", "value": "31"}}, {}) is None
+
+
+# --- Items 6/7 (D1/D2): zero-call runs, failed no-op writes, raised calls ---
+
+
+def _sheets():
+    from test_manifest_sheet_effects import initial as sheet_initial
+    from test_manifest_sheet_effects import spec as sheet_spec
+
+    return sheet_initial, sheet_spec
+
+
+def test_sheet_scope_closes_on_a_run_without_tool_calls():
+    from automationbench_v1.contracts.sheet_effects import capture_sheet_effects
+
+    sheet_initial, sheet_spec = _sheets()
+    source = run_operations(sheet_initial(), [])
+    source["task_evidence"]["initial"] = sheet_initial()
+    evidence = capture_sheet_effects(source, sheet_spec("append"))
+    assert evidence.complete and not evidence.effects, evidence.reason
+    source["task_evidence"]["initial"]["google_sheets"]["rows"][0]["cells"]["Amount"] = "$11"
+    assert not capture_sheet_effects(source, sheet_spec("append")).complete
+
+
+def test_failed_sheet_write_that_changed_nothing_keeps_scope_closed():
+    from automationbench.tools.zapier.google_sheets.row import google_sheets_add_row, google_sheets_update_row
+    from automationbench_v1.contracts.sheet_effects import capture_sheet_effects
+
+    sheet_initial, sheet_spec = _sheets()
+    failed = zapier("google_sheets_update_row", {}, lambda world: google_sheets_update_row(world))
+    args = {"spreadsheet": "sheet", "worksheet": "tab", "cells": {"Name": "New", "Amount": "$30"}}
+    added = zapier("google_sheets_add_row", args, lambda world: google_sheets_add_row(world, **args))
+    source = run_operations(sheet_initial(), [failed, added])
+    evidence = capture_sheet_effects(source, sheet_spec("append"))
+    assert evidence.complete, evidence.reason
+    assert [fact.invocation_id for fact in evidence.effects if fact.status == "qualified"] == ["execution-1"]
+
+
+def _with_raised_call(source, position=0):
+    """Insert a dispatched call that raised before running (no write, no revision)."""
+    source = copy.deepcopy(source)
+    receipt = {"invocation_id": "raised-0", "phase": "raised", "tool_name": "quickbooks_create_invoice",
+               "arguments_json": "{}", "error_json": canonical_json({"type": "TypeError"}),
+               "state_read_revision": position, "state_persistence": "not_attempted"}
+    source["tool_execution_events"].insert(position, {"source": "tool_server", "receipt_json": canonical_json(receipt)})
+    return source
+
+
+@pytest.mark.parametrize("position", [0, 1])
+def test_a_call_that_raised_before_running_opens_no_inventory(position):
+    from automationbench_v1.contracts.sheet_effects import capture_sheet_effects
+
+    slack = _with_raised_call(_sparse_slack_source({}), position)
+    evidence = capture_slack_effects(slack, SlackEffectSource.model_validate({"kind": "channel_message"}))
+    assert evidence.complete and [fact.status for fact in evidence.effects] == ["qualified"], evidence.reason
+    assert capture_slack_reads(slack, SlackReadSource.model_validate({})).complete
+    sheet_initial, sheet_spec = _sheets()
+    sheets = _with_raised_call(run_operations(sheet_initial(), []), 0)
+    assert capture_sheet_effects(sheets, sheet_spec("append")).complete
+    # A raised call that claims applied persistence is not exempt.
+    claimed = copy.deepcopy(slack)
+    for event in claimed["tool_execution_events"]:
+        receipt = json.loads(event["receipt_json"])
+        if receipt["invocation_id"] == "raised-0":
+            receipt["state_persistence"] = "applied"
+            event["receipt_json"] = canonical_json(receipt)
+    assert not capture_slack_effects(claimed, SlackEffectSource.model_validate({"kind": "channel_message"})).complete
+
+
+# --- Round-4 D3: admission is closed under canonical re-save ----------------
+
+
+def _obligation_contract(copies):
+    from test_manifest_obligation_assessments import contract as obligation_contract
+
+    raw = obligation_contract().model_dump(mode="json")
+    term = {"value": {"kind": "literal", "value": "2:00 PM"}, "mode": "clock_time"}
+    label = {"value": {"kind": "literal", "value": "UTC"}, "mode": "words"}
+    text = {"kind": "field", "path": ["effect", "notes"], "domain": "string"}
+    raw["checks"][0]["effect_match"] = {
+        "op": "any", "args": [{"op": "mentions_together", "text": text, "terms": [term, label]}] * copies}
+    return raw
+
+
+def test_contract_whose_canonical_resave_exceeds_the_budget_is_rejected_at_load():
+    from automationbench_v1.contracts.predicates import parse_predicate
+
+    copies = 190  # compact: under the 4096-node budget; canonical (defaults written out): over it
+    raw = _obligation_contract(copies)
+    parse_predicate(raw["checks"][0]["effect_match"])
+    with pytest.raises(ValueError, match="contract_canonical_form_inadmissible"):
+        load_contract(json.dumps(raw))
+    loaded = load_contract(json.dumps(_obligation_contract(20)))
+    assert load_contract(canonical_json(loaded.model_dump(mode="json"))) == loaded

@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict
 
 from ..asana_evidence import action_records, asana_effects
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation
 from .handler_scope import outside_service
@@ -112,7 +112,7 @@ API/foreign operations and missing capture cannot establish an absence result.
         for field in ("tool_execution_events", "state_write_receipts"):
             if not isinstance(source.get(field), (tuple, list)):
                 raise TypeError("execution_inventory_missing")
-        index = EffectIndex(world_transitions(source))
+        index = EffectIndex(persisted_transitions(source))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))
         return result()

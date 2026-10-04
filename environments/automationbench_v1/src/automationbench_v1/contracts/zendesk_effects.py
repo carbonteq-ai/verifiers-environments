@@ -11,7 +11,7 @@ from automationbench.tools.api.fetch import _url_to_internal_path
 from automationbench.tools.api.routes.zendesk import route_zendesk
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
@@ -136,7 +136,7 @@ def capture_zendesk_ticket_effects(source: Mapping, spec: ZendeskTicketEffectSou
     try:
         if any(not isinstance(source.get(field), (list, tuple)) for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("zendesk_execution_inventory_missing")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         return EffectEvidence(source_id, selector_id, (), False, str(error))
     for occurrence in index.occurrences:

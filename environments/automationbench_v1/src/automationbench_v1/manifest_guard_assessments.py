@@ -355,18 +355,20 @@ def execution_subject(source, occurrence):
 def guard_requests(source, contract, view, material, trace_subject):
     tables, effects = restore_guard_inputs(material, contract)
     requests = []
+    source_digest, contract_digest = digest(material["source"]), canonical_contract_digest(contract)
     for check in contract.checks:
         if not isinstance(check, GuardCheck):
             continue
+        selectors = selectors_digest(contract, check)
         cases, potential = plan_guard_instances(
             check, tables[check.population], effects[check.source],
             *(effects[item.source] for item in check.alternatives),
         )
         for case in (*cases, None):
             config = {
-                "contract_digest": canonical_contract_digest(contract),
-                "source_digest": digest(material["source"]),
-                "selectors_digest": selectors_digest(contract, check),
+                "contract_digest": contract_digest,
+                "source_digest": source_digest,
+                "selectors_digest": selectors,
                 "check_id": check.check_id,
                 "instance_key": case.instance_key if case is not None else "scope",
                 "case": asdict(case) if case is not None else None,
@@ -491,13 +493,16 @@ def assess_guard(task, request, context):
                 alternative_effects={item.alias: effects[item.source] for item in check.alternatives},
                 alternative_sources={item.alias: contract.sources[item.source] for item in check.alternatives},
             )
-        cache[key] = (material, contract, check, evaluation, cases, potential)
+        # Digests are computed once per cached evaluation, not per instance.
+        digests = (digest(material["source"]), selectors_digest(contract, check), canonical_contract_digest(contract))
+        cache[key] = (material, contract, check, evaluation, cases, potential, digests)
         while len(cache) > 8:
             cache.popitem(last=False)
-    material, contract, check, evaluation, cases, potential = cache[key]
+    material, contract, check, evaluation, cases, potential, digests = cache[key]
+    source_digest, selectors, contract_digest = digests
     if (
-        config["source_digest"] != digest(material["source"])
-        or config["selectors_digest"] != selectors_digest(contract, check)
+        config["source_digest"] != source_digest
+        or config["selectors_digest"] != selectors
         or config["potential_instances"] != potential
     ):
         raise ValueError("guard_requested_input_mismatch")
@@ -533,9 +538,9 @@ def assess_guard(task, request, context):
             finding.candidate_identity,
         )
     output = GuardOutput(
-        contract_digest=canonical_contract_digest(contract),
-        source_digest=digest(material["source"]),
-        selectors_digest=selectors_digest(contract, check),
+        contract_digest=contract_digest,
+        source_digest=source_digest,
+        selectors_digest=selectors,
         input_digest=view.input_digest,
         check_id=check.check_id,
         instance_key=config["instance_key"],

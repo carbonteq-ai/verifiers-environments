@@ -25,7 +25,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation
 from .base import FrozenModel, Identifier
@@ -215,7 +215,7 @@ def capture_record_writes(source: Mapping, spec: RecordWriteSource) -> EffectEvi
         if any(not isinstance(source.get(field), (list, tuple))
                for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("record_writes_execution_inventory_missing")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))
         return result()

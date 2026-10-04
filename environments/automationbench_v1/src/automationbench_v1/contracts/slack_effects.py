@@ -10,7 +10,7 @@ from dataclasses import asdict
 from typing import Any, Literal
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
@@ -208,7 +208,7 @@ def capture_slack_effects(source: Mapping, spec: SlackEffectSource) -> EffectEvi
     try:
         if any(not isinstance(source.get(field), (list, tuple)) for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("slack_execution_inventory_missing")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))
         return result()

@@ -11,7 +11,7 @@ from automationbench.tools.api.fetch import _url_to_internal_path
 from automationbench.tools.api.routes.gmail import route_gmail
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
@@ -153,7 +153,7 @@ def capture_gmail_observations(source: Mapping, spec: GmailObservationSource) ->
     try:
         if any(not isinstance(source.get(field), (list, tuple)) for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("gmail_observation_execution_inventory_missing")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
         terminals = {}
         for event in source["tool_execution_events"]:
             receipt = json.loads(event["receipt_json"])
