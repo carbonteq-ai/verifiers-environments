@@ -16,6 +16,7 @@ from .capture import canonical_json
 from .contracts.base import FrozenModel
 from .contracts.effects import EffectEvidence, EffectFact, EffectSource, capture_effects
 from .contracts.engine import binding_reason
+from .contracts.existentials import exists_names
 from .contracts.gmail_observations import GmailObservationSource, capture_gmail_observations
 from .contracts.guards import (
     GuardCheck,
@@ -31,6 +32,7 @@ from .contracts.record_writes import RecordWriteSource, capture_record_writes
 from .contracts.requests import RequestPopulationEvidence, RequestSource, capture_request_population
 from .contracts.sheet_effects import SheetEffectSource, capture_sheet_effects
 from .contracts.slack_effects import SlackEffectSource, capture_slack_effects
+from .contracts.slack_reads import SlackReadSource, capture_slack_reads
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
 
 GUARD_PRODUCER = "automationbench.manifest_guards"
@@ -186,6 +188,8 @@ def capture_effect_input(source, spec):
         return capture_record_writes(source, spec)
     if isinstance(spec, GmailObservationSource):
         return capture_gmail_observations(source, spec)
+    if isinstance(spec, SlackReadSource):
+        return capture_slack_reads(source, spec)
     if isinstance(spec, SlackEffectSource):
         return capture_slack_effects(source, spec)
     if isinstance(spec, SheetEffectSource):
@@ -198,7 +202,8 @@ def capture_effect_input(source, spec):
 def _guard_names(contract):
     checks = [check for check in contract.checks if isinstance(check, GuardCheck)]
     table_names = {name for check in checks
-                   for name in (check.population, *(lookup.source for lookup in check.lookups))}
+                   for name in (check.population, *(lookup.source for lookup in check.lookups),
+                                *exists_names(check))}
     effect_names = {name for check in checks
                     for name in (check.source, *(item.source for item in check.effect_joins))}
     return table_names, effect_names
@@ -226,7 +231,7 @@ def capture_guard_inputs(source, contract) -> dict:
     effects = {
         key: asdict(capture_effect_input(source, spec))
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource))
     }
     return {
         "table_evidence_json": canonical_json(tables),
@@ -256,7 +261,7 @@ def restore_guard_inputs(material, contract):
     effect_sources = {
         key: spec
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource))
     }
     if set(tables) != set(table_sources) or set(effects) != set(effect_sources):
         raise ValueError("guard_input_inventory_mismatch")
@@ -280,6 +285,7 @@ def required_tables(check):
         *(lookup.source for lookup in check.lookups),
         *(item.aggregate.population for item in getattr(check, "aggregates", ())),
         *(item.population for item in getattr(check, "selections", ())),
+        *exists_names(check),
     }
 
 

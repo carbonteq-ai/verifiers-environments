@@ -23,6 +23,7 @@ from .authored_outputs import AuthoredOutputSource
 from .base import FrozenModel, Identifier
 from .created_objects import CreatedRetainedCheck
 from .effects import EffectSource
+from .existentials import exists_names
 from .external_outputs import ExternalOutputSource
 from .gmail_observations import GmailObservationSource
 from .guards import GuardCheck
@@ -38,6 +39,7 @@ from .retained import RetainedRowCheck
 from .retained_records import RetainedRecordCheck, RetainedRecordSource
 from .sheet_effects import SheetEffectSource
 from .slack_effects import SlackEffectSource
+from .slack_reads import SlackReadSource
 from .summary_policy import SummaryExclusionCheck
 from .tables import TableSource
 from .zendesk_effects import ZendeskTicketEffectSource
@@ -248,6 +250,7 @@ class ContractSpec(FrozenModel):
             | SlackEffectSource
             | RecordWriteSource
             | GmailObservationSource
+            | SlackReadSource
             | JiraIssueSource
             | HubSpotObjectSource
             | ZendeskTicketEffectSource
@@ -295,6 +298,18 @@ class ContractSpec(FrozenModel):
             source = self.sources.get(check.source)
             if source is None:
                 raise ValueError("unknown_check_source")
+            existential = exists_names(check)
+            if existential:
+                if not isinstance(check, (ObligationCheck, GuardCheck)):
+                    raise ValueError("exists_requires_effect_check")
+                if any(lookup.alias == "population" for lookup in check.lookups):
+                    raise ValueError("exists_context_alias_conflict")
+                for name in existential:
+                    population = self.sources.get(name)
+                    if not isinstance(population, (TableSource, InitialCollectionSource)) or (
+                        population.path[:2] != ("task_evidence", "initial")
+                    ):
+                        raise ValueError("exists_requires_initial_population")
             if isinstance(check, (SummaryExclusionCheck, NoClarificationCheck)):
                 if not isinstance(source, AuthoredOutputSource) or not isinstance(
                     self.sources.get(check.external), ExternalOutputSource
@@ -350,6 +365,8 @@ class ContractSpec(FrozenModel):
                     check, ObligationCheck
                 ):
                     raise ValueError("gmail_observation_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, SlackReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("slack_read_requires_obligation_check")  # noqa: TRY004
                 if not isinstance(
                     source,
                     (
@@ -358,6 +375,7 @@ class ContractSpec(FrozenModel):
                         SheetEffectSource,
                         SlackEffectSource,
                         GmailObservationSource,
+                        SlackReadSource,
                         RecordWriteSource,
                     ),
                 ):
@@ -380,14 +398,14 @@ class ContractSpec(FrozenModel):
                     for alternative in check.alternatives:
                         if not isinstance(self.sources.get(alternative.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_alternative_requires_effect_source")  # noqa: TRY004
                 if isinstance(check, (ObligationCheck, GuardCheck)):
                     for join in check.effect_joins:
                         if not isinstance(self.sources.get(join.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_join_requires_effect_source")  # noqa: TRY004
                 for item in check.aggregates if isinstance(check, ObligationCheck) else ():

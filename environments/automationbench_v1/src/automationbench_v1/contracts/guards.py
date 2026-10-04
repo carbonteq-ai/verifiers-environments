@@ -17,6 +17,7 @@ from pydantic import Field, StrictInt, field_serializer, model_validator
 from ..capture import canonical_json
 from .base import FrozenModel, Identifier
 from .effects import EffectEvidence, EffectFact, EffectSource
+from .existentials import exists_context, exists_names
 from .joins import EffectJoin, join_context, validate_join_paths
 from .notification_effects import NotificationEffectSource
 from .populations import lookup_population, native_record_id
@@ -253,7 +254,8 @@ def evaluate_guard(
     if not population.rows and population.status == "unavailable":
         return GuardEvaluation((), None, "guard_population_unavailable")
     findings = []
-    contexts = [_candidate_context(check, row, tables) for row in population.rows]
+    shared = exists_context(exists_names(check), tables)
+    contexts = [_candidate_context(check, row, tables) | shared for row in population.rows]
     unique_matches = {}
     for effect in effects.effects:
         possible = []
