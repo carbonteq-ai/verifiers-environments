@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any, ClassVar, Literal, cast
 
 import verifiers.v1 as vf
@@ -30,6 +31,101 @@ def _strip_none(value: Any) -> Any:
     if isinstance(value, list):
         return [_strip_none(item) for item in value if item is not None]
     return value
+
+
+SPREADSHEET_DISCOVERY_TOOL = "google_drive_find_multiple_files"
+
+
+def _with_spreadsheet_discovery(
+    tools: tuple[str, ...], prompt: Any, initial_state: dict[str, Any]
+) -> tuple[str, ...]:
+    """Give limited_zapier tasks a way to find the spreadsheets their Sheets tools need.
+
+    The upstream tool lists for every HR task and a few marketing tasks offer only
+    Sheets tools that take a spreadsheet ID, while the prompt never names that ID
+    and no tool can list spreadsheets, so the policy can only guess IDs. Drive file
+    search returns spreadsheets (all of them when the query matches none) and does
+    not change any scored state, so adding it makes those tasks solvable without
+    touching the benchmark data.
+    """
+
+    if not any(tool.startswith("google_sheets_") for tool in tools):
+        return tools
+    if any(tool.startswith("google_drive_find") for tool in tools):
+        return tools
+    spreadsheets = initial_state.get("google_sheets", {}).get("spreadsheets", [])
+    ids = [str(sheet["id"]) for sheet in spreadsheets if sheet.get("id")]
+    text = str(prompt)
+    if not ids or all(sheet_id in text for sheet_id in ids):
+        return tools
+    return (*tools, SPREADSHEET_DISCOVERY_TOOL)
+
+
+UPSTREAM_TURN_BUDGET_SENTENCE = "You have a budget of ~50 tool-using turns — favor parallel tool calls and avoid duplicate searches. "
+
+
+def _with_turn_budget(prompt: Any, turn_budget: int) -> Any:
+    """Replace the upstream "~50 turns" system sentence with the budget the harness enforces.
+
+    Every upstream domain prompt carries the same sentence, while training harnesses
+    stop episodes much earlier. Stating the real budget, and asking for brief thinking,
+    keeps the policy from planning for turns or reply length it will never get.
+    """
+
+    replacement = (
+        f"You have a budget of {turn_budget} tool-using turns — favor parallel tool calls, avoid duplicate "
+        "searches, keep your thinking brief, and act as soon as you have enough information. "
+    )
+    if not isinstance(prompt, list) or not prompt or not isinstance(prompt[0], dict):
+        raise ValueError("AutomationBench turn budget requires a message-list prompt")
+    system = prompt[0]
+    content = system.get("content")
+    if (
+        system.get("role") != "system"
+        or not isinstance(content, str)
+        or UPSTREAM_TURN_BUDGET_SENTENCE not in content
+    ):
+        raise ValueError(
+            "AutomationBench system prompt does not contain the upstream turn-budget sentence"
+        )
+    return [
+        {**system, "content": content.replace(UPSTREAM_TURN_BUDGET_SENTENCE, replacement)},
+        *prompt[1:],
+    ]
+
+
+def _with_world_time(prompt: Any, declared_time: Any) -> Any:
+    """Expose only the explicit simulated clock, never a host-time fallback.
+
+    Preserve the declared timestamp and its precision. Legacy worlds sometimes
+    omit an offset; disclose that absence instead of assigning them a timezone.
+    This changes public task context and therefore the frozen task digest.
+    """
+    if not isinstance(declared_time, str) or "T" not in declared_time:
+        raise ValueError("world time context requires an explicit ISO datetime")
+    try:
+        instant = datetime.fromisoformat(declared_time)
+    except ValueError as exc:
+        raise ValueError("world time context requires an explicit ISO datetime") from exc
+    if not isinstance(prompt, list) or not prompt or not isinstance(prompt[0], dict):
+        raise ValueError("world time context requires a message-list prompt")
+    system = prompt[0]
+    content = system.get("content")
+    if system.get("role") != "system" or not isinstance(content, str):
+        raise ValueError("world time context requires an initial system message")
+    precision = (
+        "The timestamp's timezone is unspecified; do not infer one or treat it as a globally defined instant. "
+        if instant.utcoffset() is None
+        else ""
+    )
+    context = (
+        "\n\nSimulation context: For this task, the world time is "
+        f"{declared_time}. {precision}"
+        "Use this simulated clock for relative dates and deadlines; the host clock "
+        "does not define task time. This clock does not specify a business-day "
+        "calendar or holidays; use the task's available procedures for those rules."
+    )
+    return [{**system, "content": content + context}, *prompt[1:]]
 
 
 def _service_for_name(name: str) -> str | None:
@@ -67,6 +163,21 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     toolset: Literal["zapier", "limited_zapier", "api"] = "zapier"
     search_top_k: int = 20
     allowed_tools: tuple[str, ...] = ()
+    # None keeps the upstream "~50 turns" system prompt.
+    turn_budget: int | None = Field(default=None, gt=0)
+    # Explicit, versioned public context; False preserves upstream prompts.
+    world_time_context: bool = False
+    # Host-side raw material for calibration; never exposed as a tool argument.
+    capture_actions: bool = False
+    # Offline development candidate; independent native findings, official score unchanged.
+    reviewed_hr_assessments: bool = False
+    reviewed_simple_assessments: bool = False
+    reviewed_suppression_assessments: bool = False
+    reviewed_cash_flow_assessments: bool = False
+    reviewed_renewal_assessments: bool = False
+    reviewed_record_update_assessments: bool = False
+    reviewed_access_assessments: bool = False
+    manifest_assessments: bool = False
 
 
 class AutomationBenchTask(
@@ -126,6 +237,11 @@ class AutomationBenchTask(
         state.initial_state = self.data.initial_state
         state.assertions = self.data.assertions
         state.search_top_k = cast(AutomationBenchTaskConfig, self.config).search_top_k
+        state.capture_actions = cast(AutomationBenchTaskConfig, self.config).capture_actions
+        if state.capture_actions:
+            from .capture import snapshot_world
+
+            snapshot_world(state)
 
     def _snapshot(self, trace: vf.Trace) -> ScoreSnapshot:
         state = cast(AutomationBenchState, trace.state)
@@ -137,6 +253,20 @@ class AutomationBenchTask(
 
     async def finalize(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         del runtime
+        state = cast(AutomationBenchState, trace.state)
+        if state.capture_actions:
+            trace.info["automationbench_capture"] = {
+                "schema_version": 1,
+                "initial_digest": state.action_initial_digest,
+                "snapshots": dict(state.action_snapshots),
+                "events": [event.model_dump(mode="json") for event in state.action_events],
+                "coverage": {
+                    "scope": "successfully synchronized tool state",
+                    "failed_mcp_retention": "unqualified",
+                    "concurrent_mcp_retention": "unqualified",
+                    "native_call_alignment": "unavailable",
+                },
+            }
         snapshot = self._snapshot(trace)
         trace.info["automationbench"] = {
             "domain": self.data.domain,
@@ -188,20 +318,73 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
         for domain in self.config.domains:
             rows = cast(Iterable[dict[str, Any]], get_domain_dataset(domain))
             for raw in rows:
+                task_name = str(raw.get("task") or f"{domain}-{index}")
+                if requested and task_name not in requested:
+                    index += 1
+                    continue
                 info = raw.get("info", {})
                 if isinstance(info, str):
                     info = json.loads(info)
                 info = _strip_none(info)
                 prompt = raw.get("prompt")
+                if self.config.task.turn_budget is not None:
+                    prompt = _with_turn_budget(prompt, self.config.task.turn_budget)
                 initial_state = _strip_none(info.get("initial_state", {}))
+                if self.config.task.world_time_context:
+                    prompt = _with_world_time(
+                        prompt, initial_state.get("meta", {}).get("current_time")
+                    )
                 assertions = tuple(_strip_none(item) for item in info.get("assertions", []))
                 zapier_tools = tuple(str(item) for item in info.get("zapier_tools", []))
-                task_name = str(raw.get("task") or f"{domain}-{index}")
-                if requested and task_name not in requested:
-                    index += 1
-                    continue
+                if self.config.task.toolset == "limited_zapier":
+                    zapier_tools = _with_spreadsheet_discovery(zapier_tools, prompt, initial_state)
+                task_type = AutomationBenchTask
+                if self.config.task.reviewed_hr_assessments:
+                    from .hr_assessments import ReviewedHrTask
+
+                    task_type = ReviewedHrTask
+                if self.config.task.reviewed_simple_assessments:
+                    from .simple_assessments import ReviewedSimpleTask
+                    from .simple_evidence import SUPPORTED
+
+                    if task_name in SUPPORTED:
+                        task_type = ReviewedSimpleTask
+                if self.config.task.reviewed_suppression_assessments:
+                    from .marketing_assessments import ReviewedSuppressionTask
+                    from .marketing_evidence import TASK
+
+                    if task_name == TASK:
+                        task_type = ReviewedSuppressionTask
+                if self.config.task.reviewed_cash_flow_assessments:
+                    from .finance_assessments import ReviewedCashFlowTask
+                    from .finance_evidence import TASK as CASH_FLOW_TASK
+
+                    if task_name == CASH_FLOW_TASK:
+                        task_type = ReviewedCashFlowTask
+                if self.config.task.reviewed_renewal_assessments:
+                    from .operations_assessments import RENEWAL_TASK, ReviewedRenewalTask
+
+                    if task_name == RENEWAL_TASK:
+                        task_type = ReviewedRenewalTask
+                if self.config.task.reviewed_record_update_assessments:
+                    from .record_assessments import ReviewedRecordUpdateTask
+                    from .simple_record_contracts import SUPPORTED as RECORD_UPDATE_TASKS
+
+                    if task_name in RECORD_UPDATE_TASKS:
+                        task_type = ReviewedRecordUpdateTask
+                if self.config.task.reviewed_access_assessments:
+                    from .operations_assessments import ACCESS_TASK, ReviewedAccessTask
+
+                    if task_name == ACCESS_TASK:
+                        task_type = ReviewedAccessTask
+                if self.config.task.manifest_assessments:
+                    from .contracts.loader import supported_tasks
+                    from .manifest_assessments import ManifestAssessmentTask
+
+                    if task_name in supported_tasks():
+                        task_type = ManifestAssessmentTask
                 tasks.append(
-                    AutomationBenchTask(
+                    task_type(
                         AutomationBenchData(
                             idx=index,
                             name=task_name,

@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Literal, Optional, Set
 from urllib.parse import unquote
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 
 def generate_mailchimp_id() -> str:
@@ -75,6 +75,11 @@ class MailchimpSubscriber(BaseModel):
     last_open_days_ago: Optional[int] = None
     open_rate: Optional[float] = None
 
+    @field_serializer("tags", when_used="json")
+    def serialize_tags(self, tags: Set[str]) -> list[str]:
+        """Canonicalize this declared set without changing ordered state fields."""
+        return sorted(tags)
+
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""
         result = {
@@ -86,7 +91,7 @@ class MailchimpSubscriber(BaseModel):
             "vip": str(self.vip).lower(),
             "source": self.source,
             "merge_fields": self.merge_fields,
-            "tags": list(self.tags),
+            "tags": sorted(self.tags),
             "last_changed": self.updated_at.isoformat(),
         }
         if self.notes:

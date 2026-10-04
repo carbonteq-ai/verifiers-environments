@@ -1,5 +1,60 @@
 # AutomationBench v1 environment
 
+The local `summary_exclusions@1` check binds public policy to retained assistant
+and external output facts. Composition supplies an optional semantic backend
+with caller-owned messages and parsing; raw exchanges are journaled before
+parsing. Known violations survive unrelated gaps, while compliance requires
+closed output/action capture and complete decisions. Its 78-case controlled
+transport gate does not qualify model prose accuracy or whole-task coverage.
+
+Local assessment candidate, 2026-10-04 (unpublished): manifest data describes
+source-bound record goals, conditional action guards, new-occurrence obligations
+and supported retained schedule goals. `public.request@1` supplies one reviewed
+authored obligation with exact public-source receipts, without pretending an
+object existed initially. Missing authority preserves an unavailable member.
+Native findings and domain credit retain source evidence and original execution
+identities; the existing scalar scorer is preserved. Recorded Luna traces are
+reassessed without overwriting their original files.
+
+`gmail.message_reads@1` supplies authenticated returned fields from supported
+Gmail reads. ID-only and metadata-only results never inherit a backend body.
+The Contact assistant declaration checks the returned original introduction
+and both requested assistant fields, with separate once-only contributions.
+It proves successful tool retrieval, not comprehension or exact token exposure.
+Conditional summary compliance and whole-task acceptance remain open.
+
+`external.outputs@1` supplies a separately qualified factual inventory for
+audited discovery/read handlers and Contact assistant fields. The saved SDK
+example reconciles all seven calls using exact controller-bound server and
+request/result evidence, and retains both field values as authored record text.
+Known fields survive unrelated capture gaps; native-only model coverage and
+summary interpretation remain unavailable pending separate qualification.
+
+Consumed manifest credit freezes one canonical manifest revision per episode
+ledger across the six current policy families. Changed reward designs use a
+separate replay ledger; failure or cancellation cannot erase valid partial
+credit. `assistant.outputs@1` separately extracts authored assistant text from
+sampled native messages or exact retained SDK artifacts. Known text and complete
+capture are different facts. This source neither judges summary wording nor
+closes externally sent messages or record text. These changes remain local
+candidate work, with qualification recorded in the framework plan.
+
+Local manifests also support fresh retained Jira issues through
+`objects.created_and_retained@1`, with completion credit selected separately.
+Initial identity membership, final retention and acknowledged action evidence
+are distinct; historical action logs cannot invent retained objects. The Sheets
+evidence adapter recognizes the installed append alias and preserves its native
+argument precedence. The retired-content guard is installed after actual
+negative-action replay and whole policy-inventory binding checks. Whole workflow
+eligibility and release qualification remain open.
+
+The prepaid declaration now includes schedule completion-action credit and
+ineligible-recognition harm, with complete relevant policy inventories bound.
+Journal content, aggregate totals and whole-task coverage remain open. Local
+Contact state-goal declarations and other bounded components do not qualify the
+full library. Older revision/distribution sections below describe historical
+published or candidate revisions, not this unpublished source tree.
+
 CarbonTeq's standalone Verifiers v1 adapter for Zapier AutomationBench 1.0.5.
 The adapter preserves the existing task, tool, state, scoring, and trace
 contracts from the former in-repository package while moving its release
@@ -82,9 +137,14 @@ uv sync --locked --python 3.12
 uv run ruff check .
 uv run ruff format --check .
 uv run pyright
-uv run pytest
+uv run pytest -n 6
 uv build --wheel
 ```
+
+`pytest-xdist` is a dev dependency. `-n 6` runs six worker processes and the
+package config distributes by file (`--dist=loadfile`), because several files
+share mutable module-scoped recorded-episode fixtures. Plain `uv run pytest`
+still runs serially. Keep the worker count well below the machine's core count.
 
 The endpoint-based Verifiers CLI can run a single deterministic task once an
 OpenAI-compatible endpoint is available:
@@ -106,3 +166,18 @@ uv run eval automationbench-v1 \
 Native Verifiers traces remain the replay authority. A framework composition
 may consume this wheel, but the environment itself has no framework or
 tracking dependency.
+
+The unpublished manifest candidate also supports `records.retained_when@1`:
+declare an `initial.records@1` population and a `final.records@1` projection of
+the same typed collection. Each outcome follows the original native ID and
+requires explicit terminal finalization. Missing evidence abstains; a fully
+observed terminal inventory without the original record fails retention.
+Already-correct state can satisfy the outcome without action credit. This
+operator has a separately qualified `records_retained_completion_once@1` policy
+for observed Zendesk status completion. It requires explicit earliest selection,
+an effects source, known initially false goal and current retained success; noops
+and initially correct records receive no action contribution. Manifest predicates must name declared canonical
+schema fields, and terminal projections preserve raw values without coercion
+or generated defaults. Candidate source and tests are under qualification;
+this does not describe a published release or complete task coverage. The public
+Zendesk ticket update is qualified while resolution-email purpose remains open.

@@ -13,6 +13,8 @@ from automationbench.schema.world import WorldState
 from automationbench.tools import ALL_TOOLS
 from automationbench.tools.zapier.meta import ToolRegistry
 
+from .capture import CapturedAction, capture_action
+
 
 class _PortableToolRegistry(ToolRegistry):
     """AutomationBench registry without its optional OpenAI Agents dependency.
@@ -57,6 +59,10 @@ class AutomationBenchState(vf.State):
     initial_state: dict[str, object] = Field(default_factory=dict)
     assertions: tuple[dict[str, object], ...] = ()
     search_top_k: int = 20
+    capture_actions: bool = False
+    action_initial_digest: str | None = None
+    action_snapshots: dict[str, str] = Field(default_factory=dict)
+    action_events: tuple[CapturedAction, ...] = ()
 
 
 class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState]):
@@ -64,21 +70,34 @@ class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState])
 
     TOOL_PREFIX = None
 
+    def execution_capture_enabled(self) -> bool:
+        return self.state.capture_actions
+
     @vf.tool
     def search_tools(self, query: str, top_k: int = 5) -> str:
         """Find Zapier-style tools by service name, action, or description."""
 
         bounded = max(1, min(top_k, self.state.search_top_k))
-        return json.dumps(_registry().bm25(query, top_k=bounded), indent=2)
+        return capture_action(
+            self.state,
+            "search_tools",
+            {"query": query, "top_k": top_k},
+            lambda: json.dumps(_registry().bm25(query, top_k=bounded), indent=2),
+        )
 
     @vf.tool
     def execute_tool(self, tool_name: str, arguments: str) -> str:
         """Execute a tool found by ``search_tools`` against this rollout's world."""
 
-        world = WorldState.model_validate(self.state.world)
-        result = _registry().execute(tool_name, arguments, world=world)
-        self.state.world = world.model_dump(mode="json")
-        return result
+        def execute():
+            world = WorldState.model_validate(self.state.world)
+            result = _registry().execute(tool_name, arguments, world=world)
+            self.state.world = world.model_dump(mode="json")
+            return result
+
+        return capture_action(
+            self.state, "execute_tool", {"tool_name": tool_name, "arguments": arguments}, execute
+        )
 
 
 if __name__ == "__main__":

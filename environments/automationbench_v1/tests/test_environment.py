@@ -16,10 +16,61 @@ from automationbench_v1.taskset import (
     AutomationBenchConfig,
     AutomationBenchTaskConfig,
     AutomationBenchTaskset,
+    _with_world_time,
 )
 from automationbench_v1.tools import AutomationBenchState, AutomationBenchToolset
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("timestamp", ["2026-04-15T09:00:00Z", "2026-01-27T09:00:00", "2026-04-15T09:00:00+05:00"])
+def test_world_time_context_preserves_declared_clock_without_hidden_task_data(timestamp: str) -> None:
+    prompt = [{"role": "system", "content": "Workflow instructions"}, {"role": "user", "content": "Check recent hires"}]
+    result = _with_world_time(prompt, timestamp)
+    assert prompt[0]["content"] == "Workflow instructions"
+    assert result[1] == prompt[1]
+    assert timestamp in result[0]["content"]
+    assert "host clock does not define task time" in result[0]["content"]
+    assert ("timezone is unspecified" in result[0]["content"]) == (timestamp == "2026-01-27T09:00:00")
+
+
+@pytest.mark.parametrize("timestamp", [None, "", "2026-04-15", "invalid", "2026-99-15T09:00:00Z"])
+def test_world_time_context_rejects_missing_or_invalid_clock(timestamp: Any) -> None:
+    with pytest.raises(ValueError, match="explicit ISO datetime"):
+        _with_world_time([{"role": "system", "content": "Instructions"}], timestamp)
+
+
+def test_world_time_context_is_opt_in_and_bound_to_loaded_task() -> None:
+    config = AutomationBenchConfig(domains=["hr"], task_names=["hr.i9_verification_tracking"])
+    [original] = AutomationBenchTaskset(config).load()
+    [contextual] = AutomationBenchTaskset(config.model_copy(update={"task": AutomationBenchTaskConfig(world_time_context=True)})).load()
+    original_prompt = cast(Any, original.data.prompt)
+    contextual_prompt = cast(Any, contextual.data.prompt)
+    assert "Simulation context:" not in original_prompt[0].content
+    assert contextual.data.initial_state["meta"]["current_time"] in contextual_prompt[0].content
+    assert contextual_prompt[1].content == original_prompt[1].content
+    assert contextual.data.assertions == original.data.assertions
+
+
+def test_world_time_context_does_not_validate_unselected_tasks(monkeypatch: pytest.MonkeyPatch) -> None:
+    from automationbench_v1 import taskset
+
+    rows = [
+        {"task": "hr.untimed", "prompt": [], "info": {}},
+        {
+            "task": "hr.timed",
+            "prompt": [{"role": "system", "content": "Instructions"}, {"role": "user", "content": "Task"}],
+            "info": {"initial_state": {"meta": {"current_time": "2026-04-15T09:00:00Z"}}},
+        },
+    ]
+    monkeypatch.setattr(taskset, "get_domain_dataset", lambda domain: rows)
+    [selected] = AutomationBenchTaskset(
+        AutomationBenchConfig(domains=["hr"], task_names=["hr.timed"], task=AutomationBenchTaskConfig(world_time_context=True))
+    ).load()
+    assert selected.data.idx == 1
+    assert selected.key == "hr.timed"
+    with pytest.raises(ValueError, match="explicit ISO datetime"):
+        AutomationBenchTaskset(AutomationBenchConfig(domains=["hr"], task=AutomationBenchTaskConfig(world_time_context=True))).load()
 
 
 def test_distribution_metadata_supports_both_online_rl_python_capsules() -> None:
@@ -226,3 +277,70 @@ def test_task_setup_and_finalize_put_evaluation_detail_on_trace() -> None:
     assert trace.reward == 1.0
     assert trace.metrics["task_completed_correctly"] == 1.0
     assert trace.info["automationbench"]["assertions"][0]["passed"] is True
+
+
+def test_calibration_capture_is_opt_in_host_material_with_explicit_coverage() -> None:
+    task = AutomationBenchTaskset(
+        AutomationBenchConfig(task=AutomationBenchTaskConfig(capture_actions=True))
+    ).load()[0]
+    trace = vf.Trace(
+        agent=vf.AgentInfo(config=vf.AgentConfig()),
+        task=vf.TraceTask(type=type(task).__name__, data=task.data),
+        state=AutomationBenchState(),
+    )
+    asyncio.run(task.setup(trace, None))  # type: ignore[arg-type]
+    state = cast(AutomationBenchState, trace.state)
+    assert state.capture_actions
+    assert state.action_initial_digest in state.action_snapshots
+    asyncio.run(task.finalize(trace, None))  # type: ignore[arg-type]
+    captured = trace.info["automationbench_capture"]
+    assert captured["events"] == []
+    assert captured["initial_digest"] == state.action_initial_digest
+    assert captured["coverage"]["native_call_alignment"] == "unavailable"
+    assert captured["coverage"]["failed_mcp_retention"] == "unqualified"
+    assert not AutomationBenchTaskConfig().capture_actions
+
+
+def test_limited_zapier_adds_spreadsheet_search_when_ids_are_undiscoverable() -> None:
+    config = AutomationBenchConfig(
+        domains=["hr", "simple"],
+        task_names=["hr.docusign_nda_collection", "simple.email_sf_contact_phone_update"],
+        task=AutomationBenchTaskConfig(toolset="limited_zapier"),
+    )
+    hr_task, simple_task = AutomationBenchTaskset(config).load()
+    assert hr_task.data.zapier_tools[-1] == "google_drive_find_multiple_files"
+    assert "google_drive_find_multiple_files" not in simple_task.data.zapier_tools
+
+    [toolset] = hr_task.toolsets(AutomationBenchTaskConfig.model_validate(hr_task.config.model_dump()))
+    assert isinstance(toolset, AutomationBenchLimitedToolset)
+    assert toolset.config.allowed_tools == hr_task.data.zapier_tools
+    toolset._inert_state = AutomationBenchState(
+        world=hr_task.data.initial_state,
+        initial_state=hr_task.data.initial_state,
+    )
+    found = toolset.invoke("google_drive_find_multiple_files", title="NDA compliance tracker")
+    assert "ss_nda_tracker" in found
+    worksheet = toolset.invoke("google_sheets_find_worksheet", spreadsheet="ss_nda_tracker", title="Status")
+    assert '"success": true' in worksheet
+
+
+def test_default_toolset_keeps_upstream_tool_lists() -> None:
+    config = AutomationBenchConfig(domains=["hr"], task_names=["hr.docusign_nda_collection"])
+    [task] = AutomationBenchTaskset(config).load()
+    assert "google_drive_find_multiple_files" not in task.data.zapier_tools
+
+
+def test_turn_budget_replaces_the_upstream_fifty_turn_sentence_in_every_domain() -> None:
+    domains: list[Any] = ["simple", "sales", "marketing", "operations", "support", "finance", "hr"]
+    budgeted = AutomationBenchTaskset(
+        AutomationBenchConfig(domains=domains, task=AutomationBenchTaskConfig(turn_budget=12))
+    ).load()
+    upstream = AutomationBenchTaskset(AutomationBenchConfig(domains=domains)).load()
+    assert len(budgeted) == len(upstream) == 800
+    for task, original in zip(budgeted, upstream, strict=True):
+        system = cast(Any, task.data.prompt)[0].content
+        assert "~50 tool-using turns" not in system
+        assert "You have a budget of 12 tool-using turns" in system
+        assert "keep your thinking brief" in system
+        assert "~50 tool-using turns" in cast(Any, original.data.prompt)[0].content
+        assert task.data.task_name == original.data.task_name

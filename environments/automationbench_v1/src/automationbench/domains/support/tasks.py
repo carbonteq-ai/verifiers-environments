@@ -9221,7 +9221,10 @@ def get_support_gorgias_refund_processing_task() -> dict:
                     ],
                 },
                 "gmail": {"messages": [], "labels": [], "drafts": []},
-                "jira": {"actions": {}},
+                "jira": {
+                    "actions": {},
+                    "projects": [{"id": "fin", "key": "FIN", "name": "Finance"}],
+                },
                 "slack": {
                     "channels": [
                         {"id": "C_finops", "name": "finance-ops", "member_ids": []},

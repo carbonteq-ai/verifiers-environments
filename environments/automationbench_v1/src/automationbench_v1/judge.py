@@ -11,11 +11,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import re
 from typing import Any, Literal
 
 import verifiers.v1 as vf
-from pydantic import Field, FiniteFloat
+from pydantic import Field, FiniteFloat, model_validator
 
 from .episode_prompt import (
     EPISODE_PROMPT_VERSION,
@@ -32,6 +33,7 @@ from .episode_prompt import (
     normalize_wire_verdict,
     validate_episode_verdict,
 )
+from .judge_budget import JudgeBudgetError, admitted_output_tokens, measure_vllm_chat_tokens
 from .limited_tools import selected_tool_definitions
 
 CONTEXT_PROJECTION = "automationbench-judge-context@2"
@@ -86,6 +88,10 @@ class EpisodeQualityConfig(vf.JudgeConfig):
     attempts: int = Field(default=2, ge=1, le=3)
     timeout_seconds: float = Field(default=60.0, gt=0, le=900, allow_inf_nan=False)
     input_budget_tokens: int = Field(ge=1)
+    budget_tokenizer: Literal["none", "vllm-chat@1"] = "none"
+    context_window_tokens: int | None = Field(default=None, ge=1)
+    context_safety_margin_tokens: int = Field(default=256, ge=0)
+    minimum_response_tokens: int = Field(default=512, ge=1)
     # The model-native frame preserves the fixed wire verdict but lets the
     # selected judge organize each episode in vocabulary it finds natural.
     # Direct mode remains the explicit compatibility contract for prior runs.
@@ -100,6 +106,20 @@ class EpisodeQualityConfig(vf.JudgeConfig):
     assessment_review_max_tokens: int = Field(default=4096, ge=256, le=8192)
     # The output does not implicitly add another native trajectory reward.
     weight: FiniteFloat = 0.0
+
+    @model_validator(mode="after")
+    def validate_budget_contract(self) -> EpisodeQualityConfig:
+        if self.budget_tokenizer == "vllm-chat@1":
+            if self.context_window_tokens is None:
+                raise ValueError("vLLM judge budgeting requires context_window_tokens")
+            if self.sampling.max_tokens is None:
+                raise ValueError("vLLM judge budgeting requires sampling.max_tokens")
+            if (
+                self.input_budget_tokens + self.minimum_response_tokens + self.context_safety_margin_tokens
+                > self.context_window_tokens
+            ):
+                raise ValueError("judge input, minimum output, and margin exceed configured context")
+        return self
 
 
 class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityConfig]):
@@ -122,6 +142,10 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
             "projection": EPISODE_PROMPT_VERSION,
             "context_projection": CONTEXT_PROJECTION,
             "input_budget_tokens": self.config.input_budget_tokens,
+            "budget_tokenizer": self.config.budget_tokenizer,
+            "context_window_tokens": self.config.context_window_tokens,
+            "context_safety_margin_tokens": self.config.context_safety_margin_tokens,
+            "minimum_response_tokens": self.config.minimum_response_tokens,
             "episode_rubrics": EPISODE_RUBRICS,
             "assessment_protocol": self.config.assessment_protocol,
             "assessment_frame_max_tokens": self.config.assessment_frame_max_tokens,
@@ -177,6 +201,66 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
             attempts.append(attempt)
             try:
                 async with asyncio.timeout(self.config.timeout_seconds):
+                    async def complete_bounded(
+                        stage: str,
+                        stage_messages: list[vf.Message],
+                        schema: type[Any],
+                        requested_output_tokens: int | None = None,
+                        *,
+                        initial_input: bool = False,
+                        attempt_record: dict[str, Any] = attempt,
+                    ) -> vf.JudgeResponse[Any]:
+                        if self.config.budget_tokenizer == "none":
+                            if requested_output_tokens is None:
+                                return await self.complete(stage_messages, trace=trace, schema=schema)
+                            return await self.complete(
+                                stage_messages, trace=trace, schema=schema,
+                                max_tokens=requested_output_tokens,
+                            )
+                        api_key = os.environ.get(self.config.api_key_var)
+                        if not api_key:
+                            raise JudgeBudgetError("vLLM judge tokenizer credential is unavailable")
+                        sampling = self.config.sampling.model_dump(exclude_none=True)
+                        extra_body = sampling.get("extra_body") or {}
+                        template_kwargs = extra_body.get("chat_template_kwargs")
+                        if template_kwargs is not None and not isinstance(template_kwargs, dict):
+                            raise JudgeBudgetError("judge chat_template_kwargs must be a mapping")
+                        count, server_context = await measure_vllm_chat_tokens(
+                            base_url=self.config.base_url,
+                            model=self.config.model,
+                            messages=[message.model_dump(mode="json", exclude_none=True) for message in stage_messages],
+                            api_key=api_key,
+                            headers=self.config.headers,
+                            chat_template_kwargs=template_kwargs,
+                        )
+                        configured_context = self.config.context_window_tokens
+                        assert configured_context is not None
+                        requested = requested_output_tokens or self.config.sampling.max_tokens
+                        assert requested is not None
+                        output_tokens = admitted_output_tokens(
+                            input_tokens=count,
+                            server_context_tokens=server_context,
+                            configured_context_tokens=configured_context,
+                            requested_output_tokens=requested,
+                            safety_margin_tokens=self.config.context_safety_margin_tokens,
+                            minimum_output_tokens=self.config.minimum_response_tokens,
+                            initial_input_budget_tokens=self.config.input_budget_tokens if initial_input else None,
+                        )
+                        attempt_record.setdefault("token_budget", []).append(
+                            {
+                                "stage": stage,
+                                "input_tokens": count,
+                                "output_tokens": output_tokens,
+                                "server_context_tokens": server_context,
+                            }
+                        )
+                        return await self.complete(
+                            stage_messages,
+                            trace=trace,
+                            schema=schema,
+                            max_tokens=output_tokens,
+                        )
+
                     verdict_messages = messages
                     if self.config.assessment_protocol in {
                         "model-native-frame@1",
@@ -191,11 +275,12 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
                             message.model_dump(mode="json", exclude_none=True)
                             for message in frame_messages
                         ]
-                        frame_response = await self.complete(
+                        frame_response = await complete_bounded(
+                            "frame",
                             frame_messages,
-                            trace=trace,
-                            schema=EpisodeAssessmentFrame,
-                            max_tokens=self.config.assessment_frame_max_tokens,
+                            EpisodeAssessmentFrame,
+                            self.config.assessment_frame_max_tokens,
+                            initial_input=True,
                         )
                         attempt["assessment_frame_raw_response"] = frame_response.text
                         frame = EpisodeAssessmentFrame.model_validate_json(frame_response.text)
@@ -204,8 +289,9 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
                             vf.AssistantMessage(content=frame_response.text),
                             vf.UserMessage(content=MODEL_NATIVE_VERDICT_REQUEST),
                         ]
-                    response = await self.complete(
-                        verdict_messages, trace=trace, schema=WireEpisodeVerdict
+                    response = await complete_bounded(
+                        "verdict", verdict_messages, WireEpisodeVerdict,
+                        initial_input=self.config.assessment_protocol == "direct@1",
                     )
                     if self.config.assessment_protocol == "model-native-frame-review@1":
                         attempt["provisional_raw_response"] = response.text
@@ -222,11 +308,11 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
                             message.model_dump(mode="json", exclude_none=True)
                             for message in review_messages
                         ]
-                        response = await self.complete(
+                        response = await complete_bounded(
+                            "review",
                             review_messages,
-                            trace=trace,
-                            schema=WireEpisodeVerdict,
-                            max_tokens=self.config.assessment_review_max_tokens,
+                            WireEpisodeVerdict,
+                            self.config.assessment_review_max_tokens,
                         )
                 attempt["raw_response"] = response.text
                 wire_verdict = WireEpisodeVerdict.model_validate_json(response.text)
@@ -253,7 +339,13 @@ class AutomationBenchEpisodeJudge(vf.Judge[WireEpisodeVerdict, EpisodeQualityCon
                 # Compatibility for existing trace readers. New readers should
                 # use the structured error record above.
                 attempt["error_type"] = failure["type"]
-                attempt["status"] = "invalid_output" if isinstance(error, ValueError) else "failed"
+                attempt["status"] = (
+                    "unjudgeable"
+                    if isinstance(error, JudgeBudgetError)
+                    else "invalid_output" if isinstance(error, ValueError) else "failed"
+                )
+                if isinstance(error, JudgeBudgetError):
+                    break
         last_error = attempts[-1].get("error", {})
         raise ValueError(
             "episode judge exhausted bounded attempts; no rewards admitted; "

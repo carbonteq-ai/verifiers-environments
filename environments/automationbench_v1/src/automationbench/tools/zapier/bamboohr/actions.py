@@ -9,7 +9,10 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -28,7 +31,7 @@ def bamboohr_department(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("department", params)
+    records = find_records(app_state, "department", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -69,7 +72,7 @@ def bamboohr_employeeList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("employeeList", params)
+    records = find_records(app_state, "employeeList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -106,7 +109,7 @@ def bamboohr_employee_file_category(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("employee_file_category", params)
+    records = find_records(app_state, "employee_file_category", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -143,7 +146,7 @@ def bamboohr_list_fields(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_fields", params)
+    records = find_records(app_state, "list_fields", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -182,7 +185,7 @@ def bamboohr_list_monitor_fields(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("list_monitor_fields", params)
+    records = find_records(app_state, "list_monitor_fields", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -221,7 +224,7 @@ def bamboohr_new_employee(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_employee", params)
+    records = find_records(app_state, "new_employee", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -256,7 +259,7 @@ def bamboohr_report_changed(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("report_changed", params)
+    records = find_records(app_state, "report_changed", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -295,7 +298,7 @@ def bamboohr_report_field(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("report_field", params)
+    records = find_records(app_state, "report_field", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -328,7 +331,7 @@ def bamboohr_terminated_employee(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("terminated_employee", params)
+    records = find_records(app_state, "terminated_employee", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -369,7 +372,7 @@ def bamboohr_time_off(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("time_off", params)
+    records = find_records(app_state, "time_off", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -408,7 +411,7 @@ def bamboohr_time_off_request(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("time_off_request", params)
+    records = find_records(app_state, "time_off_request", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -457,7 +460,7 @@ def bamboohr_updated_employee(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_employee", params)
+    records = find_records(app_state, "updated_employee", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -494,7 +497,7 @@ def bamboohr_updated_employee_poll(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("updated_employee_poll", params)
+    records = find_records(app_state, "updated_employee_poll", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -571,7 +574,7 @@ def bamboohr_employeeSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("employeeSearch", params)
+    records = find_records(app_state, "employeeSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,

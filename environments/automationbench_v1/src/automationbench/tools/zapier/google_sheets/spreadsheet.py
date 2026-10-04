@@ -8,6 +8,7 @@ from typing import Optional
 
 from automationbench.schema.google_sheets import Spreadsheet, Worksheet, generate_google_sheets_id
 from automationbench.schema.world import WorldState
+from automationbench.tools.zapier.google_sheets._common import resolve_spreadsheet, row_view
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -64,38 +65,57 @@ register_metadata(
 )
 
 
+_GRID_ROWS_PER_WORKSHEET = 20
+
+
 def google_sheets_get_spreadsheet_by_id(
     world: WorldState,
     spreadsheet: Optional[str] = None,
     spreadsheet_id: Optional[str] = None,
     id: Optional[str] = None,
-    includeGridData: bool = True,
+    includeGridData: bool = False,
 ) -> str:
     """
-    Get a spreadsheet by ID.
+    Get a spreadsheet and its worksheets by ID or title.
 
     Args:
-        spreadsheet: Spreadsheet ID (required).
+        spreadsheet: Spreadsheet ID or title (required).
         spreadsheet_id: Alias for spreadsheet.
         id: Alias for spreadsheet.
-        includeGridData: Whether to include grid data in response.
+        includeGridData: Also return each worksheet's first 20 rows (row_id and
+            cells) with its total row_count. Use google_sheets_get_many_rows or
+            google_sheets_find_many_rows for more rows.
 
     Returns:
-        JSON string with spreadsheet details.
+        JSON string with spreadsheet details and worksheets (id, title, headers).
     """
-    spreadsheet = spreadsheet or spreadsheet_id or id or ""
-    spreadsheet_obj = world.google_sheets.get_spreadsheet_by_id(spreadsheet)
-    if spreadsheet_obj:
+    reference = spreadsheet or spreadsheet_id or id or ""
+    state = world.google_sheets
+    resolved = resolve_spreadsheet(state, reference)
+    spreadsheet_obj = state.get_spreadsheet_by_id(resolved) if resolved else None
+    if resolved is None:
+        titles = [f"{ss.title} ({ss.id})" for ss in state.spreadsheets]
+        return json.dumps(
+            {
+                "success": False,
+                "error": f"Spreadsheet '{reference}' not found. Known spreadsheets: {titles}",
+            }
+        )
+    if spreadsheet_obj is not None:
         result = spreadsheet_obj.to_display_dict()
-        worksheets = world.google_sheets.get_worksheets_for_spreadsheet(spreadsheet)
-        result["worksheets"] = [
-            {"id": ws.id, "title": ws.title, "headers": ws.headers} for ws in worksheets
-        ]
-        if not includeGridData:
-            # Return only properties, not grid data
-            result.pop("cells", None)
-        return json.dumps({"success": True, "spreadsheet": result})
-    return json.dumps({"error": f"Spreadsheet with id '{spreadsheet}' not found"})
+    else:
+        result = {"id": resolved}
+    worksheets = []
+    for ws in state.get_worksheets_for_spreadsheet(resolved):
+        entry: dict = {"id": ws.id, "title": ws.title, "headers": ws.headers}
+        if includeGridData:
+            rows = state.get_rows_for_worksheet(resolved, ws.id)
+            entry["row_count"] = len(rows)
+            entry["rows"] = [row_view(r) for r in rows[:_GRID_ROWS_PER_WORKSHEET]]
+            entry["has_more_rows"] = len(rows) > _GRID_ROWS_PER_WORKSHEET
+        worksheets.append(entry)
+    result["worksheets"] = worksheets
+    return json.dumps({"success": True, "spreadsheet": result})
 
 
 register_metadata(

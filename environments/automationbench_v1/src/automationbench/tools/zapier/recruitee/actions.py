@@ -9,7 +9,10 @@ import json
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.action_utils import _build_response
+from automationbench.tools.zapier.action_utils import (
+    _build_response,
+    find_records,
+)
 from automationbench.tools.zapier.types import register_metadata
 
 
@@ -30,7 +33,7 @@ def recruitee_adminList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("adminList", params)
+    records = find_records(app_state, "adminList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -67,7 +70,7 @@ def recruitee_candidateList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidateList", params)
+    records = find_records(app_state, "candidateList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -104,7 +107,7 @@ def recruitee_candidate_applied(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_applied", params)
+    records = find_records(app_state, "candidate_applied", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -139,7 +142,7 @@ def recruitee_candidate_applied_new(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_applied_new", params)
+    records = find_records(app_state, "candidate_applied_new", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -174,7 +177,7 @@ def recruitee_candidate_applied_new_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_applied_new_instant", params)
+    records = find_records(app_state, "candidate_applied_new_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -211,7 +214,7 @@ def recruitee_candidate_assigned_new(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_assigned_new", params)
+    records = find_records(app_state, "candidate_assigned_new", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -248,7 +251,7 @@ def recruitee_candidate_assigned_new_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_assigned_new_instant", params)
+    records = find_records(app_state, "candidate_assigned_new_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -281,7 +284,7 @@ def recruitee_candidate_completed_questionnaire(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_completed_questionnaire", params)
+    records = find_records(app_state, "candidate_completed_questionnaire", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -314,7 +317,7 @@ def recruitee_candidate_completed_questionnaire_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_completed_questionnaire_instant", params)
+    records = find_records(app_state, "candidate_completed_questionnaire_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -351,7 +354,7 @@ def recruitee_candidate_disqualified(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_disqualified", params)
+    records = find_records(app_state, "candidate_disqualified", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -388,7 +391,7 @@ def recruitee_candidate_disqualified_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_disqualified_instant", params)
+    records = find_records(app_state, "candidate_disqualified_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -425,7 +428,7 @@ def recruitee_candidate_moved_to_stage(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_moved_to_stage", params)
+    records = find_records(app_state, "candidate_moved_to_stage", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -462,7 +465,7 @@ def recruitee_candidate_moved_to_stage_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_moved_to_stage_instant", params)
+    records = find_records(app_state, "candidate_moved_to_stage_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -497,7 +500,7 @@ def recruitee_candidate_requalified(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_requalified", params)
+    records = find_records(app_state, "candidate_requalified", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -532,7 +535,7 @@ def recruitee_candidate_requalified_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidate_requalified_instant", params)
+    records = find_records(app_state, "candidate_requalified_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -573,7 +576,7 @@ def recruitee_companyList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("companyList", params)
+    records = find_records(app_state, "companyList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -612,7 +615,7 @@ def recruitee_countryList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("countryList", params)
+    records = find_records(app_state, "countryList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -651,7 +654,7 @@ def recruitee_departmentList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("departmentList", params)
+    records = find_records(app_state, "departmentList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -688,7 +691,7 @@ def recruitee_disqualify_reasonList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("disqualify_reasonList", params)
+    records = find_records(app_state, "disqualify_reasonList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -723,7 +726,7 @@ def recruitee_jobList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("jobList", params)
+    records = find_records(app_state, "jobList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -756,7 +759,7 @@ def recruitee_job_published_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("job_published_instant", params)
+    records = find_records(app_state, "job_published_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -789,7 +792,7 @@ def recruitee_job_unpublished_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("job_unpublished_instant", params)
+    records = find_records(app_state, "job_unpublished_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -826,7 +829,7 @@ def recruitee_new_candidate_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_candidate_instant", params)
+    records = find_records(app_state, "new_candidate_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -861,7 +864,7 @@ def recruitee_new_job_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_job_instant", params)
+    records = find_records(app_state, "new_job_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -894,7 +897,7 @@ def recruitee_new_task_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("new_task_instant", params)
+    records = find_records(app_state, "new_task_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -933,7 +936,7 @@ def recruitee_offer_statusList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("offer_statusList", params)
+    records = find_records(app_state, "offer_statusList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1012,7 +1015,7 @@ def recruitee_regionList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("regionList", params)
+    records = find_records(app_state, "regionList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1053,7 +1056,7 @@ def recruitee_roleList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("roleList", params)
+    records = find_records(app_state, "roleList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1086,7 +1089,7 @@ def recruitee_stageList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("stageList", params)
+    records = find_records(app_state, "stageList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1119,7 +1122,7 @@ def recruitee_talent_poolList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("talent_poolList", params)
+    records = find_records(app_state, "talent_poolList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1160,7 +1163,7 @@ def recruitee_taskList(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("taskList", params)
+    records = find_records(app_state, "taskList", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1193,7 +1196,7 @@ def recruitee_task_completed_instant(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("task_completed_instant", params)
+    records = find_records(app_state, "task_completed_instant", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1232,7 +1235,7 @@ def recruitee_adminSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("adminSearch", params)
+    records = find_records(app_state, "adminSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1304,7 +1307,7 @@ def recruitee_candidateSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("candidateSearch", params)
+    records = find_records(app_state, "candidateSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1385,7 +1388,7 @@ def recruitee_jobSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("jobSearch", params)
+    records = find_records(app_state, "jobSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1452,7 +1455,7 @@ def recruitee_placementSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("placementSearch", params)
+    records = find_records(app_state, "placementSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1540,7 +1543,7 @@ def recruitee_talent_poolSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("talent_poolSearch", params)
+    records = find_records(app_state, "talent_poolSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
@@ -1629,7 +1632,7 @@ def recruitee_taskSearch(
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
     results: List[Dict[str, Any]] = []
-    records = app_state.find_actions("taskSearch", params)
+    records = find_records(app_state, "taskSearch", params)
     results = [record.to_result_dict() for record in records]
     template = {
         "success": True,
