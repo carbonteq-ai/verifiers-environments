@@ -28,6 +28,7 @@ from .predicates import (
 )
 from .predicates import context_paths as _fields
 from .record_writes import RecordWriteSource
+from .selections import AlternativeEffect, SelectionAlias, publish_selections
 from .sheet_effects import SheetEffectSource
 from .slack_effects import SlackEffectSource
 from .tables import TableEvidence, left_lookup
@@ -68,20 +69,51 @@ class GuardCheck(FrozenModel):
     # Links to effects of other declared sources (e.g. an action taken without a
     # prior read). Readable only by effect_match. Omitted when empty.
     effect_joins: tuple[EffectJoin, ...] = Field(default=(), exclude_if=lambda value: not value)
+    # Candidate-relative choices published as selected.<alias>/selection.<alias>,
+    # as for obligations. Omitted when empty.
+    selections: tuple[SelectionAlias, ...] = Field(default=(), exclude_if=lambda value: not value)
+    # Further channels watched by the same harm check, each with its own
+    # effect_match (no joins). Omitted when empty.
+    alternatives: tuple[AlternativeEffect, ...] = Field(default=(), exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def unique_aliases(self):
         aliases = [item.alias for item in self.lookups]
-        if len(set(aliases)) != len(aliases) or set(aliases) & {
-            "request", "effect", "candidate", "joined", "join", "lookup",
-        }:
+        reserved = {"request", "effect", "candidate", "joined", "join", "lookup", "member", "selected", "selection"}
+        if len(set(aliases)) != len(aliases) or set(aliases) & reserved:
             raise ValueError("guard_lookup_alias_conflict")
-        validate_join_paths(self.effect_joins, aliases)
+        chosen: list[str] = []
+        for item in self.selections:
+            if item.alias in chosen:
+                raise ValueError("guard_selection_alias_conflict")
+            raw = [item.where.model_dump(mode="json"), *(key.model_dump(mode="json") for key in item.order_by)]
+            for path in _fields(raw):
+                if path[0] in {"selected", "selection"}:
+                    if len(path) < 2 or path[1] not in chosen or path[0] == "selection" and len(path) != 2:
+                        raise ValueError("guard_selection_reference_unknown")
+                elif path[0] == "lookup":
+                    if len(path) != 2 or path[1] not in aliases:
+                        raise ValueError("guard_lookup_status_reference_unknown")
+                elif len(path) < 2 or path[0] not in {"member", "request", "candidate", *aliases}:
+                    raise ValueError("guard_selection_context_unknown")
+            chosen.append(item.alias)
+        alternatives = [item.alias for item in self.alternatives]
+        if len(set(alternatives)) != len(alternatives):
+            raise ValueError("guard_alternative_alias_conflict")
+        validate_join_paths(self.effect_joins, aliases, chosen)
         joined = {item.alias for item in self.effect_joins}
-        for name in ("prohibited_when", "effect_match"):
-            for path in _fields(getattr(self, name).model_dump(mode="json")):
+        named = [("prohibited_when", self.prohibited_when), ("effect_match", self.effect_match)]
+        named += [("alternative", item.effect_match) for item in self.alternatives]
+        for name, predicate in named:
+            for path in _fields(predicate.model_dump(mode="json")):
                 if path[0] == "lookup" and (len(path) != 2 or path[1] not in aliases):
                     raise ValueError("guard_lookup_status_reference_unknown")
+                if path[0] in {"selected", "selection"} and (
+                    len(path) < 2 or path[1] not in chosen or path[0] == "selection" and len(path) != 2
+                ):
+                    raise ValueError("guard_selection_reference_unknown")
+                if path[0] == "member":
+                    raise ValueError("guard_selection_context_unknown")
                 if path[0] in {"joined", "join"} and (
                     name != "effect_match" or len(path) < 2 or path[1] not in joined
                     or path[0] == "join" and len(path) != 2
@@ -118,22 +150,23 @@ class GuardCase:
     candidate_identity: tuple
 
 
-def plan_guard_instances(check: GuardCheck, population: TableEvidence, effects: EffectEvidence):
-    """Inventory-only targets. No policy, matching or outcome evaluation here."""
-    potential = len(population.rows) * len(effects.effects)
+def plan_guard_instances(check: GuardCheck, population: TableEvidence, effects: EffectEvidence, *alternatives):
+    """Inventory-only targets. No policy, matching or outcome evaluation here.
+
+    Alternative channels add their effects; the same effect identity seen on
+    two channels is one instance.
+    """
+    facts = [effect for evidence in (effects, *alternatives) for effect in evidence.effects]
+    potential = len(population.rows) * len(facts)
     if potential > check.max_instances:
         return (), potential
     identities = tuple(dict.fromkeys(row.identity for row in population.rows))
-    return tuple(
-        GuardCase(
-            _digest([identity, effect.origin, effect.invocation_id, effect.effect_id]),
-            effect.invocation_id,
-            effect.effect_id,
-            identity,
-        )
-        for identity in identities
-        for effect in effects.effects
-    ), potential
+    cases = {}
+    for identity in identities:
+        for effect in facts:
+            key = _digest([identity, effect.origin, effect.invocation_id, effect.effect_id])
+            cases.setdefault(key, GuardCase(key, effect.invocation_id, effect.effect_id, identity))
+    return tuple(cases.values()), potential
 
 
 def _digest(value) -> str:
@@ -181,24 +214,26 @@ def _candidate_context(check: GuardCheck, row, tables: Mapping[str, Any]):
             context.setdefault("lookup", {})[lookup.alias] = result.status
         if result.status == "matched":
             context[lookup.alias] = json.loads(result.matches[0].cells_json)
-    return context
+    return publish_selections(check.selections, context, tables) if check.selections else context
 
 
-def _effect_context(check, context, effect: EffectFact, params, join_effects):
+def _effect_context(check, context, effect: EffectFact, params, join_effects, primary=True):
     material = context | {"effect": params}
-    if check.effect_joins:
+    if check.effect_joins and primary:
         material |= join_context(check.effect_joins, effect, params, context, join_effects)
     return material
 
 
-def _finding(check, row, effect: EffectFact, context, unique_match: bool, join_effects) -> GuardFinding:
+def _finding(check, row, effect: EffectFact, context, unique_match: bool, join_effects,
+             effect_match=None) -> GuardFinding:
     instance = _digest([row.identity, effect.origin, effect.invocation_id, effect.effect_id])
     if effect.status != "qualified" or effect.params_json is None:
         value, reason, paths = None, "guard_effect_unavailable", ()
     else:
-        material = _effect_context(check, context, effect, json.loads(effect.params_json), join_effects)
+        material = _effect_context(check, context, effect, json.loads(effect.params_json), join_effects,
+                                   effect_match is None)
         policy = evaluate_predicate(check.prohibited_when, material)
-        match = evaluate_predicate(check.effect_match, material)
+        match = evaluate_predicate(check.effect_match if effect_match is None else effect_match, material)
         if policy.value is False or match.value is False:
             value, reason = 0.0, "no_declared_prohibited_match"
         elif policy.value is None or match.value is None:
@@ -231,6 +266,8 @@ def evaluate_guard(
     table_sources: Mapping[str, Any],
     join_effects: Mapping[str, EffectEvidence] | None = None,
     join_sources: Mapping[str, Any] | None = None,
+    alternative_effects: Mapping[str, EffectEvidence] | None = None,
+    alternative_sources: Mapping[str, Any] | None = None,
 ) -> GuardEvaluation:
     """Keep event findings independent of later state and unrelated unknowns.
 
@@ -250,29 +287,41 @@ def evaluate_guard(
             join_sources[alias]
         ):
             raise ValueError("guard_join_evidence_mismatch")
+    alternative_effects, alternative_sources = dict(alternative_effects or {}), dict(alternative_sources or {})
+    if (set(alternative_effects) != {item.alias for item in check.alternatives}
+            or set(alternative_sources) != set(alternative_effects)):
+        raise ValueError("guard_alternative_inventory_mismatch")
+    for alias, evidence in alternative_effects.items():
+        if evidence.source_digest != _digest(source) or evidence.selector_digest != _digest(
+            alternative_sources[alias].model_dump(mode="json")
+        ):
+            raise ValueError("guard_alternative_evidence_mismatch")
+    # (effect, effect_match or None for the primary) over every watched channel.
+    channels = [(effect, None) for effect in effects.effects] + [
+        (effect, item.effect_match) for item in check.alternatives for effect in alternative_effects[item.alias].effects
+    ]
     if check.population not in tables or any(item.source not in tables for item in check.lookups):
         raise ValueError("guard_table_reference_unknown")
     population = tables[check.population]
-    if len(population.rows) * len(effects.effects) > check.max_instances:
+    if len(population.rows) * len(channels) > check.max_instances:
         return GuardEvaluation((), None, "guard_instance_budget_exceeded")
     if not population.rows and population.status == "unavailable":
         return GuardEvaluation((), None, "guard_population_unavailable")
     findings = []
     contexts = [_candidate_context(check, row, tables) for row in population.rows]
-    unique_matches = {}
-    for effect in effects.effects:
+    unique_matches = []
+    for effect, match in channels:
         possible = []
         if effect.status == "qualified" and effect.params_json is not None:
             params = json.loads(effect.params_json)
             possible = [
                 evaluate_predicate(
-                    check.effect_match, _effect_context(check, context, effect, params, join_effects)
+                    check.effect_match if match is None else match,
+                    _effect_context(check, context, effect, params, join_effects, match is None),
                 ).value
                 for context in contexts
             ]
-        unique_matches[(effect.origin, effect.invocation_id, effect.effect_id)] = bool(
-            population.enumerated and possible.count(True) == 1 and None not in possible
-        )
+        unique_matches.append(bool(population.enumerated and possible.count(True) == 1 and None not in possible))
     identities = Counter(row.identity for row in population.rows)
     logical_keys = Counter(row.key_json for row in population.rows if row.key_json is not None)
     ambiguous = set()
@@ -290,7 +339,7 @@ def evaluate_guard(
             if row.identity in ambiguous:
                 continue
             ambiguous.add(row.identity)
-            for effect in effects.effects:
+            for effect, _ in channels:
                 findings.append(
                     GuardFinding(
                         check.check_id,
@@ -308,21 +357,17 @@ def evaluate_guard(
                 )
             continue
         findings.extend(
-            _finding(
-                check,
-                row,
-                effect,
-                context,
-                unique_matches[(effect.origin, effect.invocation_id, effect.effect_id)],
-                join_effects,
-            )
-            for effect in effects.effects
+            _finding(check, row, effect, context, unique, join_effects, match)
+            for (effect, match), unique in zip(channels, unique_matches, strict=True)
         )
+    if check.alternatives:
+        findings = _merge_channels(findings)
     if any(item.value == 1 for item in findings):
         compliance, reason = 0.0, "witnessed_declared_guard_violation"
     elif (
         population.closed
         and effects.complete
+        and all(evidence.complete for evidence in alternative_effects.values())
         and all(table.closed for table in tables.values())
         and all(item.value is not None for item in findings)
     ):
@@ -330,6 +375,16 @@ def evaluate_guard(
     else:
         compliance, reason = None, "guard_compliance_scope_unavailable"
     return GuardEvaluation(tuple(findings), compliance, reason)
+
+
+def _merge_channels(findings):
+    """One finding per instance: a match on any channel wins, else unknown wins."""
+    merged: dict[str, GuardFinding] = {}
+    for item in findings:
+        prior = merged.get(item.instance_key)
+        if prior is None or item.value == 1 and prior.value != 1 or item.value is None and prior.value == 0:
+            merged[item.instance_key] = item
+    return list(merged.values())
 
 
 @dataclass(frozen=True)

@@ -383,6 +383,18 @@ class ContractSpec(FrozenModel):
                             GmailObservationSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_alternative_requires_effect_source")  # noqa: TRY004
+                if isinstance(check, GuardCheck):
+                    for alternative in check.alternatives:
+                        if not isinstance(self.sources.get(alternative.source), (
+                            EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
+                            RecordWriteSource,
+                        )):
+                            raise ValueError("guard_alternative_requires_effect_source")  # noqa: TRY004
+                    for selection in check.selections:
+                        if not isinstance(self.sources.get(selection.population), (
+                            TableSource, InitialCollectionSource,
+                        )):
+                            raise ValueError("guard_selection_requires_initial_population")  # noqa: TRY004
                 if isinstance(check, (ObligationCheck, GuardCheck)):
                     for join in check.effect_joins:
                         if not isinstance(self.sources.get(join.source), (

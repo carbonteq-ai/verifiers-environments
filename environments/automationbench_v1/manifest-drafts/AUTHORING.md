@@ -250,6 +250,25 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
     is fine. An undecidable rival (an ambiguous magnitude) keeps the unit
     unknown.
 
+19. Any-channel harm guards: `effects.prohibited_when@1` takes
+    `alternatives: [{alias, source, effect_match}]` like obligations
+    (mechanism 10). Each listed effect source (Gmail/Slack/Sheets/record
+    writes; not Gmail reads) is watched with its own `effect_match`; a match
+    on any channel is a violation and is penalised on that effect. "No
+    violation" needs every channel's inventory complete, so one unobserved
+    channel keeps compliance unknown. Alternative matches cannot read
+    `joined.*` (joins apply to the primary source). The same effect seen on
+    two channels is one instance (any match wins, else unknown wins).
+
+        "source": "sends", "effect_match": {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body_text"], "domain": "string"}, "mode": "words", "value": {"kind": "field", "path": ["request", "Hire"], "domain": "string"}},
+        "alternatives": [{"alias": "slack_dm", "source": "dms",
+                          "effect_match": {"op": "mentions", "text": {"kind": "field", "path": ["effect", "text"], "domain": "string"}, "mode": "words", "value": {"kind": "field", "path": ["request", "Hire"], "domain": "string"}}}]
+
+    Guards also accept `selections` exactly as obligations (mechanism 4),
+    over Sheets or `initial.records@1` populations; `prohibited_when`,
+    `effect_match` and alternatives read `selection.<alias>` /
+    `selected.<alias>.*` (e.g. "the deal has an active conversation").
+
 Engine corrections in the same round: amounts followed by a list comma
 ("$8,420, no") are read; k (and dollar-marked m/b) suffixes are read exactly
 ("$120k" = 120000) and only values they could be rounded from stay unknown;
