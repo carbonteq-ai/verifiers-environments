@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -650,6 +651,7 @@ def test_catalog_supported_tasks_matches_all_packaged_contracts():
         "simple.email_sf_contact_assistant_update", "simple.email_sf_contact_account_update",
         "simple.email_zendesk_ack_reply", "finance.escrow_tracking", "hr.airtable_learning_path_assignment",
         "operations.zoom_training_setup", "operations.calendly_equipment_inspection",
+        *json.loads((Path(__file__).with_name("installed_candidate_manifests.json")).read_text()),
     }))
 
 

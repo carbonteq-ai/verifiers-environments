@@ -106,8 +106,11 @@ def _path_bytes(saved):
 def test_only_the_prepaid_revision_declares_aggregates():
     from automationbench_v1.contracts.loader import supported_tasks
 
+    # Installed training candidates (installed_candidate_manifests.json) may use
+    # aggregates freely; this pins the reviewed installed manifests only.
+    candidates = json.loads(Path(__file__).with_name("installed_candidate_manifests.json").read_text())
     declaring = set()
-    for name in supported_tasks():
+    for name in sorted(set(supported_tasks()) - set(candidates)):
         for check in load_task_contract(name).checks:
             if isinstance(check, ObligationCheck) and "aggregates" in check.model_dump(mode="json"):
                 declaring.add((name, check.check_id))

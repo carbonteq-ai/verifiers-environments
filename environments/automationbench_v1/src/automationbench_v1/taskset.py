@@ -344,6 +344,20 @@ class AutomationBenchTask(
             record_progress(trace.info, trace.num_turns, lambda: snapshot.partial_credit)
             self._attach_turn_evidence(trace, turn_rewards)
 
+    async def score(self, trace: vf.Trace, runtime: vf.Runtime | None = None) -> None:
+        await super().score(trace, runtime)
+        config = cast(AutomationBenchTaskConfig, self.config).turn_rewards
+        if config is not None and config.manifest_enabled and TURN_EVIDENCE_KEY in trace.info:
+            from .manifest_step_credit import apply_manifest_step_credit
+
+            branches = trace.branches
+            turns = [node.message for node in branches[0].nodes
+                     if node.sampled and node.message.role == "assistant"] if len(branches) == 1 else []
+            trace.info[TURN_EVIDENCE_KEY] = apply_manifest_step_credit(
+                trace.info[TURN_EVIDENCE_KEY], turns=turns, events=trace.tool_execution_events,
+                trace=trace, config=config,
+            )
+
     def _attach_turn_evidence(
         self, trace: vf.Trace, config: AutomationBenchTurnRewardConfig
     ) -> None:

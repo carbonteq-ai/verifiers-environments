@@ -22,7 +22,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .tool_mistakes import classify_tool_result, is_mistake
 
@@ -38,15 +38,37 @@ class AutomationBenchTurnRewardConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     tool_failure_penalty: float = Field(default=0.05, ge=0.0, le=1.0)
+    # Manifest step credit (manifest_step_credit.py); both None keeps version 2.
+    manifest_goal_share: float | None = Field(default=None, ge=0.0, le=1.0)
+    manifest_harm_penalty: float | None = Field(default=None, ge=0.0, le=1.0)
+    manifest_harm_cap: float = Field(default=0.3, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def manifest_weights_together(self):
+        if (self.manifest_goal_share is None) != (self.manifest_harm_penalty is None):
+            raise ValueError("manifest_goal_share and manifest_harm_penalty are selected together")
+        return self
+
+    @property
+    def manifest_enabled(self) -> bool:
+        return self.manifest_goal_share is not None
 
     @property
     def scorer_digest(self) -> str:
-        identity = {
+        identity: dict[str, Any] = {
             "scorer": "automationbench-turn-progress",
             # 2: only mistakes are penalized; empty searches no longer are.
             "version": 2,
             "tool_failure_penalty": self.tool_failure_penalty,
         }
+        if self.manifest_enabled:
+            # 3: manifest goal credit and harm debit on the issuing step.
+            identity |= {
+                "version": 3,
+                "manifest_goal_share": self.manifest_goal_share,
+                "manifest_harm_penalty": self.manifest_harm_penalty,
+                "manifest_harm_cap": self.manifest_harm_cap,
+            }
         encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode()).hexdigest()
 

@@ -75,6 +75,7 @@ from .manifest_summary_assessments import (
     summary_requests,
 )
 from .manifest_summary_credit import manifest_summary_penalty, plan_summary_credit
+from .public_state import public_initial_state
 from .taskset import AutomationBenchTask
 from .tools import AutomationBenchState
 
@@ -147,7 +148,7 @@ class ManifestAssessmentTask(AutomationBenchTask):
         final = retained.get("end_state", state.world)
         return {
             "task_name": self.data.task_name,
-            "initial": self.data.initial_state, "final": final,
+            "initial": public_initial_state(self.data.initial_state), "final": final,
             "prompt": self.data.model_dump(mode="json")["prompt"],
             "complete": trace.is_completed and trace.ok and not trace.errors,
             "authored_outputs": build_authored_output_material(trace),
