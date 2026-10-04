@@ -344,7 +344,10 @@ def test_sheet_scope_closes_on_a_run_without_tool_calls():
 
 
 def test_failed_sheet_write_that_changed_nothing_keeps_scope_closed():
-    from automationbench.tools.zapier.google_sheets.row import google_sheets_add_row, google_sheets_update_row
+    from automationbench.tools.zapier.google_sheets.row import (
+        google_sheets_add_row,
+        google_sheets_update_row,
+    )
     from automationbench_v1.contracts.sheet_effects import capture_sheet_effects
 
     sheet_initial, sheet_spec = _sheets()

@@ -570,12 +570,6 @@ def assess_guard(task, request, context):
     )
 
 
-def _memo(cache: dict, key, compute):
-    if key not in cache:
-        cache[key] = compute()
-    return cache[key]
-
-
 def plan_guard_credit(source, batches, context, contract):
     """Consume only current immutable guard receipts; preserve prefix consumption."""
     if context.source != source.identity:
@@ -631,11 +625,13 @@ def plan_guard_credit(source, batches, context, contract):
         if len(receipts) != 1 or receipts[0].invocation_id != run.invocation_id:
             raise ValueError("guard_credit_output_receipt_unresolved")
         output = GuardOutput.model_validate_json(receipts[0].payload_json)
+        if check.check_id not in selectors:
+            selectors[check.check_id] = selectors_digest(contract, check)
         if (
             output.contract_digest != contract_id
             or output.source_digest != safe_digest
             or output.input_digest != view.input_digest
-            or output.selectors_digest != _memo(selectors, check.check_id, lambda: selectors_digest(contract, check))
+            or output.selectors_digest != selectors[check.check_id]
             or output.check_id != check.check_id
             or output.instance_key != config.get("instance_key")
             or config.get("source_digest") != output.source_digest
