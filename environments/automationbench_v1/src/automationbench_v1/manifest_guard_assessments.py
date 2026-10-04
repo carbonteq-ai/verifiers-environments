@@ -581,7 +581,7 @@ def plan_guard_credit(source, batches, context, contract):
     }
     rules = {rule.check: rule for rule in contract.credit if rule.policy == "per_effect_negative@1"}
     checks = {check.check_id: check for check in contract.checks if isinstance(check, GuardCheck)}
-    requests, planned = [], set()
+    requests, firings = [], {}
     instances = set()
     inputs = {}
     plans = {}
@@ -685,9 +685,41 @@ def plan_guard_credit(source, batches, context, contract):
             ),
         )
         key = (recipient.execution.occurrence_id, rule.channel)
-        if key in planned:
-            raise ValueError("guard_credit_aggregation_required")
-        planned.add(key)
+        firings.setdefault(key, []).append((check.check_id, output, parent, recipient, rule, signal, credit_rule))
+    for key, group in firings.items():
+        if len(group) == 1:
+            _, _, parent, recipient, rule, signal, credit_rule = group[0]
+            accepted, expected = (parent,), {signal.signal_id: signal}
+        else:
+            # Several declared harms on one call and channel (two guards, or one
+            # guard on several rows). The framework takes one contribution per
+            # call and channel, so they merge deterministically into one -1
+            # whose parents are every fired harm and whose signal is the
+            # earliest fired guard in contract order.
+            order = {item.check_id: position for position, item in enumerate(contract.checks)}
+            group = sorted(group, key=lambda item: (order[item[0]], item[1].instance_key))
+            recipient, rule = group[0][3], group[0][4]
+            expected = {group[0][5].signal_id: group[0][5]}
+            accepted = tuple(item[2] for item in group)
+            credit_rule = vf.CreditRule(
+                rule_id="automationbench.manifest_per_effect_negative",
+                revision="1",
+                configuration_json=canonical_json(
+                    {
+                        "contract_digest": contract_id,
+                        "policy": rule.policy,
+                        "merged": [
+                            {
+                                "check_id": check_id,
+                                "instance_key": output.instance_key,
+                                "effect_id": output.effect_id,
+                                "penalty_signal": signal.model_dump(mode="json"),
+                            }
+                            for check_id, output, parent, _, _, signal, _ in group
+                        ],
+                    }
+                ),
+            )
         consumed = False
         for assignment in context.prior_assignments:
             if (
@@ -703,7 +735,7 @@ def plan_guard_credit(source, batches, context, contract):
                     == recipient.execution.occurrence_id
                     and contribution.channel == rule.channel
                 ):
-                    if contribution.value != -1 or contribution.signal != signal:
+                    if contribution.value != -1 or expected.get(contribution.signal.signal_id) != contribution.signal:
                         raise ValueError("guard_prior_credit_conflict")
                     consumed = True
         if not consumed:
@@ -715,7 +747,7 @@ def plan_guard_credit(source, batches, context, contract):
                         invocation_id=uuid.uuid4().hex,
                         attempt_id=uuid.uuid4().hex,
                         rule=credit_rule,
-                        accepted=(parent,),
+                        accepted=accepted,
                         targets=(vf.CreditTarget(recipient=recipient, channel=rule.channel),),
                         allocation="turn_boundary",
                         overlap_policy="reject",
@@ -727,6 +759,8 @@ def plan_guard_credit(source, batches, context, contract):
 
 async def manifest_penalty(task, request, context=None):
     """Explicit harm-to-penalty mapping with a derived bounded signal."""
+    if "merged" in json.loads(request.rule.configuration_json):
+        return _merged_penalty(request, context)
     if len(request.accepted) != 1 or len(request.targets) != 1:
         raise ValueError("guard_penalty_requires_single_parent_and_target")
     parent, target = request.accepted[0], request.targets[0]
@@ -762,5 +796,58 @@ async def manifest_penalty(task, request, context=None):
             allocation=request.allocation,
             attribution="coarse",
             reason=parent.reason,
+        ),
+    )
+
+
+def _valid_penalty_signal(parent, signal):
+    return (
+        parent.status == "valid"
+        and parent.value == 1
+        and signal.signal_id == parent.signal.signal_id + ".penalty"
+        and signal.minimum == -1
+        and signal.maximum == 0
+        and signal.direction == "higher"
+        and signal.revision == parent.signal.revision
+    )
+
+
+def _merged_penalty(request, context):
+    """Several harms fired on one call and channel: one -1 with every parent."""
+    config = json.loads(request.rule.configuration_json)
+    entries = config.get("merged")
+    # Entries and accepted parents are planned in the same deterministic order.
+    if (
+        request.rule.rule_id != "automationbench.manifest_per_effect_negative"
+        or request.rule.revision != "1"
+        or config.get("policy") != "per_effect_negative@1"
+        or len(request.targets) != 1
+        or not isinstance(entries, list)
+        or len(entries) < 2
+        or len(entries) != len(request.accepted)
+        or context is not None
+        and request.source != context.source
+    ):
+        raise ValueError("guard_penalty_request_invalid")
+    target = request.targets[0]
+    signals = [vf.SignalDefinition.model_validate(entry["penalty_signal"]) for entry in entries]
+    if any(
+        not _valid_penalty_signal(parent, signal) or parent.subject != target.recipient
+        for parent, signal in zip(request.accepted, signals, strict=True)
+    ) or target.recipient.kind != "execution":
+        raise ValueError("guard_penalty_request_invalid")
+    return (
+        vf.CreditContribution(
+            contribution_id=uuid.uuid4().hex,
+            parent_assessment_ids=tuple(parent.assessment_id for parent in request.accepted),
+            recipient=target.recipient,
+            channel=target.channel,
+            signal=signals[0],
+            transformation="merged_prohibited_effect_penalty@1",
+            status="valid",
+            value=-1,
+            allocation=request.allocation,
+            attribution="joint",
+            reason=request.accepted[0].reason,
         ),
     )

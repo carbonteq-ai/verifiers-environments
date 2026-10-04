@@ -16,7 +16,7 @@ from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
 from .effects import EffectEvidence, EffectFact
 from .handler_scope import outside_service
-from .service_hydration import public_service_matches
+from .service_hydration import public_collection, public_service_matches
 
 # Slack-touching handlers audited as read-only (slack search.py, users.py,
 # conversation getters and their schema lookups); they close send scope only
@@ -55,10 +55,11 @@ def _text(value):
 
 
 def _collection(world, name):
-    service = world.get("slack")
-    if not isinstance(service, Mapping) or not isinstance(service.get(name), (list, tuple)):
+    # Sparse public state may omit a collection (or Slack): it is then the
+    # schema default (empty), as public_service_matches hydrates it.
+    records = public_collection(world, "slack", name)
+    if not isinstance(records, (list, tuple)):
         raise TypeError("slack_collection_unavailable:" + name)
-    records = service[name]
     if any(not isinstance(record, Mapping) for record in records):
         raise ValueError("slack_record_schema_unavailable")
     if name == "messages":

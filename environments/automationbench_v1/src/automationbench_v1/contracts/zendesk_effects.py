@@ -17,6 +17,7 @@ from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
 from .effects import EffectEvidence, EffectFact
 from .handler_scope import outside_service
+from .service_hydration import public_collection, public_service_matches
 
 
 class ZendeskTicketEffectSource(FrozenModel):
@@ -44,10 +45,11 @@ def _equal(left, right):
 
 
 def _tickets(world):
-    service = world.get("zendesk")
-    if not isinstance(service, Mapping) or not isinstance(service.get("tickets"), (list, tuple)):
+    # Sparse public state may omit tickets (or Zendesk): the schema default.
+    tickets = public_collection(world, "zendesk", "tickets")
+    if not isinstance(tickets, (list, tuple)):
         raise TypeError("zendesk_ticket_collection_unavailable")
-    return service["tickets"]
+    return tickets
 
 
 def _target(records, identity):
@@ -179,10 +181,10 @@ def capture_zendesk_ticket_effects(source: Mapping, spec: ZendeskTicketEffectSou
             first, last = chain.ordered[0], chain.ordered[-1]
             if first.before_json is None or last.after_json is None:
                 raise ValueError("zendesk_boundary_capture_unavailable")
-            if (not _equal(initial["zendesk"], index.world(first.before_json)["zendesk"])
+            if (not public_service_matches(initial, "zendesk", index.world(first.before_json)["zendesk"])
                     or not _equal(final["zendesk"], index.world(last.after_json)["zendesk"])):
                 raise ValueError("zendesk_initial_terminal_scope_mismatch")
-        elif not _equal(initial["zendesk"], final["zendesk"]):
+        elif not public_service_matches(initial, "zendesk", final["zendesk"]):
             raise ValueError("zendesk_unobserved_scope_change")
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))

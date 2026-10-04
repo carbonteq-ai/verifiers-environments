@@ -219,7 +219,16 @@ def test_scheduled_argument_is_unsupported_even_when_handler_immediately_appends
 def test_empty_explicit_inventory_is_closed_but_missing_material_is_not_empty():
     source = run_operations(initial(), [])
     assert capture(source).complete and not capture(source).effects
+    # An omitted public collection is its schema default (empty): it closes
+    # only when the native world agrees, never by assuming emptiness.
     del source["task_evidence"]["initial"]["slack"]["messages"]
+    assert capture(source).complete
+    populated = initial()
+    populated["slack"]["messages"] = [{"channel_id": "Cproduct", "ts": "1.0", "user_id": "Usarah", "text": "Old"}]
+    source = run_operations(populated, [])
+    del source["task_evidence"]["initial"]["slack"]["messages"]
+    assert not capture(source).complete
+    source["task_evidence"]["initial"].pop("slack")
     assert not capture(source).complete
 
 
