@@ -376,6 +376,14 @@ class AutomationBenchTask(
     async def partial_credit(self, trace: vf.Trace) -> float:
         return self._snapshot(trace).partial_credit
 
+    def hooks(self, attr: str):
+        """Register the mistake penalty only when a penalty is selected, so tasks
+        scored without one keep exactly the official reward set."""
+        fns = super().hooks(attr)
+        if attr == "reward" and cast(AutomationBenchTaskConfig, self.config).mistake_penalty is None:
+            fns = [fn for fn in fns if fn.__name__ != "tool_mistake_penalty"]
+        return fns
+
     @vf.reward(weight=1.0)
     async def tool_mistake_penalty(self, trace: vf.Trace) -> float:
         """Minus the capped mistake penalty when one is selected; zero otherwise."""
