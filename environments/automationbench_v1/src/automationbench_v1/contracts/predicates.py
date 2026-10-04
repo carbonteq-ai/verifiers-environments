@@ -197,18 +197,26 @@ class MentionsTogether(Frozen):
     when every term is, false when any term is. Some readable line true is
     known true; a line that could still be true (unknown terms, or a true
     unreadable line) makes the result unknown; otherwise known false.
+
+    ``excluding_values``: terms that must be absent from the same unit. A unit
+    mentioning one is false; one whose presence is unknown (or only in an
+    unreadable line) cannot be true. With them a single term is allowed.
     """
 
     op: Literal["mentions_together"]
     text: FieldValue
-    terms: tuple[MentionTerm, ...] = Field(min_length=2, max_length=8)
-    # ``block``: within one paragraph (blank-line separated) instead of one line.
-    scope: Literal["line", "block"] = "line"
+    terms: tuple[MentionTerm, ...] = Field(min_length=1, max_length=8)
+    # ``block``: within one paragraph (blank-line separated) instead of one line;
+    # ``text``: the whole text is one unit (e.g. a record's ``values_text``).
+    scope: Literal["line", "block", "text"] = "line"
+    excluding_values: tuple[MentionTerm, ...] = Field(default=(), max_length=16, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def coherent(self):
         if self.text.domain != "string" or self.text.allowed:
             raise ValueError("predicate_mentions_text_requires_string_field")
+        if len(self.terms) < 2 and not self.excluding_values:
+            raise ValueError("predicate_mentions_together_requires_two_terms_or_exclusions")
         return self
 
 
@@ -734,33 +742,30 @@ def _mentions_value(predicate: Mentions, context: Mapping) -> PredicateResult:
 
 def _mentions_together(predicate: MentionsTogether, context: Mapping) -> PredicateResult:
     text_known, text, paths = resolve_operand(predicate.text, context)
-    prepared = []
-    for item in predicate.terms:
-        term, reason, term_paths = _prepare(item, context)
-        paths = tuple(dict.fromkeys(paths + term_paths))
-        if term is None:
-            return PredicateResult(None, reason, paths)
-        prepared.append(term)
+    prepared, excluded = [], []
+    for target, items in ((prepared, predicate.terms), (excluded, predicate.excluding_values)):
+        for item in items:
+            term, reason, term_paths = _prepare(item, context)
+            paths = tuple(dict.fromkeys(paths + term_paths))
+            if term is None:
+                return PredicateResult(None, reason, paths)
+            target.append(term)
     if not text_known:
         return PredicateResult(None, "predicate_field_unavailable", paths)
     if len(text) > _LINE_TEXT_BUDGET:
         return PredicateResult(None, "predicate_mentions_text_budget_exceeded", paths)
-
-    def judge(line):
-        results = [_term_in_line(term, line) for term in prepared]
-        return False if False in results else None if None in results else True
-
-    if predicate.scope == "block":
-        value, reason = _scan_blocks(text, prepared)
-    else:
-        value, reason = _scan(text, judge)
+    value, reason = _scan_units(_units(text, predicate.scope), prepared, excluded)
     return PredicateResult(value, reason, paths)
 
 
-def _scan_blocks(text: str, prepared) -> tuple[bool | None, str]:
-    """Every term somewhere in one blank-line-separated block."""
+def _units(text: str, scope: str) -> list[list[tuple[str, bool]]]:
+    lines = list(_readable_lines(text))
+    if scope == "line":
+        return [[line] for line in lines]
+    if scope == "text":
+        return [lines]
     blocks, current = [], []
-    for line, readable in _readable_lines(text):
+    for line, readable in lines:
         if not line.strip():
             if current:
                 blocks.append(current)
@@ -769,20 +774,29 @@ def _scan_blocks(text: str, prepared) -> tuple[bool | None, str]:
             current.append((line, readable))
     if current:
         blocks.append(current)
+    return blocks
+
+
+def _presence(term, unit) -> bool | None:
+    seen = [(_term_in_line(term, line), readable) for line, readable in unit]
+    if any(value is True and readable for value, readable in seen):
+        return True
+    return None if any(value is None or value is True for value, _ in seen) else False
+
+
+def _scan_units(units, prepared, excluded) -> tuple[bool | None, str]:
+    """Every term somewhere in one unit (line/block/text), no excluded value there."""
     unknown = False
-    for block in blocks:
-        verdicts = []
-        for term in prepared:
-            seen = [(_term_in_line(term, line), readable) for line, readable in block]
-            if any(value is True and readable for value, readable in seen):
-                verdicts.append(True)
-            elif any(value is None or value is True for value, _ in seen):
-                verdicts.append(None)
-            else:
-                verdicts.append(False)
-        if all(verdict is True for verdict in verdicts):
+    for unit in units:
+        verdicts = [_presence(term, unit) for term in prepared]
+        if False in verdicts:
+            continue
+        absent = [_presence(term, unit) for term in excluded]
+        if True in absent:
+            continue
+        if all(verdict is True for verdict in verdicts) and None not in absent:
             return True, "predicate_decided"
-        unknown = unknown or False not in verdicts
+        unknown = True
     if unknown:
         return None, "predicate_mentions_unreadable_or_ambiguous"
     return False, "predicate_mentions_absent"

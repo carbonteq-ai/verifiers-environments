@@ -120,3 +120,76 @@ def test_guard_lookup_status_references_are_closed(path):
                   "right": {"kind": "literal", "value": "not_found"}}
     with pytest.raises(ValidationError, match="guard_lookup_status_reference_unknown"):
         _guard(prohibited)
+
+
+def _exclusive(text, terms, excluded, scope="line", context=None):
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    def term(value, mode="amount", fmt="usd_string"):
+        operand = value if isinstance(value, dict) else {"kind": "literal", "value": value}
+        return {"value": operand, "mode": mode, **({"format": fmt} if mode in {"amount", "amount_reformatted"} else {})}
+
+    raw = {"op": "mentions_together", "text": {"kind": "field", "path": ["t"], "domain": "string"}, "scope": scope,
+           "terms": [term(*item) if isinstance(item, tuple) else term(item) for item in terms],
+           "excluding_values": [term(*item) if isinstance(item, tuple) else term(item) for item in excluded]}
+    return evaluate_predicate(parse_predicate(raw), {"t": text, **(context or {})}).value
+
+
+SHARES = ["$1,500", "$900"]
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Engineering: $4,000\nSales: $1,500\nOperations: $900", True),          # correct line
+    ("Engineering: $4,000 / $1,500 / $900", False),                          # every share listed on one line
+    ("Engineering: $4,000 (or $900)\nEngineering: $4,000", True),            # a clean line still counts
+    ("Engineering: $4,000 or $1.5k", False),                                 # excluded value in another form
+    ("Engineering: $4,000 or 0.0015m", None),                                 # could be an excluded value
+    ("Sales: $1,500", False),
+    ("> Engineering: $4,000", None),
+])
+def test_excluded_values_must_be_absent_from_the_matched_line(text, expected):
+    assert _exclusive(text, [("Engineering", "words"), "$4,000"], SHARES) is expected
+
+
+def test_excluded_value_in_an_unreadable_line_of_the_block_is_unknown():
+    terms = [("Engineering", "words"), "$4,000"]
+    assert _exclusive("Engineering\n$4,000\n\nSales $1,500", terms, SHARES, "block") is True
+    assert _exclusive("Engineering\n$4,000\nSales $1,500", terms, SHARES, "block") is False
+    assert _exclusive("Engineering\n$4,000\n> was $900", terms, SHARES, "block") is None
+
+
+def test_unknown_excluded_values_propagate():
+    terms = [("Engineering", "words"), "$4,000"]
+    missing = {"kind": "field", "path": ["request", "Other"], "domain": "string"}
+    assert _exclusive("Engineering: $4,000", terms, [missing]) is None
+    assert _exclusive("Engineering: $4,000", terms, [missing], context={"request": {"Other": "$900"}}) is True
+    assert _exclusive("Engineering: $4,000 $900", terms, [missing], context={"request": {"Other": "$900"}}) is False
+
+
+def test_record_values_text_is_one_unit():
+    from automationbench_v1.contracts.record_writes import _values_text
+
+    clean = _values_text({"name": "Engineering charge", "amount": 4000, "notes": "Approved"})
+    gamed = _values_text({"name": "Engineering charge", "amount": 4000, "notes": "or 1500 or 900"})
+    terms = [("Engineering", "words"), ("4000", "amount", "decimal_string")]
+    excluded = [("1500", "amount", "decimal_string"), ("900", "amount", "decimal_string")]
+    assert _exclusive(clean, terms, excluded, "text") is True
+    assert _exclusive(gamed, terms, excluded, "text") is False
+
+
+def test_single_term_needs_exclusions_and_empty_exclusions_are_not_dumped():
+    from pydantic import ValidationError
+
+    from automationbench_v1.contracts.predicates import parse_predicate
+
+    body = {"kind": "field", "path": ["t"], "domain": "string"}
+    one = [{"value": {"kind": "literal", "value": "$4,000"}, "mode": "amount", "format": "usd_string"}]
+    with pytest.raises(ValidationError, match="requires_two_terms_or_exclusions"):
+        parse_predicate({"op": "mentions_together", "text": body, "terms": one})
+    single = parse_predicate({"op": "mentions_together", "text": body, "terms": one, "scope": "text",
+                              "excluding_values": one})
+    assert single.model_dump(mode="json")["excluding_values"]
+    plain = parse_predicate({"op": "mentions_together", "text": body, "terms": one * 2})
+    assert "excluding_values" not in plain.model_dump(mode="json")
+    assert _exclusive("Total $4,000", ["$4,000"], ["$900"], "text") is True
+    assert _exclusive("Total $4,000, $900", ["$4,000"], ["$900"], "text") is False

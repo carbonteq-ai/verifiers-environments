@@ -203,5 +203,34 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
 16. Authoring trap: a guard whose effect match does not depend on the row must
     use `match_cardinality: "per_candidate"`.
 
+## Mechanisms added after round 4 (2026-10-04)
+
+17. Absent from the same scope: `mentions_together` takes
+    `excluding_values` (up to 16 terms, same fields as `terms`). A unit (line,
+    `block`, or `scope: "text"` = the whole text, e.g. one record's
+    `values_text`) matches only if every term is present **and** no excluded
+    value appears in it; an excluded value whose presence is unknown (an
+    unresolved field, an ambiguous form, or only in a quoted line of the unit)
+    keeps the unit unknown. With exclusions a single term is allowed. Use it to
+    stop "list every candidate amount on one line" from passing:
+
+        {"op": "mentions_together", "text": {"kind": "field", "path": ["effect", "body"], "domain": "string"},
+         "terms": [{"value": {"kind": "field", "path": ["request", "Department"], "domain": "string"}, "mode": "words"},
+                   {"value": {"kind": "field", "path": ["request", "Share"], "domain": "string"},
+                    "mode": "amount", "format": "usd_string"}],
+         "excluding_values": [{"value": {"kind": "field", "path": ["request", "Other Share"], "domain": "string"},
+                               "mode": "amount", "format": "usd_string"}]}
+
+    For a record write: `"text": {"kind": "field", "path": ["effect", "values_text"], "domain": "string"},
+    "scope": "text"`. Excluded terms are matched like terms (amounts in any
+    accepted form, including "$1.5k"), so list only values that must not
+    appear; a legitimate "was $900" beside the right amount also fails.
+
+Engine corrections in the same round: amounts followed by a list comma
+("$8,420, no") are read; k (and dollar-marked m/b) suffixes are read exactly
+("$120k" = 120000) and only values they could be rounded from stay unknown;
+24-hour ranges ("13:00-13:30") yield both ends; guards publish
+`lookup.<alias>` (`matched`/`not_found`) like obligations.
+
 Revise a task by overwriting its `tasks/<task_name>/` files and recording the
 coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
