@@ -1,0 +1,677 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-mailchimp-email-request",
+  "revision": "round5_v1",
+  "public_request": "A customer emailed asking to be added to our newsletter. Find the email from Dana Okafor and add her to the Newsletter list in Mailchimp using the email address she sent from. The Newsletter list ID is list_001.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "96e7b4d36442d3be89995377ac139ecf9aff17d7d01c2d7dad0a509479eb49ea"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "71f4563986eb92352a956f66b7c089b55429ec7eb750c87ba530983e31364d96"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "mailchimp",
+        "audiences"
+      ],
+      "canonical_sha256": "f01ebb5075924b179813d0f765e3a9fdac3dfadd3485af499ccbfb490ef28e02"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "newsletter-request",
+      "fields": {
+        "message_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "sender_email": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "from_"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ],
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "list_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "mailchimp",
+            "audiences",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "mailchimp",
+              "audiences"
+            ]
+          ]
+        }
+      }
+    },
+    "reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "subscribers_created": {
+      "adapter": "service.record_writes@1",
+      "service": "mailchimp",
+      "collection": [
+        "subscribers"
+      ],
+      "kind": "create"
+    },
+    "subscribers_updated": {
+      "adapter": "service.record_writes@1",
+      "service": "mailchimp",
+      "collection": [
+        "subscribers"
+      ],
+      "kind": "update"
+    },
+    "subscribers_deleted": {
+      "adapter": "service.record_writes@1",
+      "service": "mailchimp",
+      "collection": [
+        "subscribers"
+      ],
+      "kind": "delete"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "request-email-found",
+      "signal_id": "simple.mailchimp_request.email_found",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "newsletter-request"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "from_"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "returned_fields"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "sender-subscribed-to-newsletter",
+      "signal_id": "simple.mailchimp_request.subscribed",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "subscribers_created",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "newsletter-request"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "list_id"
+                  ],
+                  "domain": "scalar"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "list_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "email"
+                  ],
+                  "domain": "scalar"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "sender_email"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "status"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "subscribed"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "found-before-subscribing",
+      "signal_id": "simple.mailchimp_request.found_before_subscribe",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "subscribers_created",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "newsletter-request"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "list_id"
+                  ],
+                  "domain": "scalar"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "list_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "email"
+                  ],
+                  "domain": "scalar"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "sender_email"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_read",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "from_"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "other-subscription-created",
+      "signal_id": "simple.mailchimp_request.other_subscription",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "subscribers_created",
+      "match_cardinality": "per_candidate",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "newsletter-request"
+        }
+      },
+      "effect_match": {
+        "op": "not",
+        "arg": {
+          "op": "all",
+          "args": [
+            {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "record",
+                  "list_id"
+                ],
+                "domain": "scalar"
+              },
+              "right": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "list_id"
+                ],
+                "domain": "string"
+              }
+            },
+            {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "record",
+                  "email"
+                ],
+                "domain": "scalar"
+              },
+              "right": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "sender_email"
+                ],
+                "domain": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "check_id": "subscription-reverted",
+      "signal_id": "simple.mailchimp_request.subscription_reverted",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "subscribers_updated",
+      "match_cardinality": "per_candidate",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "newsletter-request"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "list_id"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "list_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "email"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "sender_email"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "status"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "subscribed"
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "status"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "subscribed"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "subscription-deleted",
+      "signal_id": "simple.mailchimp_request.subscription_deleted",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "subscribers_deleted",
+      "match_cardinality": "per_candidate",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "newsletter-request"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "list_id"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "list_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "email"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "sender_email"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

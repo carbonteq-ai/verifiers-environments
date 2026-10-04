@@ -1162,7 +1162,10 @@ def get_support_helpscout_jira_bugs_task() -> dict:
                         },
                     ],
                 },
-                "jira": {"actions": {}},
+                "jira": {
+                    "actions": {},
+                    "projects": [{"id": "sup", "key": "SUP", "name": "Support"}],
+                },
                 "slack": {
                     "channels": [
                         {"id": "C_eng", "name": "engineering", "member_ids": []},

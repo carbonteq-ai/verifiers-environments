@@ -1,28 +1,40 @@
-# sales.calendly_no_show_followup — batch-12 review v3
+# sales.calendly_no_show_followup — round-4 review
 
-Pack `batch-07.json` task 0; Luna episode `ce455d0a…ccf6`. Whole task: **not qualified**.
+Pack `batch-07.json` task 0; Luna episode `ce455d0a…ccf6`. Whole task: **qualified candidate**.
 
-**Coverage.** 12 obligations, 8 task-specific. Expressed v1 0 → v2 4 → v3 5 (adds C6 scheduled time).
-Gaps: 3 `other:public_policy_ambiguity` (C2 which event, C3 exact subject, C8 future event). Out of scope 4
-(2 system-prompt rules, 2 reviewed non-obligations).
+**Coverage.** 12 obligations, 8 in scope; expressed 5 → **8 / 8**. Out of scope: 2 system-prompt
+rules, marking the no-show in Calendly, and the "Deal closed" message (CRM stays the authority).
 
-**New check `followup-scheduled-time`** (mechanisms 6 and 7): for the event named in the subject, the
-description must give its start time of day. Accepted: the UTC time (14:00 / 2:00 PM / 2pm) on a line with
-no other zone label, or the New York time (9:00 AM) next to ET/EST/Eastern/America/New_York. The minutes
-come from `iso_instant` arithmetic on the bound start times. Subject and time are coupled per event.
+**Decisions on the three former ambiguities (RL lens)**
+- C2, which event: the invitee's active event that had already started when the no-show was
+  reported (2026-02-15 09:00Z). Only the Discovery Call (Feb 10, 14:00Z) qualifies. The Product Demo
+  starts at 15:00Z that day, so nobody could have missed it yet, and the Follow-up Call was cancelled.
+  Rewarding the Product Demo would teach the agent to log no-shows for meetings that have not
+  happened. The population is all Calendly invitations, with decided event and contact lookups; the
+  build asserts exactly one qualifies.
+- C3, subject: must equal `Follow up on missed call - Discovery Call` exactly.
+- C8, harm (`no-followup-for-other-event`): a missed-call task naming the future or cancelled event.
+  This also catches hedging with one task per event.
 
-**Luna replay**: task 1, priority 1, pipeline 1, scheduled time **0**. Luna wrote '14:00–14:30
-America/New_York' for a 14:00 UTC event, which states the wrong instant. Bindings verified, no errors,
-scalars and bytes unchanged, rescore/reload repeated.
+**Scheduled time (C6).** Accepted: UTC (labelled or not), or a conversion to ET, CT, MT, PT or CET
+next to that zone's label. Also accepted: the raw `start_time` copied, its Z form, or `14:00:00`. A
+UTC time under a non-UTC label scores 0 (Luna's case). The Product Demo's 15:00 anywhere scores 0
+(anti-hedge), except as "15:00 CET".
 
-**Alternatives** (16 runs): 6 correct variants give 1/1/1/1. Mislabelled zone, Product Demo time under a
-Discovery Call subject, and no time are known 0. A bare '2:00' abstains. Old threshold, cancelled event and
-missing description stay known 0 (D2 fixed). Missing ACK abstains.
+**Luna replay**: task 1, priority 1, pipeline 1, time **0** (Luna wrote "14:00–14:30
+America/New_York" for a 14:00 UTC event), guard compliant. No errors, no failed runs, scalars and
+bytes unchanged, rescore and reload repeated.
+**Alternatives** (30 runs on the real simulator): 13 correct variants score 1/1/1/1.
+- Wrong instants score 0 on time; a bare "2:00" abstains because it is ambiguous.
+- Product Demo or Follow-up subjects score task 0 and fire the guard.
+- The old $100k threshold scores 0 on priority and on the pipeline total.
+- Hedging is caught by the guard or the exact-subject check; a missing ACK abstains.
 
-**Remaining gaps.** C2/C3/C8 still need a decision. Reading A ('event dated today', not yet started) is
-now decidable with iso_instant. Reading B ('most recent past event') still needs member-level lookups
-inside selections.
+**Mechanism defects** (reproducers in `round-4/sales-support/repro/`): D1 `clock_time` reads
+`14:00:00` and ISO timestamps as absent; D2 "am"/"pm" starting the next word ("08:00
+America/Chicago") is taken as a meridiem, so the time is dropped; D3 a contract can load and still
+fail every producer run once re-serialised (budget; the draft now uses clock literals); D4 `amount`
+reads "$87,000," as absent.
 
-**Limits.** Zone handling is enumerated: a correct conversion to another zone ('6:00 AM PT') is a false 0.
-Smallest fix: a `mentions` instant mode that reads a time with its zone label. Date is not required.
-**Defects:** none new.
+Workarounds for D1/D2/D4 (verbatim source strings) are in the draft. Limits: zones are enumerated;
+the meeting date is not required.

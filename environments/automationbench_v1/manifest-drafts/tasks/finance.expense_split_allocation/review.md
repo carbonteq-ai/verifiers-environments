@@ -1,29 +1,32 @@
-# finance.expense_split_allocation: batch-12 round 3 (v3)
+# finance.expense_split_allocation: round 4
 
-Status: **not qualified**. Each charge amount must now sit on the same line as its expense, which removes the false passes v2 gave on Luna. Two obligations are still gaps.
+Status: **qualified candidate**, with one open gaming risk for review. Coverage 14/16 → **16/16** in-scope obligations; 3 out of scope (two system-prompt rules, residual-cent rule).
 
-## Coverage
-16 in-scope obligations (19 reviewed; 3 out of scope as system-prompt or rounding items, excluded from the totals). Expressed: v1 8, v2 12, v3 14. Gaps: 2 (other:all_occurrences_verbatim 1, other:agent_defined_log_schema 1). The checks match exact facts only (expense and department names, amounts, recipients); none are wording checks.
-
-## What changed (`finance.expense_split_allocation.draft-v3.json`, 19 checks, outcome-only)
-- **E18 closed with `mentions_together`.** The six `*-charge-emailed` checks now need the expense name and the department's share on one readable line. Both cent and whole-dollar rounding still count.
-- **HTML-only emails score.** Every check reads `effect.body_text`, so an HTML-only email is now read as text. In v2 these abstained (D4).
-- **E13 reclassified as expressed. No new mechanism was added.** Each expense × department outcome already has a per-expense check, and every input to it is bound to a public source by digest. What v2 called missing was generality, a single check that would work on any data. The brief puts task parameters in manifest data, so this does not leave a public outcome unchecked.
-- The round-2 verbatim fix now rejects "$36,000.00" for "$36,000": the verbatim check gives 0 and the paraphrase guard flags it.
+## What changed (`draft.json`, 20 checks, outcome-only)
+- **E12 expressed (agent-named log columns).** The six log checks read each created Allocations row through `service.record_writes@1` `values_text`, so any header works. Each row must name the expense and the department and contain the correct share (cent or whole dollar).
+  - For the Sales, Marketing and Operations training rows, the share (3,000/2,000/1,000) equals that department's Sq Ft. There the share must carry a dollar sign (`usd_marked`) or sit under an "Allocation" header. Otherwise the result stays unknown rather than a guessed 0 or 1.
+- **Excluded-expense guard** matches the expense name in any column.
+- **E11b expressed.** The email verbatim guard uses `amount_reformatted`, so any reformatted occurrence is harm. A new guard applies the same rule to log rows ("notifications or records").
+- **Block-format emails.** An expense and its share in one blank-line paragraph that names no other expense now counts.
 
 ## Luna replay (hash-bound, native)
-Scalar rewards and episode bytes are unchanged, and rescoring and reloading give the same findings. Every scope closes. Holiday party passes. Every wrong share, in both the log and the emails, is a known 0, including the three training findings that falsely passed in v2.
+- Holiday party: logs, charges and source amounts are 1.
+- Every wrong log and charge is a known 0. That includes the training rows ($3,300/$2,200/$1,100 beside Sq Ft 3,000/2,000/1,000), which a naive `values_text` check would have passed.
+- Guards are compliant and scopes close. Scalars and bytes are unchanged; rescoring and reloading repeat the findings.
 
-## Genuine-simulator alternatives (16 runs)
-- These pass: cent rounding, whole-dollar rounding, one email to all heads, a markdown table, a square-footage header line, and HTML-only emails.
-- These score 0 on the affected checks: stale headcount, shares swapped between expenses, wrong shares, "$36,000.00", and "36000 USD". The paraphrase guard flags the last two.
-- A missing acknowledgement abstains and never becomes a false 0.
-- **Limitation:** a correct email in block format, with the expense on one line and "Your share: $X" on the next, scores 0 on the charge checks.
-- **Gap:** a message that uses both "$36,000" and "36000 USD" passes everything (E11b).
+## Genuine-simulator alternatives (29 runs)
+- **Pass:** cents and whole-dollar shares; one email to all heads; tables; HTML-only; blank-line paragraph emails; logs under other headers (marked); Luna-style columns.
+- **0 or harm:**
+  - Stale headcount, wrong or swapped shares.
+  - Reformatted source amounts (email or log), including mixed "$36,000 (36000 USD)".
+  - An excluded expense logged under another header; no log.
+- **Unknown:** unmarked shares under non-"Allocation" headers for the three training rows. Missing acknowledgement abstains.
+- **Gaming:**
+  - One-paragraph email shotgun scores 0.
+  - **A log row with extra cells listing every candidate share passes every log check.** `values_text` has no "sole amount" test; email lines with several shares have the same weakness. This is recorded as a mechanism request: terms that must be absent from the same unit.
 
-## Remaining gaps
-- **E11b (other:all_occurrences_verbatim).** No mention mode tests the written form of every occurrence. Proposed: a `non_verbatim_amount` mode, true when some number equals the value but is written differently. It would also serve payment P6b and deferred DR12b.
-- **E12 (other:agent_defined_log_schema).** Logs whose amount column has a different header abstain. I probed `service.record_writes@1` with `values_text`, which ignores column names, on Luna. It falsely passes the training rows, because each row's Sq Ft cell (3,000, 2,000, 1,000) equals the correct share. Proposed: a `usd_marked` amount format, or a labelled Sheets text view that can exclude non-amount columns.
-
-## Mechanism defects
-None in mechanisms 6–8.
+## Limitations
+- Wide-format logs (departments as headers) score 0.
+- Tight block emails score 0.
+- Duplicate conflicting rows are not penalized.
+- Presence, not assertion.
