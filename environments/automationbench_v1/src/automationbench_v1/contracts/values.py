@@ -53,7 +53,7 @@ class ValueInput(FrozenModel):
     kind: Literal["input"]
     format: Literal[
         "number", "decimal_string", "usd_string", "usd_marked", "iso_date", "iso_timestamp",
-        "clock_time", "clock_24h", "duration_text", "duration_clock", "iso_instant",
+        "clock_time", "clock_24h", "duration_text", "duration_clock", "iso_instant", "date_text",
     ]
     path: Path | None = None
     literal: StrictStr | StrictInt | StrictFloat | None = None
@@ -171,6 +171,81 @@ def instant_seconds(text) -> Fraction:
         raise _Unavailable("value_instant_unavailable") from exc
     delta = moment - _EPOCH
     return Fraction(delta.days * 86400 + delta.seconds) + Fraction(delta.microseconds, 1_000_000)
+
+
+# Month and weekday names shared with prose date mentions (predicates.py).
+MONTH_NUMBERS = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3, "apr": 4, "april": 4,
+    "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7, "aug": 8, "august": 8, "sep": 9, "sept": 9,
+    "september": 9, "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+}
+WEEKDAY_NUMBERS = {
+    "mon": 0, "monday": 0, "tue": 1, "tues": 1, "tuesday": 1, "wed": 2, "wednesday": 2, "thu": 3,
+    "thur": 3, "thurs": 3, "thursday": 3, "fri": 4, "friday": 4, "sat": 5, "saturday": 5, "sun": 6,
+    "sunday": 6,
+}
+_MONTH_NAME = r"([a-z]+)\.?"
+_DATE_TEXT_FORMS = (
+    # [Weekday,] Month D[st], YYYY
+    re.compile(r"(?:([a-z]+)\.?,?\s+)?" + _MONTH_NAME + r"\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})"),
+    # [Weekday,] D[st] [of] Month[,] YYYY
+    re.compile(r"(?:([a-z]+)\.?,?\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?" + _MONTH_NAME
+               + r",?\s+(\d{4})"),
+)
+
+
+def calendar_day(year, month, day, weekday=None):
+    """A valid date whose weekday, when stated, agrees; otherwise None."""
+    try:
+        value = date(year, month, day)
+    except (ValueError, OverflowError):
+        return None
+    return value if weekday is None or value.weekday() == weekday else None
+
+
+def date_from_text(text) -> date:
+    """A stored human date with an explicit year ("February 3, 2026").
+
+    Accepts ISO ``YYYY-MM-DD``, month-name forms in either order with an
+    optional (checked) weekday, and ``M/D/YYYY`` only when the day-first
+    reading is invalid or identical. Year-less, relative or contradictory
+    text is unavailable.
+    """
+    if type(text) is not str or len(text) > 64:
+        raise _Unavailable("value_date_text_unavailable")
+    raw = text.strip().rstrip(".").strip().lower()
+    match = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", raw)
+    if match:
+        found = calendar_day(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        if found is None:
+            raise _Unavailable("value_date_text_unavailable")
+        return found
+    match = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", raw)
+    if match:
+        first, second, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+        readings = {found for found in (calendar_day(year, first, second), calendar_day(year, second, first))
+                    if found is not None}
+        if len(readings) != 1:
+            raise _Unavailable("value_date_text_ambiguous")
+        return readings.pop()
+    for index, pattern in enumerate(_DATE_TEXT_FORMS):
+        match = pattern.fullmatch(raw)
+        if match is None:
+            continue
+        weekday_name, first, second, year = match.groups()
+        month_name, day = (first, second) if index == 0 else (second, first)
+        weekday = None
+        if weekday_name is not None:
+            if weekday_name not in WEEKDAY_NUMBERS:
+                break
+            weekday = WEEKDAY_NUMBERS[weekday_name]
+        if month_name not in MONTH_NUMBERS:
+            continue
+        found = calendar_day(int(year), MONTH_NUMBERS[month_name], int(day), weekday)
+        if found is not None:
+            return found
+        break
+    raise _Unavailable("value_date_text_unavailable")
 
 
 class DecimalExpression(FrozenModel):
@@ -357,6 +432,8 @@ def _evaluate(expr, context, evidence, rounding):
                 value = date.fromisoformat(raw)
                 if value.isoformat() != raw:
                     raise ValueError("noncanonical date")
+            elif expr.format == "date_text":
+                value = date_from_text(raw)
             else:
                 if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])", raw) is None:
                     raise ValueError("offset ISO timestamp required")
