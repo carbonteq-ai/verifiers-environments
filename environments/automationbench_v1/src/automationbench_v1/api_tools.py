@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import verifiers.v1 as vf
 
-from automationbench.schema.world import WorldState
 from automationbench.tools.api import api_fetch as upstream_api_fetch
 from automationbench.tools.api import api_search as upstream_api_search
 from automationbench.tools.api import base64_encode as upstream_base64_encode
 
 from .capture import capture_action
 from .tools import AutomationBenchState
+from .world_codec import dump_world, load_world
 
 
 class AutomationBenchApiToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState]):
@@ -44,9 +44,9 @@ class AutomationBenchApiToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchStat
         """Call a discovered endpoint against this rollout's simulated world."""
 
         def execute():
-            world = WorldState.model_validate(self.state.world)
+            world = load_world(self.state.world)
             result = upstream_api_fetch(world, method, url, params=params, body=body)
-            self.state.world = world.model_dump(mode="json")
+            self.state.world = dump_world(world)
             return result
 
         return capture_action(

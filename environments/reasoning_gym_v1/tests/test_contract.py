@@ -35,7 +35,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert (PACKAGE_ROOT / "src/reasoning_gym/factory.py").is_file()
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=84ab782391bbfe1ac4f4ca32fa612e56d01b5b81#84ab782391bbfe1ac4f4ca32fa612e56d01b5b81"
+        "?rev=e6a3d9bbfe6959b97878f451fc721793a232cd5f#e6a3d9bbfe6959b97878f451fc721793a232cd5f"
     )
 
 

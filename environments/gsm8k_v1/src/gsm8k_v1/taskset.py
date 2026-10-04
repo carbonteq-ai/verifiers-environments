@@ -2,8 +2,9 @@
 
 The task data keeps the immutable Hugging Face source identity alongside the row.
 That makes a native Verifiers trace replayable without making the framework own the
-dataset or its cache. Answer verification remains an in-runtime ``math-verify``
-script, matching the upstream Verifiers environment's trust boundary.
+dataset or its cache. Answers are checked in-process with Verifiers'
+time-limited ``math-verify`` wrapper, like the MATH environment, so scoring never
+prepares a per-runtime script environment inside its scoring budget.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any, Literal, cast
 
 import verifiers.v1 as vf
@@ -29,7 +29,27 @@ SYSTEM = (
     "Solve the grade-school math problem. Reason step by step, then give the final "
     "answer as a single number on the last line, prefixed with '#### ' (e.g. '#### 42')."
 )
-VERIFY = (Path(__file__).parent / "verify.py").read_bytes()
+VERIFY_TIMEOUT_SECONDS = 5
+_FINAL_ANSWER = re.compile(r"####\s*(.+)")
+
+
+def score_answer(reply: str | None, gold: str, *, timeout_seconds: int = VERIFY_TIMEOUT_SECONDS) -> float:
+    """1.0 when the reply's final ``####`` answer equals the gold answer, else 0.0.
+
+    Reasoning before a closing think tag is ignored, and an unclosed think block
+    scores zero. Without a ``####`` line the whole reply is compared, as before.
+    """
+
+    if not reply or ("<think>" in reply and "</think>" not in reply):
+        return 0.0
+    text = reply.rsplit("</think>", 1)[-1]
+    matches = _FINAL_ANSWER.findall(text)
+    prediction = (matches[-1] if matches else text).strip()
+    if not prediction:
+        return 0.0
+    return vf.verify_boxed_math_answer(
+        f"\\boxed{{{prediction}}}", f"\\boxed{{{gold}}}", timeout_seconds=timeout_seconds
+    )
 
 
 def normalized_row_digest(row: Mapping[str, Any]) -> str:
@@ -68,29 +88,16 @@ class GSM8KData(vf.TaskData):
 
 class GSM8KTask(vf.Task[GSM8KData]):
     @vf.reward(weight=1.0)
-    async def correct(self, trace: vf.Trace, runtime: vf.Runtime) -> float:
-        """Score the model's final answer inside the rollout runtime."""
+    async def correct(self, trace: vf.Trace) -> float:
+        """Score the model's final ``####`` answer against the gold answer."""
 
-        result = await runtime.run_uv_script(
-            VERIFY,
-            args=[self.data.answer, trace.last_reply or ""],
-        )
-        if result.exit_code != 0:
-            raise RuntimeError(f"verify.py failed: {result.stderr.strip()[-500:]}")
-        lines = result.stdout.strip().splitlines()
-        return float(lines[-1]) if lines else 0.0
+        return score_answer(trace.last_reply, self.data.answer)
 
     async def validate(self, runtime: vf.Runtime) -> bool:
         """Check that this task's gold answer is accepted by the verifier."""
 
-        result = await runtime.run_uv_script(
-            VERIFY,
-            args=[self.data.answer, f"#### {self.data.answer}"],
-        )
-        if result.exit_code != 0:
-            raise RuntimeError(f"verify.py failed: {result.stderr.strip()[-500:]}")
-        lines = result.stdout.strip().splitlines()
-        return bool(lines) and float(lines[-1]) == 1.0
+        del runtime
+        return score_answer(f"#### {self.data.answer}", self.data.answer) == 1.0
 
 
 class GSM8KConfig(vf.TasksetConfig):

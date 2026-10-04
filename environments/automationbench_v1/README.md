@@ -69,7 +69,10 @@ maintains the compatibility delta from upstream Zapier commit
 exact Verifiers commit and resolved dependency graph.
 
 The wheel vendors the CarbonTeq AutomationBench fork at commit
-`908db2abd4a868acc37ab0850474bff653bea25c`. Vendoring keeps this standalone
+`e193bce99af1ea7cca272644a2b3a1676a587b4a` (branch `codex/tool-fidelity-fixes`): 1.0.5.post1 plus
+tool-fidelity fixes, so tools do what their names and parameters promise and
+return no template sample data (see the fork's `CARBONTEQ_FORK.md`). Graders
+and task data are unchanged. Vendoring keeps this standalone
 Verifiers environment installable without a second VCS dependency and lets
 posttrain job packaging produce one hash-locked runtime closure. The vendored
 source remains under the fork's original `automationbench` import namespace;
@@ -85,13 +88,44 @@ The adapter owns only the v1 boundary:
 - a task-filtered `limited_zapier` toolset for smaller-policy curricula;
 - deterministic final-state assertion scoring with dense
   `partial_credit` and strict `task_completed_correctly` metrics; and
-- trace metadata containing assertion results and the final world state.
+- trace metadata containing assertion results and the final world state; and
+- optional per-turn rewards for step-level training (see below).
 
-The dependency is the public CarbonTeq AutomationBench fork at immutable merge
-commit `908db2abd4a868acc37ab0850474bff653bea25c`; no private package index or
+The dependency is the public CarbonTeq AutomationBench fork at immutable
+commit `e193bce99af1ea7cca272644a2b3a1676a587b4a`; no private package index or
 credential is required to build this environment library. The package is
 independent of posttrain, Trackio, trainers, serving systems, and the other
 environment packages.
+
+The adapter keeps the world as JSON between tool calls and rebuilds it for
+each call and for scoring (`world_codec.py`). Google Sheets' private record of
+updated rows travels with it, so `google_sheets_row_updated` and
+`google_sheets_row_not_updated` assertions see updates made by earlier calls
+(before 0.5.0 they never did). Lists sent for comma-separated string
+parameters arrive as `"a,b"`; parameters documented as JSON get JSON text.
+
+## Per-turn rewards
+
+Setting `task.turn_rewards` (for example `{tool_failure_penalty: 0.05}`) makes
+each rollout record how its tool calls change the task's partial credit. Before
+every model call the task scores the live world and appends the result to
+`trace.info["automationbench_turn_progress"]`; `finalize` adds the final state.
+The measurement has to be live: record IDs are generated with `uuid4`, so
+replaying a finished episode's tool calls would not rebuild its world.
+
+`finalize` then writes `trace.info["posttrain_turn_rewards"]`, Posttrain's turn
+evidence for projection `assistant-turns@1`: one assessment per sampled
+assistant turn (`assistant-0`, `assistant-1`, ...) with `turn_reward` = the change
+in partial credit the turn caused minus `tool_failure_penalty` for each of its
+tool calls whose result reports a failure (an `error` key, `"success": false`, a
+raised tool, or a harness `error:` message), plus the `assertion_progress` and
+`tool_failures` components. Over an episode the rewards sum to the final
+partial credit minus the untouched world's credit, minus the penalties. A turn
+whose world cannot be scored keeps the last scored credit. The scorer digest in
+`trace.info["posttrain_scorer_digests"]["posttrain_turn_rewards"]` changes with
+the penalty. Unset, nothing is recorded and scoring is unchanged. The last
+turn of an episode stopped by the turn limit has no committed tool results, so
+its failures are not counted.
 
 ## Validate and run
 
