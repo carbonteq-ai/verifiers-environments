@@ -28,11 +28,13 @@ from .populations import (
     InitialCollectionSource,
     Path,
     PopulationEvidence,
+    _canonical,
     _field,
     _key,
     _model,
     _project,
     _resolve,
+    _string_keyed_mapping,
     capture_population,
 )
 from .predicates import Predicate, evaluate_predicate, parse_predicate
@@ -133,9 +135,16 @@ class RecordRetentionEvidence(FrozenModel):
 
 def _leaf(model, path):
     for index, part in enumerate(path):
-        info = model.model_fields[part]
+        info = model.model_fields[_canonical(model, part)]
         if index == len(path) - 1:
             return info.rebuild_annotation()
+        if index == len(path) - 2 and _string_keyed_mapping(info.annotation):
+            # One key of a string-keyed mapping (HubSpot ``properties``): the
+            # mapping's value type is the leaf.
+            mapping = next(item for item in (get_args(info.annotation) if get_origin(info.annotation)
+                                             in (Union, UnionType) else (info.annotation,))
+                           if item is not type(None))
+            return get_args(mapping)[1]
         types = get_args(info.annotation) or (info.annotation,)
         model = next(item for item in types if isinstance(item, type) and hasattr(item, "model_fields"))
 

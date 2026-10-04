@@ -12,7 +12,7 @@ from pydantic import TypeAdapter
 from ..capture import canonical_json
 from .effects import EffectEvidence, EffectFact
 from .obligations import _context, _fields
-from .populations import InitialCollectionSource, PopulationEvidence, _model
+from .populations import InitialCollectionSource, PopulationEvidence, _model, _resolve_field
 from .predicates import evaluate_predicate
 from .retained_credit import CompletionEvaluation, CompletionFinding, CompletionSelection
 from .retained_records import (
@@ -76,13 +76,9 @@ def _baseline(row, retention_source, used):
 
 def _project_fields(fields, retention_source):
     projected = {}
+    model = _model(cast(str, retention_source.path[2]), cast(str, retention_source.path[3]))
     for alias, path in retention_source.fields.items():
-        value, known = fields, True
-        for part in path:
-            if not isinstance(value, Mapping) or part not in value:
-                known = False
-                break
-            value = value[part]
+        known, value = _resolve_field(fields, model, path) if isinstance(fields, Mapping) else (False, None)
         if known:
             projected[alias] = value
     return projected

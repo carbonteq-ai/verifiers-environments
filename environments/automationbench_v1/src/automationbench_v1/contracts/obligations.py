@@ -22,10 +22,12 @@ from ..capture import canonical_json
 from .aggregates import AggregateEvidence, AggregateSpec, evaluate_aggregate
 from .base import FrozenModel, Identifier
 from .effects import EffectEvidence, EffectFact, EffectSource
+from .execution_order import with_execution_order
 from .existentials import exists_context, exists_names, exists_size
 from .gmail_observations import GmailObservationSource
 from .guards import LookupSpec
 from .joins import EffectJoin, join_context, validate_join_paths
+from .linkedin_reads import LinkedInReadSource
 from .notification_effects import NotificationEffectSource
 from .populations import InitialCollectionSource, Population, lookup_population, native_record_id
 from .predicates import Predicate, evaluate_predicate, parse_predicate, resolve_operand
@@ -339,7 +341,7 @@ def evaluate_obligations(
     populations: Mapping[str, Population],
     effects: EffectEvidence,
     *,
-    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | SheetReadSource | RecordWriteSource,
+    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | SheetReadSource | LinkedInReadSource | RecordWriteSource,
     population_sources: Mapping[str, TableSource | InitialCollectionSource | RequestSource],
     join_effects: Mapping[str, EffectEvidence] | None = None,
     join_sources: Mapping[str, object] | None = None,
@@ -367,6 +369,7 @@ def evaluate_obligations(
             spec.model_dump(mode="json")  # type: ignore[attr-defined]
         ):
             raise ValueError("obligation_join_evidence_mismatch")
+    join_effects = with_execution_order(join_effects, source, check.effect_joins)
     source_id, check_id = _digest(source), _digest(check.model_dump(mode="json"))
     aggregates = evaluate_check_aggregates(source, check, population_sources)
     totals = {

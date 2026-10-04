@@ -556,3 +556,33 @@ def evaluate_value(expr, context: Mapping) -> ValueResult:
     if isinstance(expr, ValueInput) and expr.path is not None and expr.path not in paths:
         paths = (*paths, expr.path)
     return ValueResult(status, kind, canonical, reason, paths, tuple(evidence), tuple(rounding))
+
+
+def evaluate_exact_decimal(expr, context: Mapping) -> tuple[Fraction | None, str, tuple[Path, ...]]:
+    """The exact rational value of a decimal derivation, even when non-terminating.
+
+    ``evaluate_value`` requires a terminating canonical decimal (a repeating
+    quotient needs explicit rounding). Declared mention precision compares a
+    written number with the exact value at the written number's own places, so
+    it needs the unrounded rational. Missing inputs stay unavailable.
+    """
+    expr = parse_value(expr)
+    evidence, rounding = [], []
+    try:
+        kind, value = _evaluate(expr, context, evidence, rounding)
+        if kind != "decimal":
+            raise _Unavailable("value_exact_decimal_type_unavailable")
+        result, reason = value, "value_exact_derivation"
+    except _Unavailable as exc:
+        result, reason = None, str(exc)
+    return result, reason, tuple(dict.fromkeys(path for path, _ in evidence))
+
+
+def round_places(value: Fraction, places: int, ties: str) -> Fraction:
+    """``value`` rounded to ``places`` decimals with ``half_up``/``half_even`` ties."""
+    scaled = abs(value) * 10 ** places
+    whole, remainder = divmod(scaled.numerator, scaled.denominator)
+    comparison = 2 * remainder - scaled.denominator
+    if comparison > 0 or comparison == 0 and (ties == "half_up" or whole % 2):
+        whole += 1
+    return Fraction((-1 if value < 0 else 1) * whole, 10 ** places)

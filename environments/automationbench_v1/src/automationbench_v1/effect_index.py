@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from itertools import pairwise
@@ -30,6 +31,37 @@ def _freeze(value: Any) -> Any:
 
 def _reject_constant(value: str) -> None:
     raise ValueError(f"nonfinite_snapshot_constant:{value}")
+
+
+# Decoded snapshots shared by every index in the process. Every adapter, check
+# and single-occurrence chain test re-indexes the same episode snapshots;
+# decoding (json, freeze, per-service digests) dominated replay time. Entries
+# are immutable and keyed by the text's SHA-256 with the exact text retained, so
+# a hit is byte-identical evidence. Bounded by retained text size.
+_DECODED: OrderedDict[str, tuple[str, Mapping[str, Any], dict[str, str]]] = OrderedDict()
+_DECODED_TEXT_BUDGET = 96 * 1024 * 1024
+_decoded_text = 0
+
+
+def _decode(digest: str, text: str) -> tuple[Mapping[str, Any], dict[str, str]]:
+    global _decoded_text
+    hit = _DECODED.get(digest)
+    if hit is not None:
+        if hit[0] is not text and hit[0] != text:
+            raise ValueError("snapshot_digest_collision")
+        _DECODED.move_to_end(digest)
+        return hit[1], hit[2]
+    world = json.loads(text, parse_constant=_reject_constant)
+    if not isinstance(world, dict):
+        raise ValueError("world_snapshot_must_be_object")  # noqa: TRY004
+    services = {key: hashlib.sha256(canonical_json(value).encode()).hexdigest() for key, value in world.items()}
+    frozen = _freeze(world)
+    _DECODED[digest] = (text, frozen, services)
+    _decoded_text += len(text)
+    while _decoded_text > _DECODED_TEXT_BUDGET and len(_DECODED) > 1:
+        _, (old, _, _) = _DECODED.popitem(last=False)
+        _decoded_text -= len(old)
+    return frozen, services
 
 
 @dataclass(frozen=True)
@@ -114,15 +146,10 @@ class EffectIndex:
             if self._texts[digest] != text:
                 raise ValueError("snapshot_digest_collision")
             return digest
-        world = json.loads(text, parse_constant=_reject_constant)
-        if not isinstance(world, dict):
-            raise ValueError("world_snapshot_must_be_object")  # noqa: TRY004
-        self._worlds[digest] = _freeze(world)
+        world, services = _decode(digest, text)
+        self._worlds[digest] = world
         self._texts[digest] = text
-        self._service_digests[digest] = {
-            key: hashlib.sha256(canonical_json(value).encode()).hexdigest()
-            for key, value in world.items()
-        }
+        self._service_digests[digest] = dict(services)
         return digest
 
     def world(self, snapshot_json: str) -> Mapping[str, Any]:

@@ -10,6 +10,12 @@ from pydantic import Field, StrictInt, field_validator, model_validator
 
 from ..capture import canonical_json
 from .base import FrozenModel, Identifier
+from .created_records import (
+    CreatedRecordEvidence,
+    CreatedRecordSource,
+    capture_created_records,
+    validate_created_records,
+)
 from .hubspot_objects import (
     HubSpotEvidence,
     HubSpotObjectSource,
@@ -31,8 +37,8 @@ def _digest(value):
     return hashlib.sha256(canonical_json(value).encode()).hexdigest()
 
 
-CreatedObjectSource = JiraIssueSource | HubSpotObjectSource
-CreatedObjectEvidence = JiraEvidence | HubSpotEvidence
+CreatedObjectSource = JiraIssueSource | HubSpotObjectSource | CreatedRecordSource
+CreatedObjectEvidence = JiraEvidence | HubSpotEvidence | CreatedRecordEvidence
 
 
 def capture_created_evidence(source, spec: CreatedObjectSource) -> CreatedObjectEvidence:
@@ -40,6 +46,8 @@ def capture_created_evidence(source, spec: CreatedObjectSource) -> CreatedObject
         return capture_jira_evidence(source, spec)
     if isinstance(spec, HubSpotObjectSource):
         return capture_hubspot_evidence(source, spec)
+    if isinstance(spec, CreatedRecordSource):
+        return capture_created_records(source, spec)
     raise TypeError("created_object_source_unsupported")
 
 
@@ -48,6 +56,8 @@ def restore_created_evidence(value, spec: CreatedObjectSource) -> CreatedObjectE
         return JiraEvidence.model_validate(value)
     if isinstance(spec, HubSpotObjectSource):
         return HubSpotEvidence.model_validate(value)
+    if isinstance(spec, CreatedRecordSource):
+        return CreatedRecordEvidence.model_validate(value)
     raise TypeError("created_object_source_unsupported")
 
 
@@ -83,6 +93,8 @@ def _predicate_object(value: str | None, evidence: CreatedObjectEvidence) -> str
 def _objects(evidence: CreatedObjectEvidence):
     if isinstance(evidence, JiraEvidence):
         return tuple((item.issue_id, item.issue_json) for item in evidence.final.issues)
+    if isinstance(evidence, CreatedRecordEvidence):
+        return tuple((item.object_id, item.object_json) for item in evidence.final.objects)
     return tuple(
         (
             item.object_id,
@@ -93,6 +105,9 @@ def _objects(evidence: CreatedObjectEvidence):
 
 
 def _transitions(evidence: CreatedObjectEvidence) -> tuple[_CompletionTransition, ...]:
+    if isinstance(evidence, CreatedRecordEvidence):
+        # Outcome-only adapter: no qualified creation transitions or receipts.
+        raise TypeError("created_completion_source_unsupported")
     if isinstance(evidence, JiraEvidence):
         return tuple(
             _CompletionTransition(
@@ -243,6 +258,13 @@ def _admit(source, check, population, evidence, population_source, object_source
             object_source.model_dump(mode="python", warnings=False)
         )
         validate_hubspot_evidence(evidence, source, object_source)
+    elif isinstance(object_source, CreatedRecordSource) and isinstance(
+        evidence, CreatedRecordEvidence
+    ):
+        object_source = CreatedRecordSource.model_validate(
+            object_source.model_dump(mode="python", warnings=False)
+        )
+        validate_created_records(evidence, source, object_source)
     else:
         raise TypeError("created_object_source_unsupported")
     validate_request_population(population, source, bindings)

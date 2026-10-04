@@ -547,3 +547,293 @@ coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
     or another row is 0, a write-only call is not a read, a missing ACK is
     unknown. When the effect match does not depend on the candidate row, set
     `match_cardinality: "per_candidate"` (mechanism 16).
+
+## Shared verification capabilities, round 7c (2026-10-05)
+
+Mechanisms 25–27 belong to the concurrent engine round r7
+(`any_item`/`all_items`, LinkedIn reads, the `prefix` mention mode). These
+are new:
+
+28. Execution-order joins: `effect_joins[].order` is
+    `"returned_before_dispatch"` or `"overlapping"` and requires
+    `timing: "any"` (state-revision order and receipt order are never mixed).
+    They read the authenticated native receipt sequence (`receipt_seq`, one
+    `dispatch` and one terminal event per tool-server invocation):
+    - `returned_before_dispatch`: the joined call's `returned` event precedes
+      the evaluated call's `dispatch` (a raised/interrupted or later return is
+      a decided no). "Read the config before acting" is then a server-boundary
+      fact, not merely "acted on later state".
+    - `overlapping`: both calls ended and each was dispatched before the other
+      ended. A serialising server makes calls emitted in one model turn
+      disjoint, so "fetch in parallel" is usually a known 0 in these traces.
+    Missing, malformed or contradictory order evidence (or a pending call for
+    `overlapping`) is unknown. Neither relation says the model used the
+    response; returned content is still the read adapter's `joined.*`
+    (`cell_values_returned`, `native_row_ids`, ...); model conditioning is not
+    evidenced by receipts. Join existing reads/effects with:
+
+        "effect_joins": [{"alias": "config_read", "source": "config_reads", "timing": "any",
+          "match": "any", "order": "returned_before_dispatch",
+          "where": {"op": "eq", "left": {"kind": "field", "path": ["joined", "cell_values_returned"], "domain": "boolean"},
+                    "right": {"kind": "literal", "value": true}}}],
+        "effect_match": {"op": "eq", "left": {"kind": "field", "path": ["join", "config_read"]},
+                         "right": {"kind": "literal", "value": "matched"}}
+
+    For "the three reads ran in parallel" use a read source with a join to
+    another read source and `order: "overlapping"`.
+29. Generic fresh-object outcomes: `objects.created_and_retained@1` accepts
+    the source `{"adapter": "final.created_records@1", "service": <service>,
+    "collection": <top-level list with string id>, "references": {<alias>:
+    {"field": <string field>, "collection": <same-service list>}}}` (up to 4
+    references). `retained.id`, `retained.record.*` (raw terminal record) and
+    `retained.<alias>.*` (the unique terminal record whose `id` equals the
+    reference field) are readable. Fresh = id absent from the public initial
+    collection; identities are complete only when every public record has an
+    explicit string id and an omitted collection hydrates empty. A missing or
+    ambiguous reference publishes nothing (unknown). Outcome only:
+    `created_retained_completion_once@1` credit is rejected for it. Gmail
+    draft retained with its content:
+
+        "drafts": {"adapter": "final.created_records@1", "service": "gmail", "collection": "drafts",
+                   "references": {"message": {"field": "message_id", "collection": "messages"}}}
+        "retained_when": {"op": "all", "args": [
+          {"op": "in", "left": {"kind": "field", "path": ["request", "recipient"], "domain": "string"},
+           "right": {"kind": "field", "path": ["retained", "message", "to"], "domain": "sequence"}},
+          {"op": "in", "left": {"kind": "literal", "value": "DRAFT"},
+           "right": {"kind": "field", "path": ["retained", "message", "label_ids"], "domain": "sequence"}}]}
+
+    Authoring diagnosis for created drafts (not a new adapter): a Gmail
+    `drafts` record is only `{id, message_id}`, so a `service.record_writes@1`
+    `drafts` check reading `effect.record.to` is unknown and abstains with
+    `obligation_effect_scope_unavailable` (that reason also covers an unknown
+    match over a complete inventory). The same `gmail_create_draft` call also
+    creates a `messages` record carrying `to`, `subject`, `body_plain` and
+    `label_ids: ["DRAFT"]`: use `service.record_writes@1` `collection:
+    ["messages"]`, `kind: "create"`, and (to bind it to the draft object) a
+    join to the `drafts` create with `timing: "not_after"` and `where`
+    `joined.record.message_id == effect.record_id`.
+30. Typed report fields: `{"op": "labeled_value", "text": <string field>,
+    "label": <operand>, "format": usd_string|usd_marked|decimal_string,
+    "value": <operand, optional>, "precision": <mechanism 31, optional>,
+    "entity": <words term, optional>, "scope": "line"|"block",
+    "excluding": [longer label names]}`. A label (case/hyphen insensitive:
+    "Cost-per-applicant" = "cost per applicant") states values only as
+    `<label><connector><values>` (connectors `:`, `=`, dashes, `(`, `is`,
+    `was`, `are`, `were`, `of`, `at`, `equals`, `total`), `<values> [:|-|in|of|for]
+    <label>` at a segment start, or `<label>: <calculation> = <values>` (only
+    the values after the last `=`/`->`/`→`). `<values>` is a run joined by
+    `,`, `-`, `/`, `~`, `to`, `or`, `and`, `through`, `vs` or `(or`, so a hedge
+    states every alternative. Segments end at `;`, `|`, tab, `•` or a sentence
+    end. A later explanation after other words ("$40,000 (80% of $50,000)")
+    is not stated; a label whose segment has numbers only after other words
+    ("cost per applicant for the quarter is $100") is unknown; percents and
+    years are never values. With `value`: true when some value is stated and
+    all stated values equal it; false on any differing readable value
+    (hedge, conflicting repeat) or none stated; unknown when undecidable or
+    quoted/fenced only. Without `value`: true when any value is stated (an
+    excluded entity entered with an amount). With `entity`, only units naming
+    the entity count; in `block` scope one block must describe one entity
+    (use `line` when a block lists several). HR cost-per-applicant (spend and
+    other labels on nearby lines no longer interfere; "$100 or $175" fails):
+
+        {"op": "labeled_value", "text": {"kind": "field", "path": ["effect", "body_text"], "domain": "string"},
+         "scope": "block", "format": "usd_string", "label": {"kind": "literal", "value": "Cost-per-applicant"},
+         "entity": {"value": {"kind": "field", "path": ["request", "Role"], "domain": "string"}, "mode": "words"},
+         "value": {"kind": "derived", "expression": {"kind": "decimal", "op": "div",
+           "left": {"kind": "input", "format": "usd_string", "path": ["request", "Spend"]},
+           "right": {"kind": "input", "format": "decimal_string", "path": ["request", "Total Applicants"]}}}}
+
+    Excluded row entered with an amount (guard `effect_match`, with
+    `match_cardinality: "per_candidate"`): `{"op": "labeled_value", "text":
+    ..., "format": "usd_string", "label": {"kind": "field", "path":
+    ["request", "Customer"], "domain": "string"}}` — "Dispute Holdings —
+    $1,000" fires; "Dispute Holdings was excluded from the calculation." does
+    not. Whether a stated `$0` is a prohibited entry is the author's policy
+    call; the predicate reports it as stated.
+31. Declared numeric precision: `"precision": {"min_places": <0-20>,
+    "max_places": <optional>, "ties": "half_up"|"half_even"|"either"}` on an
+    `amount` term (`mentions`, `mentions_together` terms) or on
+    `labeled_value`, only when `value` is a `derived` arithmetic expression
+    (`kind: "decimal"`); a literal, a bare input (a verbatim source value) or
+    a `round` expression is rejected. A written number with `p` decimal places
+    matches when it equals the exact value, or when `min_places <= p <=
+    max_places` and it equals the exact value rounded to `p` places. A
+    truncation ("46666.66" for 140000/3), a wrong extra digit ("46666.670")
+    or a coarser rounding than `min_places` is false. Without `precision` a
+    repeating quotient stays unknown (as before). Justify `min_places` from
+    public inputs in the review (e.g. currency cents → 2); do not choose it to
+    reproduce one episode's formatting. `decimal_string` rejects digit
+    grouping ("46,666.67"); `usd_string` accepts it.
+32. Initial-state reconciliation (engine correction): fields public state
+    omits are now compared with their deterministic hydrated defaults (an
+    omitted Gmail `body_html` is null, `label_ids`/`cc` are empty), and a
+    free-form mapping (HubSpot `properties`) must not gain keys. Only
+    generated values are tolerated: defaults produced by an id/clock
+    factory, and values that differ between two hydrations of the same public
+    state. Values a validator derives from public input (Gmail
+    `internal_date` from `date`, HubSpot `status` stored as
+    `hs_pipeline_stage`) are compared. Across the 120 Luna episodes all 335
+    public-service/initial-snapshot comparisons still reconcile. Eight
+    public-initial-versus-terminal comparisons now correctly differ where the
+    old rule certified "unchanged": the agent wrote HubSpot
+    `properties.payment_retry_count`, or created Asana/Jira/Monday/Notion
+    records (new keys in a service's `actions` mapping). Adapters use that
+    comparison only when no call touched the service.
+## Engine corrections round 7 (2026-10-04)
+
+- Schema aliases in record paths: `initial.records@1` and `final.records@1`
+  field paths may name a canonical schema field or one of its plain-string
+  schema aliases, at any step. Either spelling reads the field under whichever
+  key the raw record carries: public initial state is raw JSON written with
+  aliases (HubSpot `lifecycle_stage`), terminal snapshots use canonical names
+  (`lifecyclestage`). `["lifecycle_stage"]` and `["lifecyclestage"]` are
+  equivalent; the path is kept as written, so selector digests do not change.
+  A record carrying both keys with different values leaves the field unread
+  (unknown); an omitted field is unread, never the schema default (`"lead"`).
+  Use `["lifecycle_stage"]` for HubSpot contacts and companies instead of
+  literal id lists. `["properties", "lifecyclestage"]` is a different field
+  (a key of the `properties` mapping).
+- `final.records@1` (and `records.retained_when@1` predicates, aggregates and
+  record completion) read one key of a string-keyed mapping as the last step,
+  like `initial.records@1`: `"fields": {"Risk": ["properties", "churn_risk"]}`
+  or `["retained", "Props", "churn_risk"]` with `"Props": ["properties"]`. A
+  missing key is unread (unknown). Prefer this over kept-value join chains for
+  "the field ends as X".
+- Gmail send scope: audited Gmail filing handlers (`gmail_add_label_to_email`,
+  `gmail_remove_label_from_email`, `gmail_remove_thread_label`,
+  `gmail_create_label`, `gmail_mark_as_read`, `gmail_mark_as_unread`,
+  `gmail_archive_email`, `gmail_trash_email`, `gmail_star_messages`) are
+  non-send writes for `gmail.messages@1` when their static footprint is Gmail
+  only and the observed change touches nothing but existing messages'
+  `label_ids`/`is_read`/`is_starred` and label definitions (same message ids,
+  order and content). A run that only labels mail now closes send scope, so a
+  missing confirmation is 0 rather than unknown. Any other observed change
+  under those names keeps the inventory incomplete, and so does adding `SENT`
+  or removing `DRAFT` (relabelling a draft imitates delivery).
+- `unique_candidate` trap with read joins (diagnosis of
+  `sales.full_sales_cycle_orchestrator`, check
+  `stage-advanced-after-playbook-read`): the Slack read inventory on the Luna
+  episode is complete and contains the playbook read (`slack_find_message_in_channel`
+  at revision 1, before the stage update at revision 13), but Luna also listed
+  the channel (`slack_get_channel_messages`, 20 messages). The population is
+  every Slack message, so the one stage update matched 21 candidate rows
+  through `joined.native_record_id == candidate.native_record_id`; with
+  `match_cardinality: "unique_candidate"` a multi-candidate effect is never a
+  witness, so the check abstained. Not an engine bug: when the effect match
+  depends on the candidate only through a join (or not at all), declare
+  `"match_cardinality": "per_candidate"` (mechanism 16). With it the Luna
+  episode scores 1.
+- Counts and amounts: a count written verbatim in the prompt may appear
+  reformatted ("12,000" vs "12000"); use `mode: "amount_reformatted"` (or
+  `amount` with a format) for counts in messages, not `verbatim`.
+- `mentions` `mode: "prefix"` (below) for reference-code prefixes; `verbatim`
+  is unchanged and keeps token boundaries ("INS-" never matches inside
+  "INS-2026-014").
+- `service.record_writes@1` update facts carry `added_items`: for every
+  top-level field that is a list both before and after, the items present after
+  but not before (multiset difference, AFTER order; `[]` when nothing was
+  added). "The new message is customer-visible":
+  `{"op": "any_item", "items": {"kind": "field", "path": ["effect", "added_items", "messages"]},
+  "where": {"op": "eq", "left": {"kind": "field", "path": ["item", "visibility"], "domain": "string"},
+  "right": {"kind": "literal", "value": "public"}}}`. Lists nested deeper
+  (e.g. inside action `params`) are not diffed; read them from `effect.record`.
+- Join `timing: "after"` (see mechanism 8/11): only effects committed strictly
+  after the evaluated effect (`applied_revision` greater) are tested. Use it
+  for exact self-correction exemptions ("unless a later write restores it"):
+  `{"alias": "restored", "source": "updates", "timing": "after", "match": "any",
+  "where": <same record, restored value>}` and require `join.restored == "none"`.
+  `before`, `not_after` and `any` are unchanged.
+- Replay cost: decoded snapshot worlds are shared by every effect index in
+  the process, and adapter/guard/obligation input captures are memoised by
+  (source digest, selector), so checks, restores and credit planning stop
+  re-decoding and re-diffing the same episode; receipts are unchanged. Measured
+  on `support.zendesk_hubspot_org_sync` (full draft, one scoring pass): 25.3 s
+  -> 20.7 s. The 20-minute reviewer replays are not scoring: about 1,150 s of
+  the 1,240 s `luna()` run is `vf.WireEpisode.model_validate_json` re-parsing
+  the episode after two scoring passes have attached ~2,100 assessment batches
+  (the reload check). Run that reload check once, on the final draft only.
+  Scoring itself is dominated by the Verifiers framework re-verifying the
+  shared view per assessment request (one request per candidate per check), so
+  large populations with many inapplicable candidates cost time; prefer
+  narrow populations where the public data allows.
+
+25. Quantifiers over list items:
+    `{"op": "any_item" | "all_items", "items": <field operand naming a list>,
+    "where": <predicate>, "max_items": 4096}`. `where` reads `item` (the
+    current element: `["item"]` for a scalar list, `["item", <key>, ...]` for
+    records) plus the enclosing context (`effect.*`, `request.*`, `joined.*`,
+    lookups...). `any_item` is true when some item is proven, false when every
+    item is decided false (empty list: false), else unknown. `all_items` is
+    false when some item is decided false, true when every item is proven
+    (empty list: true), else unknown. An unresolved, null or non-list `items`
+    (or one over `max_items`) is unknown. `items` must be a plain field operand
+    (no `domain`/`allowed`); `item.*` outside a quantifier is rejected at load
+    like any unknown root, and a nested quantifier's `item` shadows the outer
+    one (and any lookup alias named `item`). Evidence paths report the element
+    read (`effect.record.members.1.role`). Allowed wherever predicates are.
+    "A DocuSign room member with email X and role Y":
+
+        {"op": "any_item", "items": {"kind": "field", "path": ["effect", "record", "members"]},
+         "where": {"op": "all", "args": [
+           {"op": "eq", "left": {"kind": "field", "path": ["item", "email"], "domain": "string"},
+            "right": {"kind": "field", "path": ["request", "Email"], "domain": "string"}},
+           {"op": "eq", "left": {"kind": "field", "path": ["item", "role"], "domain": "string"},
+            "right": {"kind": "literal", "value": "signer"}}]}}
+
+    "The label list contains Z" on a scalar list: `"where": {"op": "eq",
+    "left": {"kind": "field", "path": ["item"]}, "right": {"kind": "literal",
+    "value": "Z"}}` (or the existing `in` with `domain: "sequence"`). Replace
+    fixed positions wrapped in `proven`: they fail a correct agent that orders
+    the list differently.
+
+26. LinkedIn read evidence: effect source `{"adapter": "linkedin.reads@1"}`
+    (`kind` is `read_record` and may be omitted). Use it for "research the
+    attendees / check profiles and recent posts before outreach". One fact per
+    record an acknowledged successful read returned: `linkedin_get_profile`,
+    `linkedin_find_profile` (profiles and denormalised connections),
+    `linkedin_get_my_profile`, `linkedin_get_connections`,
+    `linkedin_find_post`, `linkedin_get_company`, `linkedin_list_companies`.
+    Job lookups (`linkedin_get_job`, `linkedin_find_jobs`) return no facts.
+    Params: `record_type` (`profile`|`connection`|`company`|`post`),
+    `record_id` (native `id` in the pre-call world), `identity` (best stable
+    identity: a profile's id, a connection's `connected_profile_id`, else its
+    `email`, else null; a company's or post's id), `profile_id`, `email`,
+    `full_name`, `public_profile_url` (profiles), `company`, `headline`;
+    companies add `name`; posts add `author_id`, `text`, `is_deleted`; plus
+    `returned_fields` and `operation`. A connection's `id` is generated at
+    hydration when public state omits it, so never key on a connection's
+    `record_id`; use `identity`, `profile_id` or `email`. Closure works like
+    mechanisms 19/24: every returned record must exist in the pre-call world
+    under its id and every returned field must agree with it (a rewritten
+    result cannot invent a read); failed/empty reads return nothing; LinkedIn
+    writes (messages, invitations, shares, company updates) are not reads;
+    calls whose footprint excludes LinkedIn and left it unchanged are skipped;
+    `api_fetch` and unknown tools leave the inventory incomplete; a complete
+    inventory needs every ACK and a public-initial/terminal LinkedIn
+    reconciliation. Usable as an obligation `source` (not a guard source) and
+    as an `effect_joins` source in obligations and guards. "Email each attendee
+    only after reading their profile" (attendees = `initial.records@1` over
+    `linkedin.profiles`, whose `candidate.native_record_id` is the profile id):
+
+        "effect_joins": [{"alias": "profile", "source": "li_reads", "timing": "before", "match": "any",
+          "where": {"op": "all", "args": [
+            {"op": "eq", "left": {"kind": "field", "path": ["joined", "record_type"]},
+             "right": {"kind": "literal", "value": "profile"}},
+            {"op": "eq", "left": {"kind": "field", "path": ["joined", "identity"]},
+             "right": {"kind": "field", "path": ["candidate", "native_record_id"]}}]}}],
+        "effect_match": {"op": "all", "args": [
+          {"op": "eq", "left": {"kind": "field", "path": ["join", "profile"]},
+           "right": {"kind": "literal", "value": "matched"}}, <the send targets this attendee>]}
+
+    For "check their recent posts", join a `record_type == "post"` fact with
+    `joined.author_id` equal to the attendee's profile id. Key on email
+    (`joined.email`) when the attendee list comes from another service.
+    Remember `match_cardinality: "per_candidate"` when the effect match does
+    not otherwise depend on the candidate (mechanism 16).
+
+27. `mentions` / `mentions_together` term `mode: "prefix"`: the exact source
+    string starts a token that continues with at least one more word
+    character, with the same left boundary as `verbatim` (no word character
+    or `$` before it). `"INS-"` matches `"INS-2026-014"`; it does not match
+    `"INS-"` alone, `"XINS-1"` or quoted/fenced lines (unknown). Use it for
+    "cite the incident/ticket number" when only the prefix is public.

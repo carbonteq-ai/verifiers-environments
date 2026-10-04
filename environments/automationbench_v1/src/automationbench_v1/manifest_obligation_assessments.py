@@ -14,6 +14,7 @@ from .contracts.base import FrozenModel
 from .contracts.effects import EffectSource
 from .contracts.engine import binding_reason
 from .contracts.gmail_observations import GmailObservationSource
+from .contracts.linkedin_reads import LinkedInReadSource
 from .contracts.loader import canonical_contract_digest, load_contract
 from .contracts.notification_effects import NotificationEffectSource
 from .contracts.obligations import (
@@ -36,6 +37,7 @@ from .contracts.slack_reads import SlackReadSource
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
 from .manifest_guard_assessments import (
     EffectInput,
+    _memo,
     authenticated_view,
     capture_effect_input,
     digest,
@@ -141,6 +143,12 @@ def aggregate_receipt(check, evaluation, *, scope):
 
 
 def capture_obligation_inputs(source, contract):
+    source_digest = digest(source)
+    key = ("obligation_inputs", source_digest, canonical_json(contract.model_dump(mode="json")))
+    return dict(_memo(key, lambda: _capture_obligation_inputs(source, contract, source_digest)))
+
+
+def _capture_obligation_inputs(source, contract, source_digest):
     checks = [check for check in contract.checks if isinstance(check, ObligationCheck)]
     population_names = {name for check in checks for name in obligation_population_names(check)}
     effect_names = {name for check in checks for name in obligation_effect_names(check)}
@@ -154,9 +162,9 @@ def capture_obligation_inputs(source, contract):
         if name in population_names and isinstance(spec, (InitialCollectionSource, TableSource, RequestSource))
     }
     effects = {
-        name: asdict(capture_effect_input(source, spec))
+        name: asdict(capture_effect_input(source, spec, source_digest=source_digest))
         for name, spec in contract.sources.items()
-        if name in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, GmailObservationSource, SlackReadSource, SheetReadSource, RecordWriteSource))
+        if name in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource, RecordWriteSource))
     }
     return {"obligation_population_evidence_json": canonical_json(populations),
             "obligation_effect_evidence_json": canonical_json(effects)}

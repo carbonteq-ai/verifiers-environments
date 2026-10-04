@@ -159,3 +159,22 @@ def persisted_transitions(source: dict) -> tuple[WorldTransition, ...]:
     """``world_transitions`` without calls that provably persisted nothing."""
     skipped = _unpersisted(source)
     return tuple(item for item in world_transitions(source) if (item.origin, item.invocation_id) not in skipped)
+
+
+def observation_transitions(source: dict) -> tuple[WorldTransition, ...]:
+    """Retain returned calls even when they persisted no state change.
+
+    Reading is observable independently of mutation. A returned call without
+    an acknowledgement must remain in the inventory so read adapters can
+    report unavailable evidence, rather than certify an empty inventory.
+    Only terminal raised calls proven not to have persisted anything are
+    omitted, as they supplied no successful return.
+    """
+    unpersisted = _unpersisted(source)
+    skipped = set()
+    for event in source.get("tool_execution_events", []):
+        receipt = json.loads(event["receipt_json"])
+        key = event["source"], receipt["invocation_id"]
+        if key in unpersisted and receipt.get("phase") == "raised":
+            skipped.add(key)
+    return tuple(item for item in world_transitions(source) if (item.origin, item.invocation_id) not in skipped)

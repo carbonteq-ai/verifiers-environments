@@ -170,11 +170,14 @@ def test_manifest_projection_paths_are_installed_capabilities(changes):
 
 
 def test_salesforce_installed_record_fields_are_supported_without_alias_hydration():
+    # Round 7: a schema alias in raw public data ("stage") reads the canonical
+    # field; nothing is hydrated, so an omitted field stays unread.
     source = InitialCollectionSource(path=("task_evidence", "initial", "salesforce", "opportunities"),
         fields={"Name": ("name",), "Stage": ("stage_name",)}, key_fields=("Name",))
     evidence = capture_population({"task_evidence": {"initial": {"salesforce": {"opportunities": [
-        {"id": "opp", "name": "Deal", "stage": "Alias only"}]}}}}, source)
-    assert evidence.closed and "Stage" not in json.loads(evidence.rows[0].cells_json)
+        {"id": "opp", "name": "Deal", "stage": "Alias only"}, {"id": "opp2", "name": "Other"}]}}}}, source)
+    assert evidence.closed and json.loads(evidence.rows[0].cells_json)["Stage"] == "Alias only"
+    assert "Stage" not in json.loads(evidence.rows[1].cells_json)
 
 
 @pytest.mark.parametrize("field,value", [

@@ -6,8 +6,9 @@ import hashlib
 import json
 import uuid
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import asdict
-from typing import Literal
+from typing import Literal, cast
 
 import verifiers.v1 as vf
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr, model_validator
@@ -25,6 +26,7 @@ from .contracts.guards import (
     evaluate_guard,
     plan_guard_instances,
 )
+from .contracts.linkedin_reads import LinkedInReadSource, capture_linkedin_reads
 from .contracts.loader import canonical_contract_digest, load_contract
 from .contracts.notification_effects import NotificationEffectSource, capture_notification_effects
 from .contracts.populations import InitialCollectionSource, PopulationEvidence, capture_population
@@ -65,7 +67,7 @@ class FactInput(FrozenModel):
     effect_id: StrictStr | None
     invocation_id: StrictStr = Field(min_length=1)
     origin: Literal["tool_server"]
-    kind: Literal["create_task", "add_task_to_section", "send", "append", "update", "channel_message", "direct_message", "read_message", "read_sheet", "create", "delete"]
+    kind: Literal["create_task", "add_task_to_section", "send", "append", "update", "channel_message", "direct_message", "read_message", "read_sheet", "read_record", "create", "delete"]
     params_json: StrictStr | None
     status: Literal["qualified", "unavailable"]
     reason: StrictStr = Field(min_length=1)
@@ -201,7 +203,32 @@ def parse_guard_config(text: str) -> GuardRunConfig:
     return GuardRunConfig.model_validate_json(text)
 
 
-def capture_effect_input(source, spec):
+# Per-process memo of adapter captures. Every check family captures its effect
+# and population inputs at request time, again when restoring them for each
+# check, and again during credit planning; all are pure functions of the raw
+# source and the declared selector. Keys bind the source's canonical digest and
+# the selector, so a hit returns exactly what a fresh capture would.
+_CAPTURES: OrderedDict[tuple, object] = OrderedDict()
+_CAPTURE_LIMIT = 256
+
+
+def _memo[T](key: tuple, compute: Callable[[], T]) -> T:
+    if key in _CAPTURES:
+        _CAPTURES.move_to_end(key)
+        return cast(T, _CAPTURES[key])
+    value = compute()
+    _CAPTURES[key] = value
+    while len(_CAPTURES) > _CAPTURE_LIMIT:
+        _CAPTURES.popitem(last=False)
+    return value
+
+
+def capture_effect_input(source, spec, *, source_digest: str | None = None):
+    key = ("effect", source_digest or digest(source), type(spec).__name__, canonical_json(spec.model_dump(mode="json")))
+    return _memo(key, lambda: _capture_effect_input(source, spec))
+
+
+def _capture_effect_input(source, spec):
     if isinstance(spec, RecordWriteSource):
         return capture_record_writes(source, spec)
     if isinstance(spec, GmailObservationSource):
@@ -210,6 +237,8 @@ def capture_effect_input(source, spec):
         return capture_slack_reads(source, spec)
     if isinstance(spec, SheetReadSource):
         return capture_sheet_reads(source, spec)
+    if isinstance(spec, LinkedInReadSource):
+        return capture_linkedin_reads(source, spec)
     if isinstance(spec, SlackEffectSource):
         return capture_slack_effects(source, spec)
     if isinstance(spec, SheetEffectSource):
@@ -241,6 +270,12 @@ def _capture_population(source, spec, contract):
 
 
 def capture_guard_inputs(source, contract) -> dict:
+    source_digest = digest(source)
+    key = ("guard_inputs", source_digest, canonical_json(contract.model_dump(mode="json")))
+    return dict(_memo(key, lambda: _capture_guard_inputs(source, contract, source_digest)))
+
+
+def _capture_guard_inputs(source, contract, source_digest) -> dict:
     # Populations of every supported kind share the legacy key, so Sheets-only
     # contracts keep their exact material bytes.
     table_names, effect_names = _guard_names(contract)
@@ -250,9 +285,9 @@ def capture_guard_inputs(source, contract) -> dict:
         if key in table_names and isinstance(spec, (TableSource, InitialCollectionSource, RequestSource))
     }
     effects = {
-        key: asdict(capture_effect_input(source, spec))
+        key: asdict(capture_effect_input(source, spec, source_digest=source_digest))
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource))
     }
     return {
         "table_evidence_json": canonical_json(tables),
@@ -282,7 +317,7 @@ def restore_guard_inputs(material, contract):
     effect_sources = {
         key: spec
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource))
     }
     if set(tables) != set(table_sources) or set(effects) != set(effect_sources):
         raise ValueError("guard_input_inventory_mismatch")

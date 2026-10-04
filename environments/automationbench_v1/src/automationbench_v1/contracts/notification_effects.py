@@ -13,13 +13,22 @@ from ..effect_index import EffectIndex
 from ..notification_evidence import notifications, operation, recipients, result_payload
 from .base import FrozenModel
 from .effects import EffectEvidence, EffectFact
-from .handler_scope import outside_service
+from .handler_scope import _plain, handler_footprints, outside_service
 from .service_hydration import public_service_matches
 
 # Gmail-touching handlers audited as read-only: they filter or return stored
 # messages without mutating them. Any other handler closes send scope only when
 # its static footprint (handler_scope) excludes Gmail.
 _GMAIL_READS = frozenset({"gmail_find_email", "gmail_get_email_by_id", "gmail_list_emails"})
+# Audited Gmail handlers that only file existing messages (labels, read and
+# star flags, archive/trash labels) or define a label; never a send. Each
+# occurrence must also be observed to change nothing else (_filing_only).
+_GMAIL_FILING = frozenset({
+    "gmail_add_label_to_email", "gmail_remove_label_from_email", "gmail_remove_thread_label",
+    "gmail_create_label", "gmail_mark_as_read", "gmail_mark_as_unread", "gmail_archive_email",
+    "gmail_trash_email", "gmail_star_messages",
+})
+_FILING_FIELDS = frozenset({"label_ids", "is_read", "is_starred"})
 
 
 class NotificationEffectSource(FrozenModel):
@@ -29,6 +38,36 @@ class NotificationEffectSource(FrozenModel):
 
 def _digest(value):
     return hashlib.sha256(canonical_json(value).encode()).hexdigest()
+
+
+def _filing_only(name, before, after):
+    """A filing handler whose footprint is Gmail alone and whose observed change
+    is limited to existing messages' labels/read/star flags and label definitions."""
+    footprint = handler_footprints().get(name) if type(name) is str else None
+    if name not in _GMAIL_FILING or footprint is None or not footprint <= {"gmail"}:
+        return False
+    old, new = before.get("gmail"), after.get("gmail")
+    if not isinstance(old, Mapping) or not isinstance(new, Mapping) or set(old) != set(new):
+        return False
+    if any(canonical_json(_plain(old[key])) != canonical_json(_plain(new[key]))
+           for key in old if key not in {"messages", "labels"}):
+        return False
+    first, second = _messages(before), _messages(after)
+    if [record["id"] for record in first] != [record["id"] for record in second]:
+        return False
+
+    def unfiled(record):
+        return canonical_json({key: _plain(value) for key, value in record.items() if key not in _FILING_FIELDS})
+
+    def delivery_labels(record):
+        labels = record.get("label_ids")
+        return {label for label in labels if label in {"SENT", "DRAFT"}} if isinstance(labels, (list, tuple)) else None
+
+    # Relabelling a draft as SENT (or dropping DRAFT) imitates delivery: keep it
+    # unsupported rather than decide it is not a send.
+    return all(isinstance(a, Mapping) and isinstance(b, Mapping) and set(a) == set(b) and unfiled(a) == unfiled(b)
+               and delivery_labels(a) is not None and delivery_labels(a) == delivery_labels(b)
+               for a, b in zip(first, second, strict=True))
 
 
 def _messages(world):
@@ -208,6 +247,8 @@ def capture_notification_effects(source: dict, spec: NotificationEffectSource) -
             before, after = index.world(occurrence.before_json), index.world(occurrence.after_json)
             _messages(before)
             _messages(after)
+            if _filing_only(operation(occurrence.action)[0], before, after):
+                continue  # labels, read/star flags, archive/trash: never a send
             if EffectIndex((occurrence,)).serial_chain().status != "qualified":
                 raise ValueError("gmail_occurrence_revision_unqualified")
             name, args = operation(occurrence.action)

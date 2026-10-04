@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from datetime import datetime
+from pathlib import Path
 from typing import Any, ClassVar, Literal, cast
 
 import verifiers.v1 as vf
-from pydantic import Field
+from pydantic import Field, SerializerFunctionWrapHandler, model_serializer, model_validator
 
 from automationbench.domains import get_available_domains, get_domain_dataset
 from automationbench.rubric.registry import AssertionRegistry
@@ -156,6 +157,35 @@ class AutomationBenchData(vf.TaskData):
     initial_state: dict[str, Any]
     assertions: tuple[dict[str, Any], ...]
     zapier_tools: tuple[str, ...]
+    # Host-side declared facets. Empty values with not_reviewed status mean unknown.
+    workflow: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    guard_patterns: list[str] = Field(default_factory=list)
+    task_metadata_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    task_metadata_status: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def check_metadata_identity(self):
+        if self.task_metadata_digest is None and (
+            self.workflow or self.capabilities or self.guard_patterns or self.task_metadata_status
+        ):
+            raise ValueError("task classifications require a bound metadata digest")
+        return self
+
+    @model_serializer(mode="wrap")
+    def serialize_metadata(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = handler(self)
+        if self.task_metadata_digest is None:
+            # Preserve historical task content/hash when this opt-in is unused.
+            for name in (
+                "workflow",
+                "capabilities",
+                "guard_patterns",
+                "task_metadata_digest",
+                "task_metadata_status",
+            ):
+                data.pop(name, None)
+        return data
 
 
 class AutomationBenchTaskConfig(vf.TaskConfig):
@@ -301,6 +331,14 @@ class AutomationBenchConfig(vf.TasksetConfig):
     domains: list[Domain] = Field(default_factory=lambda: ["simple"])
     task_names: list[str] = Field(default_factory=list)
     task: AutomationBenchTaskConfig = Field(default_factory=AutomationBenchTaskConfig)
+    task_metadata_path: Path | None = None
+    task_metadata_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def check_metadata_selection(self):
+        if (self.task_metadata_path is None) != (self.task_metadata_digest is None):
+            raise ValueError("task metadata requires both path and expected digest")
+        return self
 
 
 class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConfig]):  # pyright: ignore[reportInvalidTypeArguments]
@@ -403,6 +441,15 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
         missing = requested - found
         if missing:
             raise ValueError(f"unknown AutomationBench task_names: {', '.join(sorted(missing))}")
+        if self.config.task_metadata_path is not None:
+            from .task_metadata import attach_task_metadata, load_task_metadata
+
+            metadata = load_task_metadata(
+                self.config.task_metadata_path,
+                expected_digest=cast(str, self.config.task_metadata_digest),
+            )
+            for task in tasks:
+                task.data = attach_task_metadata(task.data, metadata)
         return tasks
 
 

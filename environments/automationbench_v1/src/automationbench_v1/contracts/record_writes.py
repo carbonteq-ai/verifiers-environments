@@ -19,6 +19,7 @@ is not reported.
 
 import hashlib
 import typing
+from collections import Counter
 from collections.abc import Mapping
 from typing import Any, Literal
 
@@ -196,8 +197,30 @@ def _changes(before: dict, after: dict, kind: RecordKind):
                 if canonical_json(old.get(name)) != canonical_json(record.get(name))
             )
             changed.append((identity, {"record": record, "before": old, "changed_fields": fields,
+                                       "added_items": _added_items(old, record),
                                        "values_text": _values_text(record)}))
     return changed
+
+
+def _added_items(before: dict, after: dict) -> dict:
+    """Per top-level list field (a list both before and after): the items present
+    after but not before, as a multiset in AFTER order (an appended message, a
+    new label). Fields that gained nothing map to an empty list."""
+    added = {}
+    for name, value in after.items():
+        old = before.get(name)
+        if not isinstance(value, list) or not isinstance(old, list):
+            continue
+        remaining = Counter(canonical_json(item) for item in old)
+        items = []
+        for item in value:
+            key = canonical_json(item)
+            if remaining[key]:
+                remaining[key] -= 1
+            else:
+                items.append(item)
+        added[name] = items
+    return added
 
 
 def capture_record_writes(source: Mapping, spec: RecordWriteSource) -> EffectEvidence:

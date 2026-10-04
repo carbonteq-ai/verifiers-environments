@@ -17,6 +17,7 @@ from pydantic import Field, StrictInt, field_serializer, model_validator
 from ..capture import canonical_json
 from .base import FrozenModel, Identifier
 from .effects import EffectEvidence, EffectFact, EffectSource
+from .execution_order import with_execution_order
 from .existentials import exists_context, exists_names
 from .joins import EffectJoin, join_context, validate_join_paths
 from .notification_effects import NotificationEffectSource
@@ -288,6 +289,7 @@ def evaluate_guard(
             join_sources[alias]
         ):
             raise ValueError("guard_join_evidence_mismatch")
+    join_effects = with_execution_order(join_effects, source, check.effect_joins)
     alternative_effects, alternative_sources = dict(alternative_effects or {}), dict(alternative_sources or {})
     if (set(alternative_effects) != {item.alias for item in check.alternatives}
             or set(alternative_sources) != set(alternative_effects)):

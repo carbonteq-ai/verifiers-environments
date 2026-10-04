@@ -39,8 +39,10 @@ from .values import (
     _Unavailable,
     calendar_day,
     clock_minutes,
+    evaluate_exact_decimal,
     evaluate_value,
     parse_value,
+    round_places,
 )
 
 type Scalar = StrictStr | StrictInt | StrictFloat | StrictBool | None
@@ -144,11 +146,33 @@ class LabeledLine(Frozen):
         return self
 
 
+class DecimalPrecision(Frozen):
+    """Declared acceptable written precision for an exact derived amount.
+
+    A written number with ``p`` decimal places matches when it equals the
+    exact value, or when ``min_places <= p <= max_places`` and it equals the
+    exact value rounded to ``p`` places (``ties``: ``half_up``,
+    ``half_even`` or ``either``). Coarser or wrongly rounded/truncated
+    numbers are false. Only for arithmetic derivations: a verbatim source
+    value is never matched by a rounded rewrite.
+    """
+
+    min_places: StrictInt = Field(ge=0, le=20)
+    max_places: StrictInt | None = Field(default=None, ge=0, le=20, exclude_if=lambda value: value is None)
+    ties: Literal["half_up", "half_even", "either"] = "either"
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.max_places is not None and self.max_places < self.min_places:
+            raise ValueError("predicate_precision_places_unordered")
+        return self
+
+
 class MentionTerm(Frozen):
     """One value to find in message text; see ``Mentions`` for the modes."""
 
     value: Operand
-    mode: Literal["words", "verbatim", "amount", "amount_reformatted", "clock_time", "date"]
+    mode: Literal["words", "verbatim", "prefix", "amount", "amount_reformatted", "clock_time", "date"]
     format: Literal["usd_string", "usd_marked", "decimal_string"] | None = None
     # ``date`` only: the year of year-less prose dates ("March 5"); see _date_facts.
     assume_year: StrictInt | None = Field(default=None, ge=1900, le=2999, exclude_if=lambda value: value is None)
@@ -156,6 +180,17 @@ class MentionTerm(Frozen):
     # The value must be the only value of its kind in the matching unit
     # (see ``_rivals``); omitted when false so existing digests are unchanged.
     sole: StrictBool = Field(default=False, exclude_if=lambda value: not value)
+    # ``amount`` of an arithmetic derivation only: accepted written precision.
+    precision: DecimalPrecision | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def coherent_precision(self):
+        if self.precision is not None and (
+            self.mode != "amount" or not isinstance(self.value, DerivedValue)
+            or getattr(self.value.expression, "kind", None) != "decimal"
+        ):
+            raise ValueError("predicate_precision_requires_derived_arithmetic_amount")
+        return self
 
     @model_validator(mode="after")
     def coherent_term(self):
@@ -174,6 +209,64 @@ class MentionTerm(Frozen):
         return self
 
 
+class LabeledValue(Frozen):
+    """The value a report states for a labelled field, with conflicts rejected.
+
+    A label occurrence (``label``'s words, case/hyphen/punctuation
+    insensitive, not inside a listed longer name in ``excluding``) is
+    associated with numbers only in this representation, inside one segment
+    (a line split at ``;``, ``|``, tab, bullet ``•`` or a sentence end):
+
+    - ``<label><connector><values>``: connectors are ``:``, ``=``, dashes,
+      ``(``, ``is``/``was``/``are``/``were``/``of``/``at``/``equals``/``total``;
+    - ``<values> [:|-|in|of|for] <label>`` when the values open the segment;
+    - ``<label>: <calculation> = <values>``: when ``=``, ``->`` or ``→``
+      follows the label in its segment, only the values right after the last
+      sign are stated (the calculation's inputs are not);
+    - ``<values>`` is a run of numbers joined by ``,``, ``-``, ``/``, ``~``,
+      ``to``, ``or``, ``and``, ``through``, ``vs`` or ``(or ...``; every number
+      in the run is a stated value, so a hedge ("$100 or $175") states two.
+
+    A number later in the segment after other words (``$40,000 (80% of
+    $50,000)``) is not associated. A label whose segment has numbers only
+    after other words ("for Eng is $100") is undecidable (unknown); a label
+    without numbers in its segment states nothing. Percents and years are not
+    values. With ``entity``, only units (``scope``: line or block) mentioning
+    the entity count.
+
+    With ``value`` (read under ``format``, optional ``precision``): true when
+    some stated value exists and every stated value equals it; false when any
+    readable stated value differs (a conflicting alternative or repeat) or
+    none is stated; unknown when a stated value or association is
+    undecidable or only in quoted/fenced lines. Without ``value``: true when
+    some value is stated for the label (e.g. an excluded entity entered with an
+    amount), unknown when only undecidable, false otherwise. This is a
+    representation-bounded reading, not natural-language understanding.
+    """
+
+    op: Literal["labeled_value"]
+    text: FieldValue
+    label: Operand
+    excluding: tuple[StrictStr | FieldValue, ...] = Field(default=(), max_length=16, exclude_if=lambda value: not value)
+    entity: MentionTerm | None = Field(default=None, exclude_if=lambda value: value is None)
+    scope: Literal["line", "block"] = "line"
+    value: Operand | None = Field(default=None, exclude_if=lambda value: value is None)
+    format: Literal["usd_string", "usd_marked", "decimal_string"]
+    precision: DecimalPrecision | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode="after")
+    def coherent(self):
+        if self.text.domain != "string" or self.text.allowed:
+            raise ValueError("predicate_labeled_value_text_requires_string_field")
+        if self.entity is not None and self.entity.mode != "words":
+            raise ValueError("predicate_labeled_value_entity_requires_words")
+        if self.precision is not None:
+            if self.value is None:
+                raise ValueError("predicate_labeled_value_precision_requires_value")
+            MentionTerm(value=self.value, mode="amount", format=self.format, precision=self.precision)
+        return self
+
+
 class DateWithin(Frozen):
     """Inclusive calendar interval for ``mentions`` ``mode: "date"``."""
 
@@ -188,7 +281,11 @@ class Mentions(MentionTerm):
     (case/Unicode-spacing insensitive); hyphenated and apostrophe words stay one
     word, and a match found only by splitting them is unknown unless a listed
     longer name in ``excluding`` explains it. ``verbatim``: the exact source
-    string appears with word and digit-group boundaries. ``amount``: a
+    string appears with word and digit-group boundaries (so "INS-" never
+    matches inside "INS-2026-014"). ``prefix``: the exact source string starts
+    a token that continues with at least one more word character (a reference
+    code such as "INS-2026-014" for the prefix "INS-"; "INS-" alone or
+    "XINS-1" does not match). ``amount``: a
     standalone number (not a clock time, date or reference code) equals the
     typed decimal under ``format``. ``amount_reformatted``: such a number is
     written differently from the source string (e.g. "36000 USD" for a
@@ -308,14 +405,44 @@ class Exists(Frozen):
     max_members: StrictInt = Field(default=4096, ge=1, le=65536)
 
 
+class Items(Frozen):
+    """Quantify ``where`` over the items of one list field.
+
+    ``items`` names the list (any context root); ``where`` reads ``item`` (the
+    current element: ``["item"]`` for a scalar, ``["item", <key>...]`` for a
+    record) plus the enclosing context. ``any_item``: true when some item is
+    proven, false when every item is decided false (an empty list is false).
+    ``all_items``: false when some item is decided false, true when every item
+    is proven (an empty list is true). Otherwise unknown, including an
+    unresolved, null or non-list ``items`` and lists over ``max_items``.
+    """
+
+    op: Literal["any_item", "all_items"]
+    items: FieldValue
+    where: Predicate
+    max_items: StrictInt = Field(default=4096, ge=1, le=65536)
+
+    @model_validator(mode="after")
+    def list_operand(self):
+        # The list is read structurally; scalar domains and allowed values
+        # would silently make every list unknown.
+        if self.items.domain != "scalar" or self.items.allowed:
+            raise ValueError("predicate_items_operand_requires_plain_field")
+        if self.items.path[0] == "item" and len(self.items.path) == 1:
+            raise ValueError("predicate_items_operand_requires_plain_field")
+        return self
+
+
 type Predicate = Annotated[
-    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven | Exists | Present,
+    Comparison | Junction | Negation | LabeledLine | LabeledValue | Mentions | MentionsTogether | Proven | Exists
+    | Present | Items,
     Field(discriminator="op"),
 ]
 Junction.model_rebuild()
 Negation.model_rebuild()
 Proven.model_rebuild()
 Exists.model_rebuild()
+Items.model_rebuild()
 PREDICATE = TypeAdapter(Predicate)
 
 
@@ -328,6 +455,11 @@ def context_paths(raw):
     if isinstance(raw, dict):
         if raw.get("op") == "exists" and "where" in raw:
             yield from (path for path in context_paths(raw["where"]) if path[:1] != ("member",))
+            return
+        if raw.get("op") in {"any_item", "all_items"} and "where" in raw:
+            # ``item.*`` is bound to the current list element.
+            yield from context_paths(raw.get("items"))
+            yield from (path for path in context_paths(raw["where"]) if path[:1] != ("item",))
             return
         if raw.get("kind") in {"field", "input"} and raw.get("path") is not None:
             yield tuple(raw["path"])
@@ -365,7 +497,7 @@ def _validate_tree(predicate: Predicate) -> None:
             pending.extend((arg, depth + 1) for arg in item.args)
         elif isinstance(item, Negation):
             pending.append((item.arg, depth + 1))
-        elif isinstance(item, Exists):
+        elif isinstance(item, (Exists, Items)):
             pending.append((item.where, depth + 1))
 
 
@@ -498,6 +630,8 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
         return PredicateResult(None if result.value is None else not result.value, result.reason, result.evidence_paths)
     if isinstance(predicate, LabeledLine):
         return _labeled_line(predicate, context)
+    if isinstance(predicate, LabeledValue):
+        return _labeled_value(predicate, context)
     if isinstance(predicate, Mentions):
         return _mentions_value(predicate, context)
     if isinstance(predicate, MentionsTogether):
@@ -506,6 +640,8 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
         return _exists(predicate, context)
     if isinstance(predicate, Present):
         return _present(predicate.value.path, context)
+    if isinstance(predicate, Items):
+        return _items(predicate, context)
     if isinstance(predicate, Proven):
         result = _evaluate(predicate.arg, context)
         return PredicateResult(result.value is True, "predicate_proven" if result.value else "predicate_not_proven",
@@ -637,6 +773,149 @@ def _labeled_line(predicate: LabeledLine, context: Mapping) -> PredicateResult:
     return PredicateResult(values.pop() == Fraction(str(expected.canonical_value)), "predicate_decided", paths)
 
 
+# ``labeled_value``: label -> stated values, within one segment of a line.
+_SEGMENT_STOP = re.compile(r"[;|\t\u2022]|[.!?](?=\s+[A-Z]|\s*$)")
+_LABEL_CONNECTOR = re.compile(
+    r"\.?\s*(?:['\u2019]s\b)?\s*(?:(?:[:=(\-\u2013\u2014]|\bis\b|\bwas\b|\bare\b|\bwere\b|\bof\b|\bat\b"
+    r"|\bequals\b|\btotal(?:s|ed|ing)?\b)\s*){0,3}", re.IGNORECASE)
+_LABEL_TRAILER = re.compile(r"\s*(?:[:\-\u2013\u2014]|\bin\b|\bof\b|\bfor\b)?\s*", re.IGNORECASE)
+_RESULT_SIGN = re.compile(r"=|\u2192|->")
+_SEGMENT_OPENER = re.compile(r"\s*(?:[-*\u2022]|\d{1,3}[.)])?\s*")
+_VALUE_JOIN = re.compile(
+    r"\s*(?:,|-|\u2013|\u2014|/|~|\bto\b|\bor\b|\band\b|\bthrough\b|\bthru\b|\bvs\.?|\bversus\b)?\s*"
+    r"|\s*\(\s*(?:or|to|~|/|-|\u2013|vs\.?|versus)\s*", re.IGNORECASE)
+
+
+def _label_spans(line: str, label: tuple[str, ...], longer: tuple[tuple[str, ...], ...]) -> list[tuple[int, int]]:
+    """Character spans of the label's split words, not covered by a longer name."""
+    tokens = [(match.group(0).casefold(), match.start(), match.end())
+              for match in _SPLIT_TOKEN.finditer(line.translate(_INVISIBLE))]
+    words = [token for token, _, _ in tokens]
+    covered = set()
+    for other in longer:
+        for start in range(len(words) - len(other) + 1):
+            if tuple(words[start:start + len(other)]) == other:
+                covered.update(range(start, start + len(other)))
+    size = len(label)
+    return [(tokens[start][1], tokens[start + size - 1][2]) for start in range(len(words) - size + 1)
+            if tuple(words[start:start + size]) == label and not set(range(start, start + size)) <= covered]
+
+
+def _stated_numbers(line: str, lo: int, hi: int) -> list:
+    """Number tokens inside [lo, hi), without percents and years."""
+    found = []
+    for match in _NUMBER.finditer(line, lo, hi):
+        if match.end() > hi:
+            continue
+        if _number_kind(line, match) not in {"percent", "year"}:
+            found.append(match)
+    return found
+
+
+def _run(line: str, numbers: list, index: int, step: int) -> list:
+    run = [numbers[index]]
+    while 0 <= index + step < len(numbers):
+        left, right = (numbers[index], numbers[index + step]) if step > 0 else (numbers[index + step], numbers[index])
+        if not _VALUE_JOIN.fullmatch(line[left.end():right.start()]):
+            break
+        index += step
+        run.append(numbers[index])
+    return run
+
+
+def _label_values(line: str, span: tuple[int, int]):
+    """(stated number matches | None if undecidable, possible) for one label occurrence."""
+    start, end = span
+    stops = list(_SEGMENT_STOP.finditer(line))
+    lo = max((stop.end() for stop in stops if stop.end() <= start), default=0)
+    hi = min((stop.start() for stop in stops if stop.start() >= end), default=len(line))
+    numbers = _stated_numbers(line, lo, hi)
+    after = [index for index, match in enumerate(numbers) if match.start() >= end]
+    before = [index for index, match in enumerate(numbers) if match.end() <= start]
+    result = list(_RESULT_SIGN.finditer(line, end, hi))
+    if result:
+        # "<label>: <calculation> = <values>": the values after the last sign.
+        sign = result[-1].end()
+        tail = [index for index in after if numbers[index].start() >= sign]
+        if tail and not line[sign:numbers[tail[0]].start()].strip():
+            return _run(line, numbers, tail[0], 1), False
+        return [], bool(after)
+    if after and _LABEL_CONNECTOR.fullmatch(line[end:numbers[after[0]].start()]):
+        return _run(line, numbers, after[0], 1), False
+    if before and _LABEL_TRAILER.fullmatch(line[numbers[before[-1]].end():start]):
+        run = _run(line, numbers, before[-1], -1)
+        if _SEGMENT_OPENER.fullmatch(line[lo:run[-1].start()]):
+            return run, False
+    return [], bool(after)
+
+
+def _stated_equal(term: _Term, line: str, match) -> bool | None:
+    suffix = match.group(1)
+    body = match.group(0)[:-1] if suffix else match.group(0)
+    try:
+        value = _decimal(body, term.format)
+    except _Unavailable:
+        try:  # e.g. a bare "100" under usd_marked: a value, read loosely
+            value = _decimal(body, "usd_string")
+        except _Unavailable:
+            return None
+    return _magnitude(value, suffix, body, term.expected) if suffix else _equal_amount(term, value, body)
+
+
+def _labeled_value(predicate: LabeledValue, context: Mapping) -> PredicateResult:
+    text_known, text, paths = resolve_operand(predicate.text, context)
+    label_known, label, label_paths = resolve_operand(predicate.label, context)
+    paths = tuple(dict.fromkeys(paths + label_paths))
+    longer = []
+    for item in predicate.excluding:
+        known, other, refs = (True, item, ()) if isinstance(item, str) else resolve_operand(item, context)
+        paths = tuple(dict.fromkeys(paths + refs))
+        if not known or type(other) is not str:
+            return PredicateResult(None, "predicate_labeled_value_excluding_unavailable", paths)
+        longer.append(tuple(_tokens(other, split=True)))
+    entity = target = None
+    for spec, name in ((predicate.entity, "entity"), (
+            MentionTerm(value=predicate.value, mode="amount", format=predicate.format, precision=predicate.precision)
+            if predicate.value is not None else None, "value")):
+        if spec is None:
+            continue
+        term, reason, refs = _prepare(spec, context)
+        paths = tuple(dict.fromkeys(paths + refs))
+        if not isinstance(term, _Term):
+            return PredicateResult(None, reason, paths)
+        entity, target = (term, target) if name == "entity" else (entity, term)
+    if not text_known or not label_known or type(label) is not str or not _tokens(label, split=True):
+        return PredicateResult(None, "predicate_field_unavailable", paths)
+    if len(text) > _LINE_TEXT_BUDGET:
+        return PredicateResult(None, "predicate_mentions_text_budget_exceeded", paths)
+    words = tuple(_tokens(label, split=True))
+    longer = tuple(item for item in longer if len(item) > len(words))
+    verdicts = []
+    for unit in _units(text, predicate.scope):
+        present = _presence(entity, unit) if entity is not None else True
+        if present is False:
+            continue
+        for line, readable in unit:
+            for span in _label_spans(line, words, longer):
+                stated, possible = _label_values(line, span)
+                if not stated:
+                    verdict = None if possible else "none"
+                elif target is None:
+                    verdict = True
+                else:
+                    checks = [_stated_equal(target, line, match) for match in stated]
+                    verdict = False if False in checks else None if None in checks else True
+                if verdict == "none":
+                    continue
+                verdicts.append(verdict if readable and present is True else None)
+    if target is None:
+        value = True if True in verdicts else None if None in verdicts else False
+    else:
+        value = False if False in verdicts else None if None in verdicts else bool(verdicts)
+    reason = ("predicate_decided" if value is not None else "predicate_labeled_value_undecidable")
+    return PredicateResult(value, reason, paths)
+
+
 _TOKEN = re.compile(r"\w+(?:['\u2019-]\w+)*")
 _SPLIT_TOKEN = re.compile(r"\w+")
 # A standalone number: not part of a word, clock time (11:30), reference or date
@@ -732,6 +1011,7 @@ class _Term:
     split_longer: tuple[tuple[str, ...], ...]
     pattern: re.Pattern | None
     sole: bool = False
+    precision: DecimalPrecision | None = None
 
 
 def _target_amount(value, format):
@@ -764,6 +1044,8 @@ def _prepare(term: MentionTerm, context: Mapping):
     """Return (_Term | None, reason, paths); None means the term is unknown."""
     if term.mode == "date":
         return _prepare_date(term, context)
+    if term.precision is not None:
+        return _prepare_precise(term, context)
     known, value, paths = resolve_operand(term.value, context)
     if not known:
         return None, "predicate_field_unavailable", paths
@@ -811,11 +1093,36 @@ def _prepare(term: MentionTerm, context: Mapping):
             split_longer.append(tuple(split_other))
     pattern = (
         re.compile(r"(?<![\w$])(?<!\d[.,])" + re.escape(literal) + r"(?!\w)(?![.,]\d)")
-        if term.mode == "verbatim" else None
+        if term.mode == "verbatim" else
+        re.compile(r"(?<![\w$])(?<!\d[.,])" + re.escape(literal) + r"(?=\w)")
+        if term.mode == "prefix" else None
     )
     return _Term(term.mode, term.format, literal, expected, target,
                  tuple(_tokens(literal, split=True)) if term.mode == "words" else (),
                  tuple(longer), tuple(split_longer), pattern, term.sole), "prepared", paths
+
+
+def _prepare_precise(term: MentionTerm, context: Mapping):
+    """An ``amount`` term whose target is the exact (possibly repeating) derivation."""
+    assert isinstance(term.value, DerivedValue)
+    expected, reason, paths = evaluate_exact_decimal(term.value.expression, context)
+    if expected is None:
+        return None, reason, paths
+    return _Term(term.mode, term.format, "", expected, (), (), (), (), None, term.sole, term.precision), "prepared", paths
+
+
+def _equal_amount(term: _Term, value: Fraction, body: str) -> bool:
+    """Exact equality, or a declared rounding of an exact derivation at the written places."""
+    if value == term.expected:
+        return True
+    precision = term.precision
+    if precision is None or term.expected is None:
+        return False
+    places = len(body.partition(".")[2])
+    if places < precision.min_places or (precision.max_places is not None and places > precision.max_places):
+        return False
+    ties = ("half_up", "half_even") if precision.ties == "either" else (precision.ties,)
+    return any(value == round_places(term.expected, places, mode) for mode in ties)
 
 
 def _term_in_line(term: _Term | _DateTerm, line: str) -> bool | None:
@@ -846,7 +1153,7 @@ def _term_in_line(term: _Term | _DateTerm, line: str) -> bool | None:
                 value = _decimal(body, "usd_string")
             except _Unavailable:
                 continue
-        equal = _magnitude(value, suffix, body, term.expected) if suffix else value == term.expected
+        equal = _magnitude(value, suffix, body, term.expected) if suffix else _equal_amount(term, value, body)
         if equal is None:
             ambiguous = True
             continue
@@ -945,7 +1252,7 @@ def _rivals(term: _Term, line: str) -> bool | None:
         except _Unavailable:
             values.append(None)
             continue
-        values.append(_magnitude(value, suffix, body, term.expected) if suffix else value == term.expected)
+        values.append(_magnitude(value, suffix, body, term.expected) if suffix else _equal_amount(term, value, body))
     verdict = False
     for index, (match, equal) in enumerate(zip(matches, values, strict=True)):
         if equal is True:
@@ -1417,5 +1724,32 @@ def _exists(predicate: Exists, context: Mapping) -> PredicateResult:
             return PredicateResult(True, "predicate_decided", tuple(dict.fromkeys(paths)))
         unknown = unknown or result.value is None
     return PredicateResult(None if unknown else False,
+                           "predicate_input_unavailable" if unknown else "predicate_decided",
+                           tuple(dict.fromkeys(paths)))
+
+
+def _items(predicate: Items, context: Mapping) -> PredicateResult:
+    root = predicate.items.path
+    value: Any = context
+    for part in root:
+        if isinstance(part, int):
+            value = value[part] if isinstance(value, (list, tuple)) and part < len(value) else None
+        else:
+            value = value.get(part) if isinstance(value, Mapping) else None
+        if value is None:
+            break
+    if not isinstance(value, (list, tuple)) or len(value) > predicate.max_items:
+        return PredicateResult(None, "predicate_items_unavailable", (root,))
+    paths: list[tuple] = [root]
+    decisive = predicate.op == "all_items"  # all: a false item decides; any: a true one
+    unknown = False
+    for index, item in enumerate(value):
+        result = _evaluate(predicate.where, {**context, "item": item})
+        paths.extend((*root, index, *path[1:]) if path[:1] == ("item",) else path
+                     for path in result.evidence_paths)
+        if result.value is (not decisive):
+            return PredicateResult(not decisive, "predicate_decided", tuple(dict.fromkeys(paths)))
+        unknown = unknown or result.value is None
+    return PredicateResult(None if unknown else decisive,
                            "predicate_input_unavailable" if unknown else "predicate_decided",
                            tuple(dict.fromkeys(paths)))

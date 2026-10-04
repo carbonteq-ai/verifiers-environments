@@ -17,7 +17,7 @@ from dataclasses import asdict
 from typing import Literal
 
 from ..capture import canonical_json
-from ..effect_evidence import persisted_transitions
+from ..effect_evidence import observation_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
@@ -146,7 +146,7 @@ def capture_slack_reads(source: Mapping, spec: SlackReadSource) -> EffectEvidenc
     try:
         if any(not isinstance(source.get(field), (list, tuple)) for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("slack_read_execution_inventory_missing")
-        index = EffectIndex(persisted_transitions(dict(source)))
+        index = EffectIndex(observation_transitions(dict(source)))
         terminals = {}
         for event in source["tool_execution_events"]:
             receipt = json.loads(event["receipt_json"])

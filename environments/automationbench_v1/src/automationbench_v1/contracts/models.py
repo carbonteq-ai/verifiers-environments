@@ -22,6 +22,7 @@ from .aggregates import _admit as admit_aggregate
 from .authored_outputs import AuthoredOutputSource
 from .base import FrozenModel, Identifier
 from .created_objects import CreatedRetainedCheck
+from .created_records import CreatedRecordSource
 from .effects import EffectSource
 from .existentials import exists_names
 from .external_outputs import ExternalOutputSource
@@ -29,6 +30,7 @@ from .gmail_observations import GmailObservationSource
 from .guards import GuardCheck
 from .hubspot_objects import HubSpotObjectSource
 from .jira_effects import JiraIssueSource
+from .linkedin_reads import LinkedInReadSource
 from .no_clarification import NoClarificationCheck
 from .notification_effects import NotificationEffectSource
 from .obligations import ObligationCheck, _fields
@@ -253,8 +255,10 @@ class ContractSpec(FrozenModel):
             | GmailObservationSource
             | SlackReadSource
             | SheetReadSource
+            | LinkedInReadSource
             | JiraIssueSource
             | HubSpotObjectSource
+            | CreatedRecordSource
             | ZendeskTicketEffectSource
             | AuthoredOutputSource
             | ExternalOutputSource,
@@ -354,7 +358,7 @@ class ContractSpec(FrozenModel):
                             (*projection.fields[path[1]], *path[2:]),
                         )
             elif isinstance(check, CreatedRetainedCheck):
-                if not isinstance(source, (JiraIssueSource, HubSpotObjectSource)):
+                if not isinstance(source, (JiraIssueSource, HubSpotObjectSource, CreatedRecordSource)):
                     raise ValueError("created_requires_issue_selector")  # noqa: TRY004
                 if not isinstance(self.sources.get(check.population), RequestSource):
                     raise ValueError("created_requires_authored_request_population")  # noqa: TRY004
@@ -371,6 +375,8 @@ class ContractSpec(FrozenModel):
                     raise ValueError("slack_read_requires_obligation_check")  # noqa: TRY004
                 if isinstance(source, SheetReadSource) and not isinstance(check, ObligationCheck):
                     raise ValueError("sheet_read_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, LinkedInReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("linkedin_read_requires_obligation_check")  # noqa: TRY004
                 if not isinstance(
                     source,
                     (
@@ -381,6 +387,7 @@ class ContractSpec(FrozenModel):
                         GmailObservationSource,
                         SlackReadSource,
                         SheetReadSource,
+                        LinkedInReadSource,
                         RecordWriteSource,
                     ),
                 ):
@@ -403,7 +410,7 @@ class ContractSpec(FrozenModel):
                     for alternative in check.alternatives:
                         if not isinstance(self.sources.get(alternative.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, SlackReadSource, SheetReadSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_alternative_requires_effect_source")  # noqa: TRY004
                 if isinstance(check, GuardCheck):
@@ -422,7 +429,7 @@ class ContractSpec(FrozenModel):
                     for join in check.effect_joins:
                         if not isinstance(self.sources.get(join.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, SlackReadSource, SheetReadSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_join_requires_effect_source")  # noqa: TRY004
                 for item in check.aggregates if isinstance(check, ObligationCheck) else ():
@@ -535,6 +542,9 @@ class ContractSpec(FrozenModel):
                 assert rule.check is not None
                 check = checks[rule.check]
                 assert isinstance(check, CreatedRetainedCheck)
+                if isinstance(self.sources[check.source], CreatedRecordSource):
+                    # Outcome-only adapter: retained objects never imply action credit.
+                    raise ValueError("created_completion_requires_native_object_adapter")
                 fields = {
                     path[2]
                     for path in _fields(check.retained_when.model_dump(mode="python"))

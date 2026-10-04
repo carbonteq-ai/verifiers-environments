@@ -5,6 +5,7 @@ from .effects import EffectSource
 from .gmail_observations import GmailObservationSource
 from .guards import GuardCheck, LookupSpec
 from .jira_effects import JiraIssueSource
+from .linkedin_reads import LinkedInReadSource
 from .loader import canonical_contract_digest, load_contract, load_task_contract, supported_tasks
 from .models import CheckSpec, ContractSpec, CreditSpec, FieldSpec, RecordSource, SourceBinding
 from .notification_effects import NotificationEffectSource
@@ -34,6 +35,7 @@ __all__ = [
     "GuardCheck",
     "InitialCollectionSource",
     "JiraIssueSource",
+    "LinkedInReadSource",
     "LookupSpec",
     "NotificationEffectSource",
     "ObligationCheck",

@@ -5,10 +5,12 @@ import json
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import cache
 from types import MappingProxyType, UnionType
 from typing import Literal, Protocol, Union, cast, get_args, get_origin
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     Field,
     StrictBool,
@@ -27,6 +29,7 @@ from .tables import Digest
 type Path = tuple[StrictStr | StrictInt, ...]
 
 
+@cache
 def _model(service: str, collection: str) -> type[BaseModel]:
     # The installed typed schema is the capability registry. Never instantiate
     # it to manufacture missing collections, aliases or native identities.
@@ -53,25 +56,83 @@ def _string_keyed_mapping(annotation) -> bool:
     return len(candidates) == 1 and get_origin(candidates[0]) is dict and get_args(candidates[0])[:1] == (str,)
 
 
+def _names(info) -> tuple[str, ...]:
+    """Plain-string schema aliases of a field (``alias``/``validation_alias``)."""
+    names = []
+    for alias in (info.alias, info.validation_alias):
+        choices = alias.choices if isinstance(alias, AliasChoices) else (alias,)
+        names.extend(choice for choice in choices if type(choice) is str)
+    return tuple(dict.fromkeys(names))
+
+
+def _canonical(model: type[BaseModel], part) -> str | None:
+    """The canonical field a path step names: the field itself or one of its
+    plain-string schema aliases (HubSpot ``lifecycle_stage`` -> ``lifecyclestage``)."""
+    if type(part) is not str:
+        return None
+    if part in model.model_fields:
+        return part
+    owners = [name for name, info in model.model_fields.items() if part in _names(info)]
+    return owners[0] if len(owners) == 1 else None
+
+
 def _field(model: type[BaseModel], path: Path) -> None:
-    # Canonical model field names only; no alias normalization, array offsets
-    # or wildcard population expansion. A string-keyed mapping field (HubSpot
-    # ``properties``) may be read one key deep as the last path step.
+    # Canonical model field names or their plain-string schema aliases; no
+    # array offsets or wildcard population expansion. A string-keyed mapping
+    # field (HubSpot ``properties``) may be read one key deep as the last step.
     for index, part in enumerate(path):
-        if type(part) is not str or part not in model.model_fields:
+        name = _canonical(model, part)
+        if name is None:
             raise ValueError("population_field_path_unsupported")
-        if index == len(path) - 2 and _string_keyed_mapping(model.model_fields[part].annotation):
+        if index == len(path) - 2 and _string_keyed_mapping(model.model_fields[name].annotation):
             if type(path[-1]) is not str or not path[-1]:
                 raise ValueError("population_field_path_unsupported")
             return
         if index != len(path) - 1:
-            annotation = model.model_fields[part].annotation
+            annotation = model.model_fields[name].annotation
             candidates = get_args(annotation) or (annotation,)
             nested = [item for item in candidates if isinstance(item, type)
                       and issubclass(item, BaseModel)]
             if len(nested) != 1:
                 raise ValueError("population_field_path_unsupported")
             model = nested[0]
+
+
+@cache
+def _step_keys(model: type[BaseModel], path: Path) -> tuple[tuple[str, ...] | None, ...]:
+    """Raw keys that may carry each schema path step (None: a mapping key).
+
+    Public initial state is raw JSON written with schema aliases
+    (``lifecycle_stage``); terminal snapshots are dumped with canonical names
+    (``lifecyclestage``). Either key reads the same field.
+    """
+    keys: list[tuple[str, ...] | None] = []
+    current: type[BaseModel] | None = model
+    for part in path:
+        name = _canonical(current, part) if current is not None else None
+        if current is None or name is None:
+            keys.append(None)
+            current = None
+            continue
+        info = current.model_fields[name]
+        keys.append(tuple(dict.fromkeys((name, *_names(info)))))
+        candidates = get_args(info.annotation) or (info.annotation,)
+        nested = [item for item in candidates if isinstance(item, type) and issubclass(item, BaseModel)]
+        current = nested[0] if len(nested) == 1 else None
+    return tuple(keys)
+
+
+def _resolve_field(record: Mapping, model: type[BaseModel], path: Path):
+    """Read a declared field path; a key and its alias that disagree are unread."""
+    value = record
+    for part, keys in zip(path, _step_keys(model, path), strict=True):
+        if not isinstance(value, Mapping):
+            return False, None
+        present = [value[key] for key in (keys or (part,)) if key in value]
+        if not present or any(canonical_json(item) != canonical_json(present[0]) for item in present[1:]):
+            return False, None
+        value = present[0]
+    return True, value
 
 
 def _digest(value) -> str:
@@ -144,8 +205,9 @@ def _native_identity(record, source) -> str | None:
 
 def _project(record, source):
     result = {}
+    model = _model(cast(str, source.path[2]), cast(str, source.path[3]))
     for alias, path in source.fields.items():
-        exists, value = _resolve(record, path)
+        exists, value = _resolve_field(record, model, path)
         if exists:
             result[alias] = value
     return result
