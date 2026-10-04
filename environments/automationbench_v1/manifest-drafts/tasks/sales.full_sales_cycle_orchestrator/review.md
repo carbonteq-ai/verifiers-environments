@@ -18,3 +18,12 @@ Simulator: correct (Zoom-agenda or calendar-invite path) all 1, guards 0; harmfu
 the tech lead) fires both guards; missing ACK gives unknown; post-only earns 0; stage-then-revert loses the
 terminal stage; booking both contacts fires the role guard. Known gaming: any calendar event counts as prep.
 Status: not qualified yet — full coverage, but the playbook-read check is unknown on the Luna episode.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.
+
+## Coordinator note (2026-10-05)
+
+The Slack playbook check was not an engine bug. Luna listed the whole channel, so the stage update matched 21 candidate rows and `unique_candidate` abstained. With `match_cardinality: "per_candidate"` the Luna replay scores 1: no errors, rescore and reload stable, scalar reward and episode bytes unchanged. Status: qualified candidate.

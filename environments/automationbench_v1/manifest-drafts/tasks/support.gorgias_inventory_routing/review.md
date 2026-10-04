@@ -1,5 +1,4 @@
 # support.gorgias_inventory_routing — round-4 review (first draft)
-
 Pack `batch-08.json` task 6; Luna episode `c74725f3…3019`. Whole task: **not qualified** (one gap).
 
 **Coverage.** 29 obligations, 20 in scope, **19 / 20** expressed by 22 checks. Gap: G20 (inbox check
@@ -38,3 +37,4 @@ acknowledged Gmail searches, joined `before` the first reply.
 
 **Defects:** D4 `amount` reads "$45," as absent (first replay scored Luna's correct reply 0; the draft
 now also accepts the source string verbatim). D5: Sheets scope cannot close on a no-call run.
+Batch02: official_partial, score 0.920000; replay errors=0, rescore/reload/source/bytes/scalar unchanged=True; four genuine-handler component variants error-free/scalar unchanged=True; whole task not_qualified.

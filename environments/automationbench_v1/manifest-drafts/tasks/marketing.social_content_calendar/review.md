@@ -22,3 +22,7 @@ Brand Awareness paraphrases are not detected. Slack guidance is judged by output
 webinar and the batch ref in the email stay unscored ambiguities.
 ## Defects
 None hit. Round-3 read-join defects are resolved by mechanisms 11/12.
+
+## Batch 02 continuation
+Assigned episode SHA-256 3a916afc8a26a799b11d748fcc5e852701bf3abcb14fa563b22639e158f0c079; official score 0.875. Serialized scored-episode reload/rescore: **passed** (errors=0, repeat=True, reload=True, scalar unchanged=True, source bytes unchanged=True, serialized bytes=95511727). Simulator variants: correct, harmful, gaming, missing ACK; details and exact findings are in review.json.
+Two earlier invocations failed before replay due to the wrong virtualenv and then missing documented PYTHONPATH; the corrected package launcher passed. These were harness setup errors, not environment failures; full details are in review.json.

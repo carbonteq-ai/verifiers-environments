@@ -16,3 +16,8 @@ Simulator runs: correct (DMs) and alternative (Alice by email, stage+description
 harmful run (amount 200000, ROI item to Dan) fires both guards; shotgun full list to everyone, hedged
 amount and all-items-to-Alice are blocked; missing ACKs give unknown. Known gaming: a token opportunity
 update earns the update check (content is judgement). Status: qualified candidate.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

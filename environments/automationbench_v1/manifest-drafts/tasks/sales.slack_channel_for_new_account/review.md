@@ -36,3 +36,8 @@ no Slack read evidence: `gmail.message_reads@1` is the only read adapter. The sm
 guideline message could then join to `channels_created` with timing `before`.
 
 **Defects:** none new.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

@@ -15,3 +15,8 @@ Luna: all obligations 1, guards 0, no errors, scalars/bytes unchanged.
 Simulator runs: correct and support-cc variants all 1; stale tier/FX fires the misroute guard and fails the
 notice checks; wrong deal fires both guards; missing ACK gives unknown. Known gaming: listing several
 conversions passes the amount check (needs absent-in-scope). Status: qualified candidate.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

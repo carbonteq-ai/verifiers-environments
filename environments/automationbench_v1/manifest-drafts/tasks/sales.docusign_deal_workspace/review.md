@@ -21,3 +21,8 @@ missing ACKs give unknown, not zero.
 
 Mechanism note: no list-of-objects predicate, so members use a bounded `proven` position window; and a draft
 can pass load_contract yet exceed the engine's round-trip predicate budget. Status: qualified candidate.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

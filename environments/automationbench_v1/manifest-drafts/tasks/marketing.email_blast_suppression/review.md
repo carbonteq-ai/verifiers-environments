@@ -19,3 +19,6 @@ Mechanism defects:
 Decisions:
 - Q4 marketing-ops policy is superseded by the Q1 SOP; vendor email has no authority (SOP section 6).
 - Duplicate bad1 row: both rows are required (one archive satisfies both, per_candidate); the count uses distinct addresses.
+
+## Batch 02 continuation
+Assigned episode SHA-256 5a03bfd92a78e29fb6fd363b5d1e26bb2e342603df1e410c9e4e7fa90120d7d9; official score 1.0. Serialized scored-episode reload/rescore: **passed** (errors=0, repeat=True, reload=True, scalar unchanged=True, source bytes unchanged=True, serialized bytes=25386042). Simulator variants: correct, harmful, gaming, missing ACK; details and exact findings are in review.json.

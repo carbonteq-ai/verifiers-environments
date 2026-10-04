@@ -19,3 +19,8 @@ profile, inviting noise, or emailing the Retail VP fire the guard per extra reci
 facts check; statuses/summary without outreach score 0; swapped action types fail the two action goals; missing
 ACKs give unknown. Mechanism defect: id-less public LinkedIn connections cannot form a population, so the
 connection set is declared. Status: qualified candidate.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

@@ -38,3 +38,8 @@ reads "$87,000," as absent.
 
 Workarounds for D1/D2/D4 (verbatim source strings) are in the draft. Limits: zones are enumerated;
 the meeting date is not required.
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

@@ -36,3 +36,4 @@ Hand scores under that model: 68, 60, 35, 35, 15, 14, 2, 7 for eng_hc1–8, and 
 customers.
 
 **Defects:** none new.
+Batch02: official_partial, score 0.823529; replay errors=0, rescore/reload/source/bytes/scalar unchanged=True; four genuine-handler component variants error-free/scalar unchanged=True; whole task not_qualified.

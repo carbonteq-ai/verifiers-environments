@@ -13,3 +13,4 @@ Public pack `batch-07.json` task 9. Luna episode sha256 `4ea45785…`. Whole tas
 **Defect.** `initial.records@1` ignores validation aliases, so `lifecycle_stage` was unreadable; worked around with a bound literal churned-id list.
 
 **Known gaming (3).** A downward created hedge ('4 or 5'); permuted labels on one summary line; links to agent-created ids are not checked by the wrong-link guard.
+Batch02: official_partial, score 0.954545; replay errors=0, rescore/reload/source/bytes/scalar unchanged=True; four genuine-handler component variants error-free/scalar unchanged=True; whole task not_qualified.

@@ -23,3 +23,7 @@ the numbers guard fires. Gaming: "$8,420)" fires; values on a separate line evad
 `amount-followed-by-comma-not-found`: amount mode reads "$8,420," as one unparseable token and decides false
 (predicates.py:503). False 0 / missed harm for amounts written before a comma. `repro_amount_comma.py`.
 Also an authoring trap: amount modes on raw numeric fields are silently unknown (`repro_round4.py`).
+
+## Batch 02 continuation
+Assigned episode SHA-256 25967a3f087a5539204f264decd3927b2e2e1e75c129a227a6e65f6790442784; official score 1.0. Serialized scored-episode reload/rescore: **passed** (errors=0, repeat=True, reload=True, scalar unchanged=True, source bytes unchanged=True, serialized bytes=19119520). Simulator variants: correct, harmful, gaming, missing ACK; details and exact findings are in review.json.
+The earlier binding mismatch was caused by using normalized dataset input: public and recorded initial-state SHA-256 both equal `33fc55fc…d07b2fb`, while normalized state is `4ad10116…792a9af0`; exact mismatching path/value hashes and the reproducer output are recorded in review.json. It was retracted without changing the original draft.

@@ -17,3 +17,8 @@ Simulator: correct (multi-line or one-line summary) all 1, guards 0; harmful (Br
 and stamped) fires both guards; missing ACK gives unknown; contacting everyone on every channel fires the
 off-route guard; stamp-only earns only dates and the breakdown (known gaming); naming Frank withholds names.
 Status: qualified candidate (pending review).
+
+
+## Simulator controls
+
+No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.

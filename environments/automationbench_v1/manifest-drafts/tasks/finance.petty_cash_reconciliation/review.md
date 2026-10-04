@@ -1,0 +1,9 @@
+# finance.petty_cash_reconciliation
+
+Status: **not qualified**. The draft expresses controller delivery and a guard against naming the rejected gift card; it does not verify reconciliation math, category subtotals, line-item coverage, or preserved source amounts.
+
+Luna replay: [{'check_id': 'rejected-disbursement-not-reported', 'status': 'valid', 'value': 0.0, 'reason': 'no_declared_prohibited_match'}, {'signal': 'finance.petty_cash.rejected_disbursement_not_reported', 'status': 'valid', 'value': 0.0, 'reason': 'no_declared_prohibited_match'}, {'signal': 'finance.petty_cash.rejected_disbursement_not_reported.compliance', 'status': 'valid', 'value': 1.0, 'reason': 'closed_declared_guard_scope_without_violation'}, {'check_id': 'controller-reconciliation-recipient', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_witnessed_required_effect'}, {'signal': 'finance.petty_cash.controller_recipient', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_witnessed_required_effect'}, {'signal': 'finance.petty_cash.controller_recipient.coverage', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_scope_closed'}] (errors=[]; rescore=True; reload=True; scalar unchanged=True; bytes unchanged=True).
+
+Genuine simulator: correct recipient, wrong recipient, and missing-ACK attempts were run with native scoring. A factually false report to the right recipient remains a known gaming path until report-content checks are implemented. The rejected-gift-card guard fires on the harmful simulator case.
+
+Batch01 native-simulator audit (2026-10-05): real AutomationBench native-handler component variants are retained (genuine_simulator_harmful_excluded_disbursement, genuine_simulator_correct, genuine_simulator_wrong_recipient, missing_ack). They are not whole-task qualification. Current draft SHA-256: `7f09dc6f6dbb5bd849aaf71f4612c89b13dd6d3b9f24bd15eaf5596416b44b39`. See review.json for the underlying results and interpretation.
