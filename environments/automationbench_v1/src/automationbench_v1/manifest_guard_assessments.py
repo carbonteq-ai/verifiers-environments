@@ -31,6 +31,7 @@ from .contracts.populations import InitialCollectionSource, PopulationEvidence, 
 from .contracts.record_writes import RecordWriteSource, capture_record_writes
 from .contracts.requests import RequestPopulationEvidence, RequestSource, capture_request_population
 from .contracts.sheet_effects import SheetEffectSource, capture_sheet_effects
+from .contracts.sheet_reads import SheetReadSource, capture_sheet_reads
 from .contracts.slack_effects import SlackEffectSource, capture_slack_effects
 from .contracts.slack_reads import SlackReadSource, capture_slack_reads
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
@@ -64,7 +65,7 @@ class FactInput(FrozenModel):
     effect_id: StrictStr | None
     invocation_id: StrictStr = Field(min_length=1)
     origin: Literal["tool_server"]
-    kind: Literal["create_task", "add_task_to_section", "send", "append", "update", "channel_message", "direct_message", "read_message", "create", "delete"]
+    kind: Literal["create_task", "add_task_to_section", "send", "append", "update", "channel_message", "direct_message", "read_message", "read_sheet", "create", "delete"]
     params_json: StrictStr | None
     status: Literal["qualified", "unavailable"]
     reason: StrictStr = Field(min_length=1)
@@ -207,6 +208,8 @@ def capture_effect_input(source, spec):
         return capture_gmail_observations(source, spec)
     if isinstance(spec, SlackReadSource):
         return capture_slack_reads(source, spec)
+    if isinstance(spec, SheetReadSource):
+        return capture_sheet_reads(source, spec)
     if isinstance(spec, SlackEffectSource):
         return capture_slack_effects(source, spec)
     if isinstance(spec, SheetEffectSource):
@@ -249,7 +252,7 @@ def capture_guard_inputs(source, contract) -> dict:
     effects = {
         key: asdict(capture_effect_input(source, spec))
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource))
     }
     return {
         "table_evidence_json": canonical_json(tables),
@@ -279,7 +282,7 @@ def restore_guard_inputs(material, contract):
     effect_sources = {
         key: spec
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource))
     }
     if set(tables) != set(table_sources) or set(effects) != set(effect_sources):
         raise ValueError("guard_input_inventory_mismatch")

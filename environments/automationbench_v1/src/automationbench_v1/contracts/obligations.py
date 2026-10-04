@@ -41,6 +41,7 @@ from .selections import (  # noqa: F401
     _select,
 )
 from .sheet_effects import SheetEffectSource
+from .sheet_reads import SheetReadSource
 from .slack_effects import SlackEffectSource
 from .slack_reads import SlackReadSource
 from .tables import TableSource
@@ -338,7 +339,7 @@ def evaluate_obligations(
     populations: Mapping[str, Population],
     effects: EffectEvidence,
     *,
-    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | RecordWriteSource,
+    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | SheetReadSource | RecordWriteSource,
     population_sources: Mapping[str, TableSource | InitialCollectionSource | RequestSource],
     join_effects: Mapping[str, EffectEvidence] | None = None,
     join_sources: Mapping[str, object] | None = None,

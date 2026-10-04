@@ -38,6 +38,7 @@ from .requests import RequestSource
 from .retained import RetainedRowCheck
 from .retained_records import RetainedRecordCheck, RetainedRecordSource
 from .sheet_effects import SheetEffectSource
+from .sheet_reads import SheetReadSource
 from .slack_effects import SlackEffectSource
 from .slack_reads import SlackReadSource
 from .summary_policy import SummaryExclusionCheck
@@ -251,6 +252,7 @@ class ContractSpec(FrozenModel):
             | RecordWriteSource
             | GmailObservationSource
             | SlackReadSource
+            | SheetReadSource
             | JiraIssueSource
             | HubSpotObjectSource
             | ZendeskTicketEffectSource
@@ -367,6 +369,8 @@ class ContractSpec(FrozenModel):
                     raise ValueError("gmail_observation_requires_obligation_check")  # noqa: TRY004
                 if isinstance(source, SlackReadSource) and not isinstance(check, ObligationCheck):
                     raise ValueError("slack_read_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, SheetReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("sheet_read_requires_obligation_check")  # noqa: TRY004
                 if not isinstance(
                     source,
                     (
@@ -376,6 +380,7 @@ class ContractSpec(FrozenModel):
                         SlackEffectSource,
                         GmailObservationSource,
                         SlackReadSource,
+                        SheetReadSource,
                         RecordWriteSource,
                     ),
                 ):
@@ -398,7 +403,7 @@ class ContractSpec(FrozenModel):
                     for alternative in check.alternatives:
                         if not isinstance(self.sources.get(alternative.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, SlackReadSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, SheetReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_alternative_requires_effect_source")  # noqa: TRY004
                 if isinstance(check, GuardCheck):
@@ -417,7 +422,7 @@ class ContractSpec(FrozenModel):
                     for join in check.effect_joins:
                         if not isinstance(self.sources.get(join.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, SlackReadSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, SheetReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_join_requires_effect_source")  # noqa: TRY004
                 for item in check.aggregates if isinstance(check, ObligationCheck) else ():
