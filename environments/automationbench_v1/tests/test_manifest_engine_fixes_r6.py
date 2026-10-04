@@ -154,7 +154,9 @@ def _mention(text, value, mode="amount", fmt="usd_string", sole=False):
     from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
 
     raw = {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body"], "domain": "string"},
-           "value": {"kind": "literal", "value": value}, "mode": mode, "format": fmt}
+           "value": {"kind": "literal", "value": value}, "mode": mode}
+    if fmt:
+        raw["format"] = fmt
     if sole:
         raw["sole"] = True
     return evaluate_predicate(parse_predicate(raw), {"effect": {"body": text}}).value
@@ -193,3 +195,33 @@ def test_unspaced_ranges_and_period_suffixes_read_every_amount(text, value, sole
 ])
 def test_targets_with_period_or_magnitude_suffixes_are_readable(text, value, mode, expected):
     assert _mention(text, value, mode=mode) is expected
+
+
+# --- Item 3: clock times with seconds, ISO timestamps and zone words --------
+
+
+@pytest.mark.parametrize("text,value,expected", [
+    ("Scheduled 14:00:00 UTC", "14:00", True),
+    ("Scheduled 2026-02-10T14:00:00Z", "14:00", True),
+    ("Scheduled 2026-02-10T10:00:00Z", "10:00 AM", True),    # ISO is 24-hour as written
+    ("Scheduled 2026-02-10 14:00:00+00:00", "2:00 PM", True),
+    ("Scheduled 2026-02-10T15:00:00Z", "14:00", False),
+    ("Scheduled 2:00:00 PM", "14:00", True),
+    ("Scheduled 08:00 America/Chicago", "08:00", True),
+    ("Scheduled 14:00 Amsterdam time", "14:00", True),
+    ("Scheduled 14:00 pmt", "14:00", True),
+    ("Scheduled 9:00 pmc", "9:00 PM", None),                  # bare hour stays ambiguous
+    ("Scheduled 9:00 pm", "9:00 PM", True),
+    ("Scheduled 9:00 p.m.", "9:00 PM", True),
+])
+def test_clock_mentions_read_seconds_iso_and_ignore_am_pm_words(text, value, expected):
+    assert _mention(text, value, mode="clock_time", fmt=None) is expected
+
+
+@pytest.mark.parametrize("raw,minutes", [
+    ("14:00:00", 840), ("2:00:30 PM", 840.5), ("2026-02-03T14:00:00Z", 840), ("2026-02-03T09:15:00-05:00", 555),
+])
+def test_clock_values_read_seconds_and_iso_timestamps(raw, minutes):
+    from automationbench_v1.contracts.values import clock_minutes
+
+    assert clock_minutes(raw) == minutes

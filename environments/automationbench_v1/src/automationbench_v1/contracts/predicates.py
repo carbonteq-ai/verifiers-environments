@@ -634,9 +634,9 @@ def _word_hit(line: str, target: list[str], longer: list[list[str]], *, split: b
     )
 
 
-_CLOCK_12_TEXT = re.compile(r"(?<![\w:])(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?(?![a-z])", re.IGNORECASE)
-_CLOCK_24_TEXT = re.compile(r"(?<![\w:])(0\d|1[3-9]|2[0-3]):([0-5]\d)(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m)", re.IGNORECASE)
-_CLOCK_BARE_TEXT = re.compile(r"(?<![\w:])([1-9]|1[0-2]):([0-5]\d)(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m)", re.IGNORECASE)
+_CLOCK_12_TEXT = re.compile(r"(?<![\w:])(\d{1,2})(?::([0-5]\d)(?::00)?)?\s*([ap])\.?\s*m\.?(?![a-z])", re.IGNORECASE)
+_CLOCK_24_TEXT = re.compile(r"(?<![\w:])(0\d|1[3-9]|2[0-3]):([0-5]\d)(?::00(?:\.0+)?)?(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m\.?(?![a-z]))", re.IGNORECASE)
+_CLOCK_BARE_TEXT = re.compile(r"(?<![\w:])([1-9]|1[0-2]):([0-5]\d)(?::00(?:\.0+)?)?(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m\.?(?![a-z]))", re.IGNORECASE)
 # "1:00–1:15 PM" / "10-10:30am": a trailing meridiem applies to both ends.
 _CLOCK_RANGE_TEXT = re.compile(
     r"(?<![\w:])(\d{1,2})(?::([0-5]\d))?\s*(?:-|\u2013|\u2014|to)\s*(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?(?![a-z])",
@@ -645,7 +645,12 @@ _CLOCK_RANGE_TEXT = re.compile(
 # "13:00-13:30" / "9:00-17:00": a range with one unambiguous 24-hour end is 24-hour.
 _CLOCK_RANGE_24_TEXT = re.compile(
     r"(?<![\w:])([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|\u2013|\u2014|to)\s*([01]?\d|2[0-3]):([0-5]\d)(?![\w:])"
-    r"(?!\s*[ap]\.?\s*m)",
+    r"(?!\s*[ap]\.?\s*m\.?(?![a-z]))",
+    re.IGNORECASE,
+)
+# ISO timestamps are 24-hour as written: "2026-02-10T14:00:00Z", "2026-02-10 14:00:00+00:00".
+_CLOCK_ISO_TEXT = re.compile(
+    r"(?<=\d{4}-\d{2}-\d{2}[T ])([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d)(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?(?![\w:])",
     re.IGNORECASE,
 )
 _NOON_TEXT = re.compile(r"(?<![\w])(?:12\s+)?(noon|midnight)(?![\w])", re.IGNORECASE)
@@ -797,7 +802,10 @@ def _clock_times(line: str) -> tuple[list[Fraction], bool]:
     def twelve(hour, minute, meridiem):
         return Fraction((int(hour) % 12 + (12 if meridiem.lower() == "p" else 0)) * 60 + int(minute or 0))
     times, rest = [], line
-    for m in _CLOCK_RANGE_TEXT.finditer(line):
+    for m in _CLOCK_ISO_TEXT.finditer(line):
+        times.append(Fraction(int(m.group(1)) * 60 + int(m.group(2))) + Fraction(int(m.group(3) or 0), 60))
+        rest = rest.replace(m.group(0), " ")
+    for m in _CLOCK_RANGE_TEXT.finditer(rest):
         if 1 <= int(m.group(1)) <= 12 and 1 <= int(m.group(3)) <= 12:
             times += [twelve(m.group(1), m.group(2), m.group(5)), twelve(m.group(3), m.group(4), m.group(5))]
             rest = rest.replace(m.group(0), " ")
