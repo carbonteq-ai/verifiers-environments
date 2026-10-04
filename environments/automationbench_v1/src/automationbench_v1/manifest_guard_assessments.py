@@ -570,6 +570,12 @@ def assess_guard(task, request, context):
     )
 
 
+def _memo(cache: dict, key, compute):
+    if key not in cache:
+        cache[key] = compute()
+    return cache[key]
+
+
 def plan_guard_credit(source, batches, context, contract):
     """Consume only current immutable guard receipts; preserve prefix consumption."""
     if context.source != source.identity:
@@ -586,7 +592,7 @@ def plan_guard_credit(source, batches, context, contract):
     }
     rules = {rule.check: rule for rule in contract.credit if rule.policy == "per_effect_negative@1"}
     checks = {check.check_id: check for check in contract.checks if isinstance(check, GuardCheck)}
-    requests, firings = [], {}
+    requests, firings, selectors = [], {}, {}
     instances = set()
     inputs = {}
     plans = {}
@@ -629,7 +635,7 @@ def plan_guard_credit(source, batches, context, contract):
             output.contract_digest != contract_id
             or output.source_digest != safe_digest
             or output.input_digest != view.input_digest
-            or output.selectors_digest != selectors_digest(contract, check)
+            or output.selectors_digest != _memo(selectors, check.check_id, lambda: selectors_digest(contract, check))
             or output.check_id != check.check_id
             or output.instance_key != config.get("instance_key")
             or config.get("source_digest") != output.source_digest

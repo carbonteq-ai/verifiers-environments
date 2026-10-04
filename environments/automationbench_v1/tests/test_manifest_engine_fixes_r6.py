@@ -413,3 +413,22 @@ def test_contract_whose_canonical_resave_exceeds_the_budget_is_rejected_at_load(
         load_contract(json.dumps(raw))
     loaded = load_contract(json.dumps(_obligation_contract(20)))
     assert load_contract(canonical_json(loaded.model_dump(mode="json"))) == loaded
+
+
+def test_initial_records_read_one_key_of_a_string_keyed_mapping():
+    from automationbench_v1.contracts.populations import InitialCollectionSource, capture_population
+
+    spec = InitialCollectionSource.model_validate({
+        "path": ["task_evidence", "initial", "hubspot", "contacts"],
+        "fields": {"Stage": ["properties", "lifecyclestage"], "Email": ["email"]}, "key_fields": ["Email"]})
+    data = {"hubspot": {"contacts": [
+        {"id": "H1", "email": "a@example.com", "properties": {"lifecyclestage": "lead"}},
+        {"id": "H2", "email": "b@example.com", "properties": {}}]}}
+    source = run_operations(data, [])
+    source["task_evidence"]["initial"] = data
+    rows = capture_population(source, spec).rows
+    assert [json.loads(row.cells_json).get("Stage") for row in rows] == ["lead", None]
+    with pytest.raises(ValueError):
+        InitialCollectionSource.model_validate({
+            "path": ["task_evidence", "initial", "hubspot", "contacts"],
+            "fields": {"Deep": ["properties", "a", "b"]}, "key_fields": ["Deep"]})
