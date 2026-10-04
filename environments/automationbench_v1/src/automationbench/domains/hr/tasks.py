@@ -15498,10 +15498,12 @@ def get_task_5107() -> dict:
                 "google_sheets_find_worksheet",
                 "google_sheets_get_spreadsheet_by_id",
                 "jira_create_issue",
+                "jira_project",
                 "slack_send_channel_message",
             ],
             "initial_state": {
                 "meta": {"schema_version": "0.1.0", "current_time": "2026-04-15T09:00:00Z"},
+                "jira": {"actions": {}, "projects": [{"id": "it", "key": "IT", "name": "IT Operations"}]},
                 "gmail": {
                     "messages": [
                         {

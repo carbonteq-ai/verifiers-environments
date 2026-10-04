@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
@@ -1653,9 +1654,29 @@ register_metadata(
 
 
 def jira_project(world: WorldState, searchByParameter: str) -> str:
-    """Find a uniquely identified project without returning a wrapper as its ID."""
+    """Find a uniquely identified project without returning a wrapper as its ID.
+
+    An exact id/key/name wins. Otherwise a case-insensitive whole-word search
+    (every query word appears in one field) must identify exactly one project;
+    creation itself still requires an exact reference.
+    """
     try:
-        project = world.jira.resolve_project(searchByParameter)
+        try:
+            project = world.jira.resolve_project(searchByParameter)
+        except ValueError as error:
+            if str(error) != "jira_project_not_found":
+                raise
+            words = set(re.findall(r"[0-9a-z]+", searchByParameter.casefold()))
+            found = {
+                item.get("id") or item.get("key") or item.get("name")
+                for item in world.jira.project_records()
+                if words and any(
+                    words <= set(re.findall(r"[0-9a-z]+", value.casefold())) for value in item.values()
+                )
+            }
+            if len(found) != 1:
+                raise ValueError("jira_project_ambiguous" if found else "jira_project_not_found") from None
+            project = world.jira.resolve_project(found.pop())
     except (ValueError, TypeError) as error:
         return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
     result = {**project, "project": project.get("key", project.get("name"))}

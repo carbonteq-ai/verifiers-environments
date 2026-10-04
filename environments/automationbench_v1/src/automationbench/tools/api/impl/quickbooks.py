@@ -172,6 +172,12 @@ def quickbooks_vendor_update(world: WorldState, vendor_id: str, body: dict, **kw
         v.display_name = body["DisplayName"]
     if "Active" in body:
         v.active = body["Active"]
+    term = body.get("TermRef")
+    if term is not None:
+        name = term.get("name") if isinstance(term, dict) else term
+        if not isinstance(name, str) or not name.strip():
+            return json.dumps({"error": "quickbooks_vendor_terms_invalid"})
+        v.terms = name
     return json.dumps({"Vendor": v.to_display_dict()})
 
 

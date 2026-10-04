@@ -186,6 +186,9 @@ class QBVendor(BaseModel):
     currency_name: str = "United States Dollar"
     billing_address: Optional[QBAddress] = None
     print_on_check_name: Optional[str] = None
+    # Vendor payment terms (QBO TermRef name); omitted from dumps when unset so
+    # worlds and archives without terms keep their exact serialization.
+    terms: Optional[str] = Field(default=None, exclude_if=lambda value: value is None)
     created_time: datetime = Field(default_factory=datetime.now)
     last_updated_time: datetime = Field(default_factory=datetime.now)
 
@@ -206,6 +209,8 @@ class QBVendor(BaseModel):
             "sparse": "false",
             "SyncToken": "0",
         }
+        if self.terms:
+            d["TermRef__name"] = self.terms
         if self.company_name:
             d["CompanyName"] = self.company_name
         if self.email:
