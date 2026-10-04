@@ -100,6 +100,27 @@ def test_slack_reads_close_when_public_state_omits_a_collection():
     assert evidence.complete, evidence.reason
 
 
+def _nested_slack(top_level=True):
+    slack: dict[str, Any] = {
+        "channels": [{"id": "Cops", "name": "ops", "is_private": False, "messages": [
+            {"text": "Pinned policy", "ts": "1737900000.000001", "user": "Upolicy"}]}],
+        "users": [{"id": "Upolicy", "name": "Policy", "email": "policy@example.com"}]}
+    if top_level:
+        slack["messages"] = [{"channel_id": "Cops", "text": "Noise", "ts": "1741080009.000009", "user_id": "Unoise"}]
+    return {"slack": slack}
+
+
+@pytest.mark.parametrize("top_level", [True, False])
+def test_slack_scope_reconciles_messages_nested_under_channels(top_level):
+    data = _nested_slack(top_level)
+    source = run_operations(copy.deepcopy(data), [_post()])
+    source["task_evidence"]["initial"] = data
+    assert capture_slack_effects(source, SlackEffectSource.model_validate({"kind": "channel_message"})).complete
+    assert capture_slack_reads(source, SlackReadSource.model_validate({})).complete
+    data["slack"]["channels"][0]["messages"][0]["text"] = "Different policy"
+    assert not capture_slack_effects(source, SlackEffectSource.model_validate({"kind": "channel_message"})).complete
+
+
 def test_omitted_public_collection_is_the_schema_default_only():
     assert public_collection({"slack": {"channels": []}}, "slack", "users") == []
     assert public_collection({}, "slack", "users") == []

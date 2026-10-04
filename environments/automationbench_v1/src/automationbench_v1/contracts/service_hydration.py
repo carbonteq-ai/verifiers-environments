@@ -5,6 +5,8 @@ exact comparison of the two always fails on real traces. The named service is
 hydrated with the simulator's own schema and compared with the observed native
 service only where public state is specific:
 
+- Slack's own layout normalisation (messages nested under channels hoisted
+  into the top-level list) is applied to public state first;
 - every public top-level key must survive hydration (the schema silently drops
   some aliases, e.g. Gmail ``emails`` beside ``messages``);
 - top-level keys public state omits must equal their hydrated defaults exactly;
@@ -64,6 +66,18 @@ def public_service_matches(initial: Mapping, service: str, observed) -> bool:
         return True
     if not isinstance(public, Mapping) or not isinstance(observed, Mapping):
         return False
+    if service == "slack":
+        # Slack hoists messages nested under channels into the top-level list
+        # (and renames direct_messages); compare public state in that layout.
+        from automationbench.schema.slack.base import SlackState
+
+        public = _plain(SlackState.normalize_slack_state_fields(copy.deepcopy(public)))
+        if isinstance(public.get("channels"), list):
+            public["channels"] = [
+                {key: value for key, value in channel.items() if key != "messages"}
+                if isinstance(channel, dict) else channel
+                for channel in public["channels"]
+            ]
     try:
         hydrated = WorldState.model_validate({service: copy.deepcopy(public)}).model_dump(mode="json")[service]
     except (ValueError, TypeError, KeyError):
