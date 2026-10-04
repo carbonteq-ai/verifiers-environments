@@ -89,10 +89,25 @@ class RecordWriteSource(FrozenModel):
     # one inventory, so an equivalent write through a sibling action counts.
     collection: tuple[Identifier, ...] = Field(min_length=1, max_length=9)
     kind: RecordKind
+    # Composite identity for list collections whose ``id`` repeats across a
+    # parent (Mailchimp subscribers: [["list_id"], ["id"]]). The record id is
+    # then the canonical JSON list of these string fields, matching
+    # ``initial.records@1`` composite identities. Omitted when empty.
+    identity_paths: tuple[tuple[Identifier], ...] = Field(default=(), exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def installed_collection(self):
-        collection_shape(self.service, self.collection)
+        shape = collection_shape(self.service, self.collection)
+        if self.identity_paths:
+            from automationbench.schema.world import WorldState
+
+            fields = WorldState.model_fields[self.service].annotation.model_fields  # type: ignore[union-attr]
+            item = _list_model(fields[self.collection[0]].annotation)
+            if (shape != "list" or item is None or not 2 <= len(self.identity_paths) <= 4
+                    or len(set(self.identity_paths)) != len(self.identity_paths)
+                    or any(path[0] not in item.model_fields or item.model_fields[path[0]].annotation is not str
+                           for path in self.identity_paths)):
+                raise ValueError("record_writes_identity_paths_invalid")
         return self
 
 
@@ -119,7 +134,13 @@ def _collection(world, spec: RecordWriteSource):
 def _records(world, spec: RecordWriteSource) -> dict[str, tuple]:
     records: dict[str, tuple] = {}
     for record in _collection(world, spec):
-        identity = record.get("id") if isinstance(record, Mapping) else None
+        if spec.identity_paths:
+            parts = [record.get(path[0]) if isinstance(record, Mapping) else None for path in spec.identity_paths]
+            if any(type(part) is not str or not part for part in parts):
+                raise ValueError("record_writes_identity_unresolved")
+            identity = canonical_json(parts)
+        else:
+            identity = record.get("id") if isinstance(record, Mapping) else None
         if type(identity) not in {str, int} or identity == "":
             raise ValueError("record_writes_identity_unresolved")
         key = canonical_json(identity)

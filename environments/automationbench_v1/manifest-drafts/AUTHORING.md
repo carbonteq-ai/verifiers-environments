@@ -144,6 +144,12 @@ Redrafts may use these (all in the environment candidate):
    service>, "collection": [<list field>] | ["actions", <action_key>],
    "kind": "create"|"update"|"delete"}`; effect params `record`, `before`,
    `changed_fields`, `record_id`, `operation`.
+   Optional `"identity_paths": [["list_id"], ["id"]]` (list collections only,
+   2–4 string fields) keys records by a composite identity when `id` repeats
+   across a parent (Mailchimp gives a subscriber the same `id` in every
+   list); `record_id` is then the canonical JSON list (e.g.
+   `"[\"list_vip\",\"<md5>\"]"`), matching `initial.records@1`
+   `identity_paths` identities. Without it, repeated ids stay unknown.
 
 ## Mechanisms added after round 2 (2026-10-04)
 
