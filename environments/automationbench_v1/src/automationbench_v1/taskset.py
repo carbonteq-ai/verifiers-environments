@@ -229,6 +229,39 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     mistake_penalty: AutomationBenchMistakePenaltyConfig | None = None
 
 
+def training_nodes(trace: Any) -> list[Any] | None:
+    """Nodes of the trajectory Posttrain trains, or None when it trains none.
+
+    A turn whose tool call did not parse cleanly is re-rendered for the next
+    request, so Verifiers keeps the exact sampled response as a leaf and starts
+    a new branch from a canonical, unsampled copy of it. Posttrain trains the
+    deepest branch with each unsampled assistant node replaced by its sampled
+    sibling; that trajectory must cover every sampled assistant turn.
+    """
+    branches = [branch for branch in trace.branches if branch.trainable]
+    if len(branches) == 1:
+        return list(branches[0].nodes)
+    if not branches:
+        return None
+    depth = max(len(branch.nodes) for branch in branches)
+    terminal = [branch for branch in branches if len(branch.nodes) == depth]
+    if len(terminal) != 1:
+        return None
+    sampled = [node for branch in branches for node in branch.nodes
+               if node.sampled and node.message.role == "assistant"]
+    resolved = []
+    for node in terminal[0].nodes:
+        if node.message.role != "assistant" or node.sampled:
+            resolved.append(node)
+            continue
+        siblings = {id(c): c for c in sampled if c.parent == node.parent and c is not node}
+        if len(siblings) > 1:
+            return None
+        resolved.extend(siblings.values() or [node])
+    covered = {id(node) for node in resolved if node.sampled}
+    return resolved if covered == {id(node) for node in sampled} else None
+
+
 class AutomationBenchTask(
     vf.Task[AutomationBenchData, AutomationBenchState, AutomationBenchTaskConfig]
 ):
@@ -350,9 +383,9 @@ class AutomationBenchTask(
         if config is not None and config.manifest_enabled and TURN_EVIDENCE_KEY in trace.info:
             from .manifest_step_credit import apply_manifest_step_credit
 
-            branches = trace.branches
-            turns = [node.message for node in branches[0].nodes
-                     if node.sampled and node.message.role == "assistant"] if len(branches) == 1 else []
+            training = training_nodes(trace)
+            turns = [node.message for node in training or ()
+                     if node.sampled and node.message.role == "assistant"]
             trace.info[TURN_EVIDENCE_KEY] = apply_manifest_step_credit(
                 trace.info[TURN_EVIDENCE_KEY], turns=turns, events=trace.tool_execution_events,
                 trace=trace, config=config,
@@ -361,10 +394,9 @@ class AutomationBenchTask(
     def _attach_turn_evidence(
         self, trace: vf.Trace, config: AutomationBenchTurnRewardConfig
     ) -> None:
-        branches = trace.branches
-        if len(branches) != 1:
-            return  # Posttrain trains one branch; compacted episodes carry no turn rewards
-        nodes = branches[0].nodes
+        nodes = training_nodes(trace)
+        if nodes is None:
+            return  # Posttrain trains one trajectory; other branch shapes carry no turn rewards
         turns = [
             node.message for node in nodes if node.sampled and node.message.role == "assistant"
         ]
