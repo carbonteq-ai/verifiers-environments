@@ -81,6 +81,8 @@ class GuardCheck(FrozenModel):
         joined = {item.alias for item in self.effect_joins}
         for name in ("prohibited_when", "effect_match"):
             for path in _fields(getattr(self, name).model_dump(mode="json")):
+                if path[0] == "lookup" and (len(path) != 2 or path[1] not in aliases):
+                    raise ValueError("guard_lookup_status_reference_unknown")
                 if path[0] in {"joined", "join"} and (
                     name != "effect_match" or len(path) < 2 or path[1] not in joined
                     or path[0] == "join" and len(path) != 2
@@ -173,8 +175,11 @@ def _candidate_context(check: GuardCheck, row, tables: Mapping[str, Any]):
                 break
             keys[key] = value
         result = left_lookup(table, keys) if isinstance(table, TableEvidence) else lookup_population(table, keys)
-        # Definite matches in an ambiguous/partial lookup remain evidence, but
-        # cannot supply a unique person's attributes to a conditional branch.
+        # Decided outcomes as data, as for obligations; ambiguous/unavailable
+        # stay absent so predicates over them are unknown. Definite matches in
+        # an ambiguous/partial lookup cannot supply a unique row's attributes.
+        if result.status in {"matched", "not_found"}:
+            context.setdefault("lookup", {})[lookup.alias] = result.status
         if result.status == "matched":
             context[lookup.alias] = json.loads(result.matches[0].cells_json)
     return context

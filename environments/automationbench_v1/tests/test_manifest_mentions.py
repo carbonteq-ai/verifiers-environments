@@ -65,7 +65,9 @@ def test_longer_listed_names_do_not_count():
     ("Engineering owes $14,000", False),
     ("Engineering owes $4,000.50", False),
     ("Engineering owes $40,00", False),
-    ("Engineering owes $4k", None),
+    ("Engineering owes $4k", True),
+    ("Engineering owes $4.0k", True),
+    ("Engineering owes $5k", False),
     ("> Engineering owes $4,000", None),
     ("Version 4000x", False),
     ("Owes $4,000,000", False),
@@ -322,7 +324,8 @@ def together(text, *terms):
     ("Training — Engineering $3,000", True),
     ("Training: $2,000\nSecurity: $3,000", False),  # amounts swapped between lines
     ("Training\n$3,000", False),  # not beside each other
-    ("Training: $3k", None),
+    ("Training: $3k", True),
+    ("Training: 0.003m", None),
     ("> Training: $3,000", None),
 ])
 def test_amount_must_sit_beside_its_item(text, expected):
@@ -383,7 +386,9 @@ def test_clock_ranges_named_times_and_ambiguous_hours(text, value, expected):
     ("Charge: $36,000.00", True),
     ("Charge: $36,000 and later 36000", True),
     ("Charge: $35,000", False),
-    ("Charge: $36k", None),
+    ("Charge: $36k", True),             # exact magnitude reading
+    ("Charge: $36.1k", False),
+    ("Charge: 0.036m", None),           # bare m: unit reading stays open
 ])
 def test_amount_reformatted_flags_non_verbatim_copies(text, expected):
     assert mentions(text, "$36,000", "amount_reformatted", "usd_string")[0] is expected

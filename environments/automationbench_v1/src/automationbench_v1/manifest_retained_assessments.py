@@ -27,7 +27,13 @@ from .contracts.sheet_effects import (
     validate_sheet_retention,
 )
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
-from .manifest_guard_assessments import EffectInput, digest, execution_subject, selectors_digest
+from .manifest_guard_assessments import (
+    EffectInput,
+    authenticated_view,
+    digest,
+    execution_subject,
+    selectors_digest,
+)
 from .manifest_source import admit_manifest_source
 
 RETAINED_PRODUCER = "automationbench.manifest_retained_rows"
@@ -297,6 +303,7 @@ def validate_retained_batches(source, batches, context, contract):
             "state_write_receipts": raw.get("state_write_receipts", [])}
     subject = vf.SubjectRef(kind="trace", snapshot_id=source.snapshot_id, episode_id=source.episode_id, trace_id=raw["trace_id"])
     inputs, evaluations, seen, admitted_records = {}, {}, set(), []
+    views, safe_digest = {}, digest(safe)
     for batch in batches:
         run = batch.run
         if (run.run_id, run.invocation_id, run.attempt_id) not in current or run.status != "complete":
@@ -308,10 +315,8 @@ def validate_retained_batches(source, batches, context, contract):
             raise ValueError("retained_current_batch_mismatch")
         config = RetainedConfig.model_validate_json(run.configuration_json)
         view = batch.views[0]
-        material = json.loads(view.input_json)
-        if (digest(material) != view.input_digest or digest(material["source"]) != digest(safe)
-                or canonical_contract_digest(load_contract(canonical_json(material["contract"]))) != canonical_contract_digest(contract)):
-            raise ValueError("retained_current_input_mismatch")
+        material = authenticated_view(views, view, safe_digest, canonical_contract_digest(contract),
+                                      "retained_current_input_mismatch")
         if view.input_digest not in inputs:
             inputs[view.input_digest] = restore_retained_inputs(material, contract)
         check = next((item for item in contract.checks if item.check_id == config.check_id), None)

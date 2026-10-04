@@ -209,6 +209,59 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
 16. Authoring trap: a guard whose effect match does not depend on the row must
     use `match_cardinality: "per_candidate"`.
 
+## Mechanisms added after round 4 (2026-10-04)
+
+17. Absent from the same scope: `mentions_together` takes
+    `excluding_values` (up to 16 terms, same fields as `terms`). A unit (line,
+    `block`, or `scope: "text"` = the whole text, e.g. one record's
+    `values_text`) matches only if every term is present **and** no excluded
+    value appears in it; an excluded value whose presence is unknown (an
+    unresolved field, an ambiguous form, or only in a quoted line of the unit)
+    keeps the unit unknown. With exclusions a single term is allowed. Use it to
+    stop "list every candidate amount on one line" from passing:
+
+        {"op": "mentions_together", "text": {"kind": "field", "path": ["effect", "body"], "domain": "string"},
+         "terms": [{"value": {"kind": "field", "path": ["request", "Department"], "domain": "string"}, "mode": "words"},
+                   {"value": {"kind": "field", "path": ["request", "Share"], "domain": "string"},
+                    "mode": "amount", "format": "usd_string"}],
+         "excluding_values": [{"value": {"kind": "field", "path": ["request", "Other Share"], "domain": "string"},
+                               "mode": "amount", "format": "usd_string"}]}
+
+    For a record write: `"text": {"kind": "field", "path": ["effect", "values_text"], "domain": "string"},
+    "scope": "text"`. Excluded terms are matched like terms (amounts in any
+    accepted form, including "$1.5k"), so list only values that must not
+    appear; a legitimate "was $900" beside the right amount also fails.
+
+18. Sole values: `"sole": true` on an `amount`/`amount_reformatted`/
+    `clock_time` term (in `mentions` or a `mentions_together` term) means the
+    value must be the only value of its kind in the matching unit, so hedges
+    such as "$25,000 / $7,500", "$8,325 to $8,326" or "0.55, 0.54, 0.56" fail
+    without listing rivals:
+
+        {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body"], "domain": "string"},
+         "value": {"kind": "field", "path": ["request", "Total"], "domain": "string"},
+         "mode": "amount", "format": "usd_string", "sole": true}
+
+    Kind rules. A number joined to the value by a range or alternative ("-",
+    "–", "/", "~", "to", "or", "through") is always a second value. Otherwise
+    numbers are classed as money (`$`), grouped ("8,420", "120k"), decimal,
+    integer (>= 1000), count (< 1000), year (1900–2100) or percent (`%`);
+    dates, clock times and reference codes are never amounts. Money targets
+    (`usd_*` formats) fail on another money/grouped value and stay unknown on
+    a bare decimal or large integer; decimal targets fail only on another
+    decimal; integer targets (>= 1000) fail on money/grouped/integer; count
+    targets stay unknown on other counts. Counts, years and percents never
+    sink a money target. Clock times: any other readable time fails (both ends
+    of a range count), a bare ambiguous hour is unknown. Repeating the value
+    is fine. An undecidable rival (an ambiguous magnitude) keeps the unit
+    unknown.
+
+Engine corrections in the same round: amounts followed by a list comma
+("$8,420, no") are read; k (and dollar-marked m/b) suffixes are read exactly
+("$120k" = 120000) and only values they could be rounded from stay unknown;
+24-hour ranges ("13:00-13:30") yield both ends; guards publish
+`lookup.<alias>` (`matched`/`not_found`) like obligations.
+
 Revise a task by overwriting its `tasks/<task_name>/` files and recording the
 coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
 

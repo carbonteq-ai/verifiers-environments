@@ -146,6 +146,9 @@ class MentionTerm(Frozen):
     mode: Literal["words", "verbatim", "amount", "amount_reformatted", "clock_time"]
     format: Literal["usd_string", "usd_marked", "decimal_string"] | None = None
     excluding: tuple[StrictStr | FieldValue, ...] = ()
+    # The value must be the only value of its kind in the matching unit
+    # (see ``_rivals``); omitted when false so existing digests are unchanged.
+    sole: StrictBool = Field(default=False, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def coherent_term(self):
@@ -153,6 +156,8 @@ class MentionTerm(Frozen):
             raise ValueError("predicate_mentions_amount_requires_format")
         if self.excluding and self.mode != "words":
             raise ValueError("predicate_mentions_excluding_requires_words")
+        if self.sole and self.mode not in {"amount", "amount_reformatted", "clock_time"}:
+            raise ValueError("predicate_mentions_sole_requires_amount_or_clock_time")
         return self
 
 
@@ -171,9 +176,12 @@ class Mentions(MentionTerm):
     ("2:30 PM", "2pm", "14:30") equals the value; a meridiem-less one-digit hour
     ("2:30") is ambiguous.
 
+    A magnitude suffix is read exactly ("$120k" is 120000; a bare "1.2m" only
+    unknown near 1200000); values it could be rounded from stay unknown.
+
     Found in a readable line is known true. Found only in quoted (``>``) or
-    fenced lines, an ambiguous form ("4k", "2:30") or an oversized text is
-    unknown. Otherwise known false. Presence is not a positive assertion:
+    fenced lines, an ambiguous form ("2:30", "$4.2k" for 4250) or an oversized
+    text is unknown. Otherwise known false. Presence is not a positive assertion:
     negations ("not Acme") still mention the value.
     """
 
@@ -194,18 +202,26 @@ class MentionsTogether(Frozen):
     when every term is, false when any term is. Some readable line true is
     known true; a line that could still be true (unknown terms, or a true
     unreadable line) makes the result unknown; otherwise known false.
+
+    ``excluding_values``: terms that must be absent from the same unit. A unit
+    mentioning one is false; one whose presence is unknown (or only in an
+    unreadable line) cannot be true. With them a single term is allowed.
     """
 
     op: Literal["mentions_together"]
     text: FieldValue
-    terms: tuple[MentionTerm, ...] = Field(min_length=2, max_length=8)
-    # ``block``: within one paragraph (blank-line separated) instead of one line.
-    scope: Literal["line", "block"] = "line"
+    terms: tuple[MentionTerm, ...] = Field(min_length=1, max_length=8)
+    # ``block``: within one paragraph (blank-line separated) instead of one line;
+    # ``text``: the whole text is one unit (e.g. a record's ``values_text``).
+    scope: Literal["line", "block", "text"] = "line"
+    excluding_values: tuple[MentionTerm, ...] = Field(default=(), max_length=16, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def coherent(self):
         if self.text.domain != "string" or self.text.allowed:
             raise ValueError("predicate_mentions_text_requires_string_field")
+        if len(self.terms) < 2 and not self.excluding_values:
+            raise ValueError("predicate_mentions_together_requires_two_terms_or_exclusions")
         return self
 
 
@@ -526,11 +542,13 @@ def _labeled_line(predicate: LabeledLine, context: Mapping) -> PredicateResult:
 _TOKEN = re.compile(r"\w+(?:['\u2019-]\w+)*")
 _SPLIT_TOKEN = re.compile(r"\w+")
 # A standalone number: not part of a word, clock time (11:30), reference or date
-# (PMT-2026-0402, 2026-02-01) or fraction-like code (1/2). An adjacent k/m/b
-# magnitude suffix is captured so it can be treated as ambiguous.
+# (PMT-2026-0402, 2026-02-01) or fraction-like code (1/2). Digit groups end in
+# a digit, so a trailing list comma ("$8,420, no") is punctuation. An adjacent
+# k/m/b magnitude suffix is captured (see ``_magnitude``).
 _NUMBER = re.compile(
-    r"(?<![\w.,$:/-])(?<!\w-)-?\$?\d[\d,]*(?:\.\d+)?([kKmMbB])?(?![\w:/])(?!-\d)(?![.,]\d)"
+    r"(?<![\w.,$:/-])(?<!\w-)-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?(?![\w:/])(?!-\d)(?![.,]\d)"
 )
+_MAGNITUDE = {"k": 1000, "m": 1000000, "b": 1000000000}
 
 
 _POSSESSIVE = re.compile(r"['\u2019]s$")
@@ -580,6 +598,12 @@ _CLOCK_RANGE_TEXT = re.compile(
     r"(?<![\w:])(\d{1,2})(?::([0-5]\d))?\s*(?:-|\u2013|\u2014|to)\s*(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?(?![a-z])",
     re.IGNORECASE,
 )
+# "13:00-13:30" / "9:00-17:00": a range with one unambiguous 24-hour end is 24-hour.
+_CLOCK_RANGE_24_TEXT = re.compile(
+    r"(?<![\w:])([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|\u2013|\u2014|to)\s*([01]?\d|2[0-3]):([0-5]\d)(?![\w:])"
+    r"(?!\s*[ap]\.?\s*m)",
+    re.IGNORECASE,
+)
 _NOON_TEXT = re.compile(r"(?<![\w])(?:12\s+)?(noon|midnight)(?![\w])", re.IGNORECASE)
 
 
@@ -594,6 +618,7 @@ class _Term:
     longer: tuple[tuple[str, ...], ...]
     split_longer: tuple[tuple[str, ...], ...]
     pattern: re.Pattern | None
+    sole: bool = False
 
 
 def _prepare(term: MentionTerm, context: Mapping):
@@ -647,7 +672,7 @@ def _prepare(term: MentionTerm, context: Mapping):
     )
     return _Term(term.mode, term.format, literal, expected, target,
                  tuple(_tokens(literal, split=True)) if term.mode == "words" else (),
-                 tuple(longer), tuple(split_longer), pattern), "prepared", paths
+                 tuple(longer), tuple(split_longer), pattern, term.sole), "prepared", paths
 
 
 def _term_in_line(term: _Term, line: str) -> bool | None:
@@ -659,34 +684,27 @@ def _term_in_line(term: _Term, line: str) -> bool | None:
     if term.pattern is not None:
         return term.pattern.search(line) is not None
     if term.mode == "clock_time":
-        def twelve(hour, minute, meridiem):
-            return Fraction((int(hour) % 12 + (12 if meridiem.lower() == "p" else 0)) * 60 + int(minute or 0))
-        times, rest = [], line
-        for m in _CLOCK_RANGE_TEXT.finditer(line):
-            if 1 <= int(m.group(1)) <= 12 and 1 <= int(m.group(3)) <= 12:
-                times += [twelve(m.group(1), m.group(2), m.group(5)), twelve(m.group(3), m.group(4), m.group(5))]
-                rest = rest.replace(m.group(0), " ")
-        times += [twelve(m.group(1), m.group(2), m.group(3))
-                  for m in _CLOCK_12_TEXT.finditer(rest) if 1 <= int(m.group(1)) <= 12]
-        times += [Fraction(int(m.group(1)) * 60 + int(m.group(2))) for m in _CLOCK_24_TEXT.finditer(rest)]
-        times += [Fraction(720 if m.group(1).lower() == "noon" else 0) for m in _NOON_TEXT.finditer(rest)]
+        times, bare = _clock_times(line)
         if term.expected in times:
             return True
-        return None if _CLOCK_BARE_TEXT.search(rest) else False
+        return None if bare else False
     ambiguous = reformatted = False
     for match in _NUMBER.finditer(line):
-        if match.group(1):
+        suffix = match.group(1)
+        body = match.group(0)[:-1] if suffix else match.group(0)
+        try:
+            value = _decimal(body, term.format)
+        except _Unavailable:
+            if term.mode != "amount_reformatted":
+                continue
+            try:  # e.g. "36000" under a usd_marked source: compare loosely
+                value = _decimal(body, "usd_string")
+            except _Unavailable:
+                continue
+        equal = _magnitude(value, suffix, body, term.expected) if suffix else value == term.expected
+        if equal is None:
             ambiguous = True
             continue
-        try:
-            equal = _decimal(match.group(0), term.format) == term.expected
-        except _Unavailable:
-            equal = False
-            if term.mode == "amount_reformatted":
-                try:  # e.g. "36000" under a usd_marked source: compare loosely
-                    equal = _decimal(match.group(0), "usd_string") == term.expected
-                except _Unavailable:
-                    continue
         if not equal:
             continue
         if term.mode == "amount":
@@ -696,6 +714,121 @@ def _term_in_line(term: _Term, line: str) -> bool | None:
     if reformatted:
         return True
     return None if ambiguous else False
+
+
+def _clock_times(line: str) -> tuple[list[Fraction], bool]:
+    """Readable times of day (both ends of ranges) and whether a bare hour remains."""
+    def twelve(hour, minute, meridiem):
+        return Fraction((int(hour) % 12 + (12 if meridiem.lower() == "p" else 0)) * 60 + int(minute or 0))
+    times, rest = [], line
+    for m in _CLOCK_RANGE_TEXT.finditer(line):
+        if 1 <= int(m.group(1)) <= 12 and 1 <= int(m.group(3)) <= 12:
+            times += [twelve(m.group(1), m.group(2), m.group(5)), twelve(m.group(3), m.group(4), m.group(5))]
+            rest = rest.replace(m.group(0), " ")
+    for m in _CLOCK_RANGE_24_TEXT.finditer(rest):
+        if any(hour.startswith("0") or int(hour) >= 13 for hour in (m.group(1), m.group(3))):
+            times += [Fraction(int(m.group(1)) * 60 + int(m.group(2))), Fraction(int(m.group(3)) * 60 + int(m.group(4)))]
+            rest = rest.replace(m.group(0), " ")
+    times += [twelve(m.group(1), m.group(2), m.group(3))
+              for m in _CLOCK_12_TEXT.finditer(rest) if 1 <= int(m.group(1)) <= 12]
+    times += [Fraction(int(m.group(1)) * 60 + int(m.group(2))) for m in _CLOCK_24_TEXT.finditer(rest)]
+    times += [Fraction(720 if m.group(1).lower() == "noon" else 0) for m in _NOON_TEXT.finditer(rest)]
+    return times, _CLOCK_BARE_TEXT.search(rest) is not None
+
+
+# Number kinds for ``sole``; a rival of a "fail" kind sinks the unit, an
+# "open" kind keeps it unknown, others (counts, years, percents) are unrelated.
+_RANGE_JOIN = re.compile(r"\s*,?\s*(?:-|\u2013|\u2014|/|~|to|or|through|thru)\s*", re.IGNORECASE)
+_SOLE_KINDS = {
+    "money": ({"money", "grouped"}, {"decimal", "integer"}),
+    "decimal": ({"decimal"}, set()),
+    "integer": ({"money", "grouped", "integer"}, {"decimal"}),
+    "count": (set(), {"count", "integer"}),
+}
+
+
+def _number_kind(line: str, match) -> str:
+    body = match.group(0)
+    if line[match.end():].lstrip().startswith("%") or re.match(r"\s*percent\b", line[match.end():], re.IGNORECASE):
+        return "percent"
+    if "$" in body:
+        return "money"
+    if "." in body:
+        return "decimal"
+    if "," in body or match.group(1):
+        return "grouped"
+    digits = body.lstrip("-")
+    if len(digits) == 4 and 1900 <= int(digits) <= 2100:
+        return "year"
+    return "count" if int(digits) < 1000 else "integer"
+
+
+def _target_kind(term: _Term) -> str:
+    if term.format in {"usd_string", "usd_marked"}:
+        return "money"
+    expected = term.expected
+    if expected is None or expected.denominator != 1:
+        return "decimal"
+    return "integer" if abs(expected) >= 1000 else "count"
+
+
+def _rivals(term: _Term, line: str) -> bool | None:
+    """Another value of the target's kind in the line: True, unknown or False.
+
+    Clock times: any other time (both ends of a range). Amounts: kinds are
+    money ($-marked) / grouped / decimal / integer (>= 1000) / count / year /
+    percent; ``_SOLE_KINDS`` says which sink or open the unit for the target's
+    kind. A number joined to a target occurrence by a range or alternative
+    ("to", "-", "/", "or") is always a rival. Repeats of the value are fine.
+    """
+    if term.mode == "clock_time":
+        times, bare = _clock_times(line)
+        if any(time != term.expected for time in times):
+            return True
+        return None if bare else False
+    fail, open_ = _SOLE_KINDS[_target_kind(term)]
+    matches = list(_NUMBER.finditer(line))
+    values = []
+    for match in matches:
+        suffix = match.group(1)
+        body = match.group(0)[:-1] if suffix else match.group(0)
+        try:
+            value = _decimal(body, "usd_string" if "$" in body or "," in body else "decimal_string")
+        except _Unavailable:
+            values.append(None)
+            continue
+        values.append(_magnitude(value, suffix, body, term.expected) if suffix else value == term.expected)
+    verdict = False
+    for index, (match, equal) in enumerate(zip(matches, values, strict=True)):
+        if equal is True:
+            continue
+        partner = any(
+            values[other] is True and _RANGE_JOIN.fullmatch(
+                line[min(match.end(), matches[other].end()):max(match.start(), matches[other].start())])
+            for other in (index - 1, index + 1) if 0 <= other < len(matches)
+        )
+        kind = _number_kind(line, match)
+        if equal is False and (partner or kind in fail):
+            return True
+        if partner or kind in fail or kind in open_:
+            verdict = None
+    return verdict
+
+
+def _magnitude(value: Fraction, suffix: str, body: str, expected) -> bool | None:
+    """"$120k" is 120000; only values it could round from stay unknown.
+
+    ``k`` (or a dollar-marked ``m``/``b``) equal to the value is true; a value
+    within the token's rounding is unknown (approximation or unit reading);
+    anything else is false, so the token never blocks unrelated amounts.
+    """
+    scale = _MAGNITUDE[suffix.lower()]
+    decimals = len(body.partition(".")[2])
+    if abs(expected - value * scale) > Fraction(scale, 2 * 10 ** decimals):
+        return False
+    if expected == value * scale and (suffix in "kK" or "$" in body):
+        return True
+    return None
 
 
 def _scan(text: str, judge) -> tuple[bool | None, str]:
@@ -722,39 +855,37 @@ def _mentions_value(predicate: Mentions, context: Mapping) -> PredicateResult:
         return PredicateResult(None, reason, paths)
     if len(text) > _LINE_TEXT_BUDGET:
         return PredicateResult(None, "predicate_mentions_text_budget_exceeded", paths)
-    value, reason = _scan(text, lambda line: _term_in_line(term, line))
+    judge = (lambda line: _presence(term, [(line, True)])) if term.sole else (lambda line: _term_in_line(term, line))
+    value, reason = _scan(text, judge)
     return PredicateResult(value, reason, paths)
 
 
 def _mentions_together(predicate: MentionsTogether, context: Mapping) -> PredicateResult:
     text_known, text, paths = resolve_operand(predicate.text, context)
-    prepared = []
-    for item in predicate.terms:
-        term, reason, term_paths = _prepare(item, context)
-        paths = tuple(dict.fromkeys(paths + term_paths))
-        if term is None:
-            return PredicateResult(None, reason, paths)
-        prepared.append(term)
+    prepared, excluded = [], []
+    for target, items in ((prepared, predicate.terms), (excluded, predicate.excluding_values)):
+        for item in items:
+            term, reason, term_paths = _prepare(item, context)
+            paths = tuple(dict.fromkeys(paths + term_paths))
+            if term is None:
+                return PredicateResult(None, reason, paths)
+            target.append(term)
     if not text_known:
         return PredicateResult(None, "predicate_field_unavailable", paths)
     if len(text) > _LINE_TEXT_BUDGET:
         return PredicateResult(None, "predicate_mentions_text_budget_exceeded", paths)
-
-    def judge(line):
-        results = [_term_in_line(term, line) for term in prepared]
-        return False if False in results else None if None in results else True
-
-    if predicate.scope == "block":
-        value, reason = _scan_blocks(text, prepared)
-    else:
-        value, reason = _scan(text, judge)
+    value, reason = _scan_units(_units(text, predicate.scope), prepared, excluded)
     return PredicateResult(value, reason, paths)
 
 
-def _scan_blocks(text: str, prepared) -> tuple[bool | None, str]:
-    """Every term somewhere in one blank-line-separated block."""
+def _units(text: str, scope: str) -> list[list[tuple[str, bool]]]:
+    lines = list(_readable_lines(text))
+    if scope == "line":
+        return [[line] for line in lines]
+    if scope == "text":
+        return [lines]
     blocks, current = [], []
-    for line, readable in _readable_lines(text):
+    for line, readable in lines:
         if not line.strip():
             if current:
                 blocks.append(current)
@@ -763,20 +894,37 @@ def _scan_blocks(text: str, prepared) -> tuple[bool | None, str]:
             current.append((line, readable))
     if current:
         blocks.append(current)
+    return blocks
+
+
+def _presence(term, unit) -> bool | None:
+    seen = [(_term_in_line(term, line), readable) for line, readable in unit]
+    if any(value is True and readable for value, readable in seen):
+        found = True
+    else:
+        return None if any(value is None or value is True for value, _ in seen) else False
+    if term.sole:
+        rivals = [(_rivals(term, line), readable) for line, readable in unit]
+        if any(value is True and readable for value, readable in rivals):
+            return False
+        if any(value is not False for value, _ in rivals):
+            return None
+    return found
+
+
+def _scan_units(units, prepared, excluded) -> tuple[bool | None, str]:
+    """Every term somewhere in one unit (line/block/text), no excluded value there."""
     unknown = False
-    for block in blocks:
-        verdicts = []
-        for term in prepared:
-            seen = [(_term_in_line(term, line), readable) for line, readable in block]
-            if any(value is True and readable for value, readable in seen):
-                verdicts.append(True)
-            elif any(value is None or value is True for value, _ in seen):
-                verdicts.append(None)
-            else:
-                verdicts.append(False)
-        if all(verdict is True for verdict in verdicts):
+    for unit in units:
+        verdicts = [_presence(term, unit) for term in prepared]
+        if False in verdicts:
+            continue
+        absent = [_presence(term, unit) for term in excluded]
+        if True in absent:
+            continue
+        if all(verdict is True for verdict in verdicts) and None not in absent:
             return True, "predicate_decided"
-        unknown = unknown or False not in verdicts
+        unknown = True
     if unknown:
         return None, "predicate_mentions_unreadable_or_ambiguous"
     return False, "predicate_mentions_absent"
