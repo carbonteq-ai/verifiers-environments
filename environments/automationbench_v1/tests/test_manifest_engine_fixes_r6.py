@@ -225,3 +225,45 @@ def test_clock_values_read_seconds_and_iso_timestamps(raw, minutes):
     from automationbench_v1.contracts.values import clock_minutes
 
     assert clock_minutes(raw) == minutes
+
+
+# --- Item 4: collections keyed by <kind>_id (Xero) --------------------------
+
+
+def _xero_initial():
+    return {"xero": {"contacts": [{"contact_id": "C-1", "name": "Acme Ltd", "email_address": "ap@acme.example"}]}}
+
+
+def test_xero_record_writes_use_a_single_declared_identity_field():
+    from automationbench.tools.zapier.xero.contacts import xero_create_contact, xero_update_contact
+    from automationbench_v1.contracts import RecordWriteSource
+    from automationbench_v1.contracts.populations import InitialCollectionSource, capture_population
+    from automationbench_v1.contracts.record_writes import capture_record_writes
+
+    create_args = {"name": "Nimbus Supplies", "email_address": "billing@nimbus.example", "is_supplier": True}
+    update_args = {"contact_id": "C-1", "phone": "+1 555 0100"}
+    source = run_operations(_xero_initial(), [
+        zapier("xero_create_contact", create_args, lambda world: xero_create_contact(world, **create_args)),
+        zapier("xero_update_contact", update_args, lambda world: xero_update_contact(world, **update_args)),
+    ])
+    source["task_evidence"]["initial"] = _xero_initial()
+    with pytest.raises(ValueError, match="identity"):
+        RecordWriteSource.model_validate({"service": "xero", "collection": ["contacts"], "kind": "create"})
+    with pytest.raises(ValueError, match="identity_paths_invalid"):  # a lone ["id"]-style path needs no-id schemas
+        RecordWriteSource.model_validate({"service": "mailchimp", "collection": ["subscribers"], "kind": "create",
+                                          "identity_paths": [["list_id"]]})
+    spec = {"service": "xero", "collection": ["contacts"], "identity_paths": [["contact_id"]]}
+    created = capture_record_writes(source, RecordWriteSource.model_validate({**spec, "kind": "create"}))
+    updated = capture_record_writes(source, RecordWriteSource.model_validate({**spec, "kind": "update"}))
+    assert created.complete and updated.complete, (created.reason, updated.reason)
+    (new,) = [json.loads(fact.params_json) for fact in created.effects if fact.status == "qualified"]
+    (changed,) = [json.loads(fact.params_json) for fact in updated.effects if fact.status == "qualified"]
+    assert new["record"]["name"] == "Nimbus Supplies" and json.loads(new["record_id"]) == [new["record"]["contact_id"]]
+    assert changed["record_id"] == '["C-1"]' and changed["changed_fields"] == ["phone"]
+    population = capture_population(source, InitialCollectionSource.model_validate({
+        "path": ["task_evidence", "initial", "xero", "contacts"], "identity_paths": [["contact_id"]],
+        "fields": {"Name": ["name"]}, "key_fields": ["Name"]}))
+    assert [row.identity[-1] for row in population.rows] == [changed["record_id"]], population.rows
+    assert RecordWriteSource.model_validate({**spec, "kind": "create"}).model_dump(mode="json")["identity_paths"]
+    plain = RecordWriteSource.model_validate({"service": "zoom", "collection": ["meetings"], "kind": "create"})
+    assert "identity_paths" not in plain.model_dump(mode="json")
