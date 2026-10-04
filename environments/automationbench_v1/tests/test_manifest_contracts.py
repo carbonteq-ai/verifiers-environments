@@ -648,6 +648,8 @@ def test_catalog_supported_tasks_matches_all_packaged_contracts():
         "support.zoho_account_health", "marketing.brand_mention_analysis",
         "simple.zendesk_resolve_email",
         "simple.email_sf_contact_assistant_update", "simple.email_sf_contact_account_update",
+        "simple.email_zendesk_ack_reply", "finance.escrow_tracking", "hr.airtable_learning_path_assignment",
+        "operations.zoom_training_setup", "operations.calendly_equipment_inspection",
     }))
 
 

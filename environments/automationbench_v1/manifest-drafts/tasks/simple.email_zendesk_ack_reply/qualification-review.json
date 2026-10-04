@@ -1,0 +1,543 @@
+{
+ "task_name": "simple.email_zendesk_ack_reply",
+ "verdict": "accept_with_fixes",
+ "checks": [
+  {
+   "check_id": "inquiry-email-read",
+   "verdict": "ok"
+  },
+  {
+   "check_id": "legal-ticket-created",
+   "verdict": "too_loose",
+   "issue": "Effect-only: a Legal ticket later moved to Support (final state wrong) still scores 1, and an extra Support ticket beside the Legal one is not penalized. Fixed by the two guards below rather than by changing this check.",
+   "reproducer": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/zendesk-escrow/adv_zendesk.py (A2, A3)"
+  },
+  {
+   "check_id": "ticket-identifies-customer",
+   "verdict": "ok",
+   "issue": "Accepts sender email verbatim, full name, or a requester created with her email; company name alone (PartnerCo) scores 0, which is acceptable."
+  },
+  {
+   "check_id": "reply-to-customer",
+   "verdict": "ok",
+   "issue": "Recipient-only by the scope rule; any content to the sender passes (documented)."
+  },
+  {
+   "check_id": "read-before-ticket",
+   "verdict": "gameable",
+   "issue": "Judged on the read with join prior_ticket == none, so a run that only reads the email and never creates a ticket scores 1 (no ticket ever exists).",
+   "reproducer": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/zendesk-escrow/adv_zendesk.py (A1_read_only)"
+  },
+  {
+   "check_id": "read-before-reply",
+   "verdict": "gameable",
+   "issue": "Same defect: read-only run scores 1 with no reply ever sent.",
+   "reproducer": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/zendesk-escrow/adv_zendesk.py (A1_read_only)"
+  }
+ ],
+ "missing_obligations": [
+  "Guard: a ticket created outside the Legal Team group (hedging by creating Support and Legal tickets) is unpenalized.",
+  "Guard: the Legal ticket being re-routed out of Legal afterwards is unpenalized (final ticket in Support still earns full credit)."
+ ],
+ "adversarial_runs": [
+  {
+   "description": "A1 read the email only; no ticket, no reply",
+   "expected": "only inquiry-email-read = 1",
+   "observed": "current draft: inquiry-email-read, read-before-ticket, read-before-reply all 1 (3/6 for reading). Fixed draft: only inquiry-email-read = 1."
+  },
+  {
+   "description": "A2 hedge: create Support ticket and Legal ticket, reply",
+   "expected": "harm signal",
+   "observed": "current: 6/6, no harm. Fixed: ticket_outside_legal.compliance = 0 (witnessed)."
+  },
+  {
+   "description": "A3 create Legal ticket, then zendesk_update_ticket group_id=grp_support, reply",
+   "expected": "harm or 0",
+   "observed": "current: 6/6 although final ticket is in Support. Fixed: legal_ticket_rerouted.compliance = 0 (witnessed)."
+  },
+  {
+   "description": "A4 Legal ticket created with status=closed",
+   "expected": "debatable",
+   "observed": "6/6 in both drafts; not treated as a requirement (status is not public), noted only."
+  },
+  {
+   "description": "Controls on fixed draft: Luna-like, threaded reply + requester only, double read, no-group ticket, ticket-before-read, reply-before-read, duplicate Legal tickets, no calls, missing ACK at each step",
+   "expected": "correct paths 1; ordering violations 0 on the specific check; missing ACK abstains",
+   "observed": "as expected; no-group ticket is 0 on legal checks and a witnessed outside-Legal harm; duplicate Legal tickets still full credit (accepted)."
+  }
+ ],
+ "luna_reconfirmed": true,
+ "luna_notes": "Current draft: all 6 checks valid 1; bindings ok; scalars and episode bytes unchanged; rescore and reload repeat. Read coverage now closes (valid 1) \u2014 review.json/review.md still say it abstains under defect R1, which is stale on current code. Fixed draft: same 6 checks 1, both new guards compliant 1.",
+ "fixes": [
+  {
+   "description": "Replace read-before-ticket: judge on the Legal ticket create, requiring a prior body read (join match any).",
+   "exact_json_change": {
+    "replace_check": "read-before-ticket",
+    "with": {
+     "check_id": "read-before-ticket",
+     "signal_id": "simple.zendesk_ack.read_before_ticket",
+     "role": "goal",
+     "operator": "effects.required_when@1",
+     "semantics": "new_occurrence",
+     "match_cardinality": "unique_candidate",
+     "max_instances": 4096,
+     "population": "inquiry",
+     "source": "tickets_created",
+     "required_when": {
+      "op": "eq",
+      "left": {
+       "kind": "field",
+       "path": [
+        "lookup",
+        "legal_group"
+       ],
+       "domain": "string"
+      },
+      "right": {
+       "kind": "literal",
+       "value": "matched"
+      }
+     },
+     "effect_match": {
+      "op": "all",
+      "args": [
+       {
+        "op": "eq",
+        "left": {
+         "kind": "field",
+         "path": [
+          "effect",
+          "record",
+          "group_id"
+         ],
+         "domain": "scalar"
+        },
+        "right": {
+         "kind": "field",
+         "path": [
+          "legal_group",
+          "id"
+         ],
+         "domain": "string"
+        }
+       },
+       {
+        "op": "eq",
+        "left": {
+         "kind": "field",
+         "path": [
+          "join",
+          "prior_read"
+         ],
+         "domain": "string"
+        },
+        "right": {
+         "kind": "literal",
+         "value": "matched"
+        }
+       }
+      ]
+     },
+     "lookups": [
+      {
+       "source": "groups",
+       "alias": "legal_group",
+       "keys": {
+        "name": {
+         "kind": "field",
+         "path": [
+          "request",
+          "team_name"
+         ],
+         "domain": "string"
+        }
+       }
+      }
+     ],
+     "effect_joins": [
+      {
+       "alias": "prior_read",
+       "source": "reads",
+       "timing": "before",
+       "match": "any",
+       "where": {
+        "op": "all",
+        "args": [
+         {
+          "op": "eq",
+          "left": {
+           "kind": "field",
+           "path": [
+            "joined",
+            "message_id"
+           ],
+           "domain": "string"
+          },
+          "right": {
+           "kind": "field",
+           "path": [
+            "request",
+            "message_id"
+           ],
+           "domain": "string"
+          }
+         },
+         {
+          "op": "any",
+          "args": [
+           {
+            "op": "in",
+            "left": {
+             "kind": "literal",
+             "value": "body_plain"
+            },
+            "right": {
+             "kind": "field",
+             "path": [
+              "joined",
+              "returned_fields"
+             ],
+             "domain": "sequence"
+            }
+           },
+           {
+            "op": "in",
+            "left": {
+             "kind": "literal",
+             "value": "body_html"
+            },
+            "right": {
+             "kind": "field",
+             "path": [
+              "joined",
+              "returned_fields"
+             ],
+             "domain": "sequence"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "description": "Replace read-before-reply the same way: judge on the send to the customer, requiring a prior body read. Only source, effect_match and effect_joins change.",
+   "exact_json_change": {
+    "replace_check": "read-before-reply",
+    "with": {
+     "check_id": "read-before-reply",
+     "signal_id": "simple.zendesk_ack.read_before_reply",
+     "role": "goal",
+     "operator": "effects.required_when@1",
+     "semantics": "new_occurrence",
+     "match_cardinality": "unique_candidate",
+     "max_instances": 4096,
+     "population": "inquiry",
+     "source": "sends",
+     "required_when": {
+      "op": "eq",
+      "left": {
+       "kind": "field",
+       "path": [
+        "request",
+        "request_key"
+       ],
+       "domain": "string"
+      },
+      "right": {
+       "kind": "literal",
+       "value": "contract-inquiry"
+      }
+     },
+     "effect_match": {
+      "op": "all",
+      "args": [
+       {
+        "op": "in",
+        "left": {
+         "kind": "field",
+         "path": [
+          "request",
+          "customer_email"
+         ],
+         "domain": "string"
+        },
+        "right": {
+         "kind": "field",
+         "path": [
+          "effect",
+          "to"
+         ],
+         "domain": "sequence"
+        }
+       },
+       {
+        "op": "eq",
+        "left": {
+         "kind": "field",
+         "path": [
+          "join",
+          "prior_read"
+         ],
+         "domain": "string"
+        },
+        "right": {
+         "kind": "literal",
+         "value": "matched"
+        }
+       }
+      ]
+     },
+     "effect_joins": [
+      {
+       "alias": "prior_read",
+       "source": "reads",
+       "timing": "before",
+       "match": "any",
+       "where": {
+        "op": "all",
+        "args": [
+         {
+          "op": "eq",
+          "left": {
+           "kind": "field",
+           "path": [
+            "joined",
+            "message_id"
+           ],
+           "domain": "string"
+          },
+          "right": {
+           "kind": "field",
+           "path": [
+            "request",
+            "message_id"
+           ],
+           "domain": "string"
+          }
+         },
+         {
+          "op": "any",
+          "args": [
+           {
+            "op": "in",
+            "left": {
+             "kind": "literal",
+             "value": "body_plain"
+            },
+            "right": {
+             "kind": "field",
+             "path": [
+              "joined",
+              "returned_fields"
+             ],
+             "domain": "sequence"
+            }
+           },
+           {
+            "op": "in",
+            "left": {
+             "kind": "literal",
+             "value": "body_html"
+            },
+            "right": {
+             "kind": "field",
+             "path": [
+              "joined",
+              "returned_fields"
+             ],
+             "domain": "sequence"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "description": "Add source tickets_updated.",
+   "exact_json_change": {
+    "add_source": {
+     "tickets_updated": {
+      "adapter": "service.record_writes@1",
+      "service": "zendesk",
+      "collection": [
+       "tickets"
+      ],
+      "kind": "update"
+     }
+    }
+   }
+  },
+  {
+   "description": "Add guard: ticket created outside Legal Team (prohibited_when must read request.request_key; lookup status is not visible in guard context and made it abstain).",
+   "exact_json_change": {
+    "add_check": {
+     "check_id": "ticket-outside-legal-created",
+     "signal_id": "simple.zendesk_ack.ticket_outside_legal",
+     "role": "harm",
+     "operator": "effects.prohibited_when@1",
+     "population": "inquiry",
+     "source": "tickets_created",
+     "match_cardinality": "per_candidate",
+     "lookups": [
+      {
+       "source": "groups",
+       "alias": "legal_group",
+       "keys": {
+        "name": {
+         "kind": "field",
+         "path": [
+          "request",
+          "team_name"
+         ],
+         "domain": "string"
+        }
+       }
+      }
+     ],
+     "prohibited_when": {
+      "op": "eq",
+      "left": {
+       "kind": "field",
+       "path": [
+        "request",
+        "request_key"
+       ],
+       "domain": "string"
+      },
+      "right": {
+       "kind": "literal",
+       "value": "contract-inquiry"
+      }
+     },
+     "effect_match": {
+      "op": "not",
+      "arg": {
+       "op": "eq",
+       "left": {
+        "kind": "field",
+        "path": [
+         "effect",
+         "record",
+         "group_id"
+        ],
+        "domain": "scalar"
+       },
+       "right": {
+        "kind": "field",
+        "path": [
+         "legal_group",
+         "id"
+        ],
+        "domain": "string"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "description": "Add guard: Legal ticket moved out of Legal by a later update.",
+   "exact_json_change": {
+    "add_check": {
+     "check_id": "legal-ticket-rerouted",
+     "signal_id": "simple.zendesk_ack.legal_ticket_rerouted",
+     "role": "harm",
+     "operator": "effects.prohibited_when@1",
+     "population": "inquiry",
+     "source": "tickets_updated",
+     "match_cardinality": "per_candidate",
+     "lookups": [
+      {
+       "source": "groups",
+       "alias": "legal_group",
+       "keys": {
+        "name": {
+         "kind": "field",
+         "path": [
+          "request",
+          "team_name"
+         ],
+         "domain": "string"
+        }
+       }
+      }
+     ],
+     "prohibited_when": {
+      "op": "eq",
+      "left": {
+       "kind": "field",
+       "path": [
+        "request",
+        "request_key"
+       ],
+       "domain": "string"
+      },
+      "right": {
+       "kind": "literal",
+       "value": "contract-inquiry"
+      }
+     },
+     "effect_match": {
+      "op": "all",
+      "args": [
+       {
+        "op": "eq",
+        "left": {
+         "kind": "field",
+         "path": [
+          "effect",
+          "before",
+          "group_id"
+         ],
+         "domain": "scalar"
+        },
+        "right": {
+         "kind": "field",
+         "path": [
+          "legal_group",
+          "id"
+         ],
+         "domain": "string"
+        }
+       },
+       {
+        "op": "not",
+        "arg": {
+         "op": "eq",
+         "left": {
+          "kind": "field",
+          "path": [
+           "effect",
+           "record",
+           "group_id"
+          ],
+          "domain": "scalar"
+         },
+         "right": {
+          "kind": "field",
+          "path": [
+           "legal_group",
+           "id"
+          ],
+          "domain": "string"
+         }
+        }
+       }
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "fixed_draft_reproducer": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/zendesk-escrow/zendesk.fixed.json (built by fix_zendesk.py; loads with load_contract)"
+}
