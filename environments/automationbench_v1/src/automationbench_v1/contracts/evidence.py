@@ -123,7 +123,14 @@ def target_record(world: Mapping[str, Any], selector, *, declared=False) -> dict
                 or (numeric == {int} and type(value) is not int)
                 or (type(value) is float and not math.isfinite(value))):
             raise ValueError("record_raw_numeric_type_invalid:" + name)
-    return model.model_validate(dict(matched[0])).model_dump(mode="json", exclude_unset=declared)
+    record = model.model_validate(dict(matched[0]))
+    # Wall-clock default factories (created/modified timestamps absent from
+    # public state) would make every capture, and so every rescore digest,
+    # differ. An absent timestamp stays absent instead of becoming "now".
+    clock = {name for name, field in model.model_fields.items()
+             if field.default_factory is not None and name not in record.model_fields_set
+             and datetime in (get_args(field.annotation) or (field.annotation,))}
+    return record.model_dump(mode="json", exclude_unset=declared, exclude=clock or None)
 
 
 def _requested_matches(requested: Mapping, returned: Mapping, record: dict, object_type: str) -> bool:
