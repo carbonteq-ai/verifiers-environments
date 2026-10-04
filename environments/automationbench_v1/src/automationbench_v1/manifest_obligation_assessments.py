@@ -34,6 +34,7 @@ from .contracts.slack_effects import SlackEffectSource
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
 from .manifest_guard_assessments import (
     EffectInput,
+    authenticated_view,
     capture_effect_input,
     digest,
     execution_subject,
@@ -303,6 +304,7 @@ def plan_obligation_credit(source, batches, context, contract):
     rules = {rule.check: rule for rule in contract.credit if rule.policy == "required_effect_once@1"}
     checks = {check.check_id: check for check in contract.checks if isinstance(check, ObligationCheck)}
     result, seen, channels, inputs, evaluations = [], set(), set(), {}, {}
+    views, safe_digest = {}, digest(safe)
     for batch in batches:
         run = batch.run
         if (run.run_id, run.invocation_id, run.attempt_id) not in current:
@@ -317,11 +319,8 @@ def plan_obligation_credit(source, batches, context, contract):
         if identity != source.identity or len(batch.views) != 1 or len(batch.assessments) != 1:
             raise ValueError("obligation_credit_batch_mismatch")
         view = batch.views[0]
-        material = json.loads(view.input_json)
-        if (digest(material["source"]) != digest(safe) or view.input_digest != digest(material)
-                or canonical_contract_digest(load_contract(canonical_json(material["contract"])))
-                != canonical_contract_digest(contract)):
-            raise ValueError("obligation_credit_view_mismatch")
+        material = authenticated_view(views, view, safe_digest, canonical_contract_digest(contract),
+                                      "obligation_credit_view_mismatch")
         if view.input_digest not in inputs:
             inputs[view.input_digest] = restore_obligation_inputs(material, contract)
         check = checks.get(config.check_id)
@@ -336,7 +335,7 @@ def plan_obligation_credit(source, batches, context, contract):
             raise ValueError("obligation_credit_receipt_missing")
         output = ObligationOutput.model_validate_json(receipts[0].payload_json)
         if (output.contract_digest != canonical_contract_digest(contract)
-                or output.source_digest != digest(safe) or output.input_digest != view.input_digest
+                or output.source_digest != safe_digest or output.input_digest != view.input_digest
                 or output.selectors_digest != selectors_digest(contract, check)
                 or config.contract_digest != output.contract_digest
                 or config.source_digest != output.source_digest

@@ -3,6 +3,8 @@
 import hashlib
 import json
 import re
+import weakref
+from functools import lru_cache
 from importlib.resources import files
 
 from .models import ContractSpec
@@ -26,10 +28,37 @@ def _decode(raw: bytes | str):
 
 
 def load_contract(raw: bytes | str) -> ContractSpec:
+    # Admitted contracts are deeply immutable, so equal bytes share one
+    # validation; scoring re-admits the same manifest once per assessment.
+    if isinstance(raw, (bytes, str)):
+        return _admitted(raw)
     return ContractSpec.model_validate(_decode(raw))
 
 
+@lru_cache(maxsize=32)
+def _admitted(raw: bytes | str) -> ContractSpec:
+    return ContractSpec.model_validate(_decode(raw))
+
+
+_DIGESTS: dict[int, tuple[weakref.ref, str]] = {}
+
+
 def canonical_contract_digest(contract: ContractSpec) -> str:
+    key = id(contract)
+    cached = _DIGESTS.get(key)
+    if cached is not None and cached[0]() is contract:
+        return cached[1]
+    digest = _canonical_digest(contract)
+
+    def forget(ref, key=key):
+        if _DIGESTS.get(key, (None,))[0] is ref:
+            del _DIGESTS[key]
+
+    _DIGESTS[key] = (weakref.ref(contract, forget), digest)
+    return digest
+
+
+def _canonical_digest(contract: ContractSpec) -> str:
     serialized = json.dumps(
         contract.model_dump(mode="json"),
         ensure_ascii=False,

@@ -41,6 +41,23 @@ def digest(value) -> str:
     return hashlib.sha256(canonical_json(value).encode()).hexdigest()
 
 
+def authenticated_view(cache: dict, view, safe_digest: str, contract_digest: str, error: str):
+    """Decode and bind one view's input once per planning pass.
+
+    The result depends only on the view bytes, the current source and the
+    contract, so batches sharing a view reuse the first admission.
+    """
+    key = (view.input_json, view.input_digest)
+    material = cache.get(key)
+    if material is None:
+        material = json.loads(view.input_json)
+        if (digest(material["source"]) != safe_digest or view.input_digest != digest(material)
+                or canonical_contract_digest(load_contract(canonical_json(material["contract"]))) != contract_digest):
+            raise ValueError(error)
+        cache[key] = material
+    return material
+
+
 class FactInput(FrozenModel):
     effect_id: StrictStr | None
     invocation_id: StrictStr = Field(min_length=1)
@@ -557,6 +574,7 @@ def plan_guard_credit(source, batches, context, contract):
     instances = set()
     inputs = {}
     plans = {}
+    views, safe_digest = {}, digest(safe)
     for batch in batches:
         run = batch.run
         if (run.run_id, run.invocation_id, run.attempt_id) not in current:
@@ -575,14 +593,7 @@ def plan_guard_credit(source, batches, context, contract):
         if check is None or config.get("contract_digest") != contract_id:
             raise ValueError("guard_credit_configuration_mismatch")
         view = batch.views[0]
-        material = json.loads(view.input_json)
-        if (
-            digest(material["source"]) != digest(safe)
-            or canonical_contract_digest(load_contract(canonical_json(material["contract"])))
-            != contract_id
-            or view.input_digest != digest(material)
-        ):
-            raise ValueError("guard_credit_input_binding_mismatch")
+        material = authenticated_view(views, view, safe_digest, contract_id, "guard_credit_input_binding_mismatch")
         if view.input_digest not in inputs:
             inputs[view.input_digest] = restore_guard_inputs(material, contract)
         tables, effects = inputs[view.input_digest]
@@ -599,7 +610,7 @@ def plan_guard_credit(source, batches, context, contract):
         output = GuardOutput.model_validate_json(receipts[0].payload_json)
         if (
             output.contract_digest != contract_id
-            or output.source_digest != digest(safe)
+            or output.source_digest != safe_digest
             or output.input_digest != view.input_digest
             or output.selectors_digest != selectors_digest(contract, check)
             or output.check_id != check.check_id

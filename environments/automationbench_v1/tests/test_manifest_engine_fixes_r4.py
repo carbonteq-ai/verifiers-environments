@@ -193,3 +193,29 @@ def test_single_term_needs_exclusions_and_empty_exclusions_are_not_dumped():
     assert "excluding_values" not in plain.model_dump(mode="json")
     assert _exclusive("Total $4,000", ["$4,000"], ["$900"], "text") is True
     assert _exclusive("Total $4,000, $900", ["$4,000"], ["$900"], "text") is False
+
+
+def test_contract_admission_and_digest_are_cached_by_content():
+    import json as _json
+
+    from automationbench_v1.contracts import load_contract, loader
+    from automationbench_v1.contracts.loader import (
+        _canonical_digest,
+        canonical_contract_digest,
+        supported_tasks,
+    )
+    from automationbench_v1.contracts.models import ContractSpec
+
+    name = supported_tasks()[0]
+    contract = loader.load_task_contract(name)
+    raw = contract.model_dump_json()
+    first, again = load_contract(raw), load_contract(raw.encode())
+    assert load_contract(raw) is first and again == first
+    fresh = ContractSpec.model_validate(_json.loads(raw))
+    assert fresh is not first
+    assert canonical_contract_digest(first) == canonical_contract_digest(fresh) == _canonical_digest(fresh)
+    assert canonical_contract_digest(first) == canonical_contract_digest(first)
+    broken = raw.replace('"schema_version":1', '"schema_version":2')
+    for _ in range(2):
+        with pytest.raises(ValueError, match="schema_version"):
+            load_contract(broken)
