@@ -484,3 +484,66 @@ coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
   guard dropped from ~45 s to ~7 s); receipts are unchanged.
 - Not changed: `unique_candidate` ambiguity still considers every population
   row (see the round-6 engine report).
+## Google Sheets reads (2026-10-04)
+
+24. Sheets read evidence: effect source `{"adapter": "google_sheets.reads@1",
+    "spreadsheet_id": <id>, "worksheet_id": <id>}` (`kind` is `read_sheet`
+    and may be omitted; omit `worksheet_id` to accept any worksheet of the
+    spreadsheet). Use it for "check the guidelines/policy/legal-hold sheet
+    before acting". One fact per acknowledged successful read call per
+    returned worksheet: `google_sheets_get_many_rows`,
+    `google_sheets_find_many_rows`, `google_sheets_lookup_row`,
+    `google_sheets_get_row_by_id`, `google_sheets_find_worksheet`,
+    `google_sheets_get_spreadsheet_by_id` (one fact per worksheet it lists).
+    Params: `spreadsheet_id`, `worksheet_id`, `worksheet_title` (pre-call
+    world), `row_ids` and `native_row_ids` (returned rows, in order; the
+    native ids equal `candidate.native_record_id` of a `google_sheets.rows@1`
+    population of the same worksheet), `row_count`, `returned_fields`
+    (columns whose values came back), `cell_values_returned` (true when some
+    returned row carried cell values), `all_rows_returned` (every row of the
+    worksheet came back), `operation`.
+    Closure works like Slack/Gmail reads (mechanisms 12, 19): the target is
+    resolved with the simulator's own ID/title resolution over the pre-call
+    world; every returned row must exist in that worksheet with the same cell
+    values and returned worksheet metadata must match, so a rewritten result
+    cannot invent a read. Failed reads (unknown sheet/tab/row, errors) return
+    nothing; a successful search that matched no row, `find_worksheet`, and
+    `get_spreadsheet_by_id` without grid data still read the worksheet but
+    with `row_count` 0 and `cell_values_returned` false — require
+    `cell_values_returned` (or row membership) when the content matters.
+    Reads of another spreadsheet/worksheet are not facts for this selector.
+    Sheets writes (add/append/update/delete row, create spreadsheet or
+    worksheet) are not reads; Drive file search returns nothing; calls whose
+    footprint excludes Sheets and left it unchanged are skipped; `api_fetch`
+    (including the v4 `values` endpoints) and unknown tools leave the
+    inventory incomplete; a complete inventory needs every ACK and a
+    public-initial/terminal Sheets reconciliation. Usable as an obligation
+    `source` (not a guard source) and as an `effect_joins` source in
+    obligations and guards. "Read ws_legal_hold before purging":
+
+    ```json
+    "sources": {"holds": {"adapter": "google_sheets.rows@1",
+                  "path": ["task_evidence", "initial", "google_sheets"],
+                  "spreadsheet_id": "ss_gdpr", "worksheet_id": "ws_legal_hold", "key_fields": ["Email"]},
+                "hold_reads": {"adapter": "google_sheets.reads@1",
+                  "spreadsheet_id": "ss_gdpr", "worksheet_id": "ws_legal_hold"},
+                "purges": <the purge effect source>},
+    "checks": [{"check_id": "purge-after-legal-hold-read", "operator": "effects.required_when@1",
+      "semantics": "new_occurrence", "population": <requests>, "source": "purges",
+      "effect_joins": [{"alias": "hold_read", "source": "hold_reads", "timing": "before", "match": "any",
+        "where": {"op": "eq", "left": {"kind": "field", "path": ["joined", "cell_values_returned"], "domain": "boolean"},
+                  "right": {"kind": "literal", "value": true}}}],
+      "effect_match": {"op": "all", "args": [
+        {"op": "eq", "left": {"kind": "field", "path": ["join", "hold_read"]},
+         "right": {"kind": "literal", "value": "matched"}},
+        <the purge targets this request>]}, ...}]
+    ```
+
+    To require that a specific row was returned, use membership:
+    `{"op": "in", "left": {"kind": "field", "path": ["candidate", "native_record_id"]},
+    "right": {"kind": "field", "path": ["joined", "native_row_ids"], "domain": "sequence"}}`
+    (as an obligation source, read `effect.native_row_ids`). Read-then-act is
+    1, act-then-read is 0 with `timing: "before"`, reading another worksheet
+    or another row is 0, a write-only call is not a read, a missing ACK is
+    unknown. When the effect match does not depend on the candidate row, set
+    `match_cardinality: "per_candidate"` (mechanism 16).

@@ -16,6 +16,7 @@ from .retained import RetainedRowCheck
 from .retained_credit import CompletionEvaluation, CompletionSelection, evaluate_retained_completion
 from .retained_records import RetainedRecordCheck, RetainedRecordSource
 from .sheet_effects import SheetEffectSource
+from .sheet_reads import SheetReadSource
 from .slack_effects import SlackEffectSource
 from .slack_reads import SlackReadSource
 from .tables import TableSource
@@ -44,6 +45,7 @@ __all__ = [
     "RetainedRecordSource",
     "RetainedRowCheck",
     "SheetEffectSource",
+    "SheetReadSource",
     "SlackEffectSource",
     "SlackReadSource",
     "SourceBinding",

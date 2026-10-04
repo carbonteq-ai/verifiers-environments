@@ -30,6 +30,7 @@ from .contracts.populations import InitialCollectionSource, PopulationEvidence, 
 from .contracts.record_writes import RecordWriteSource
 from .contracts.requests import RequestPopulationEvidence, RequestSource, capture_request_population
 from .contracts.sheet_effects import SheetEffectSource
+from .contracts.sheet_reads import SheetReadSource
 from .contracts.slack_effects import SlackEffectSource
 from .contracts.slack_reads import SlackReadSource
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
@@ -155,7 +156,7 @@ def capture_obligation_inputs(source, contract):
     effects = {
         name: asdict(capture_effect_input(source, spec))
         for name, spec in contract.sources.items()
-        if name in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, GmailObservationSource, SlackReadSource, RecordWriteSource))
+        if name in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, GmailObservationSource, SlackReadSource, SheetReadSource, RecordWriteSource))
     }
     return {"obligation_population_evidence_json": canonical_json(populations),
             "obligation_effect_evidence_json": canonical_json(effects)}
