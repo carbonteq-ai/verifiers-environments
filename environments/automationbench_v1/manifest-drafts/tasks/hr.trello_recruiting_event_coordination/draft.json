@@ -1,0 +1,439 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-trello-recruiting-event-coordination",
+  "revision": "round6_whole_task_v1",
+  "public_request": "Coordinate the upcoming career fair. Book the venue, order branded swag, and create preparation tasks for each recruiter on Trello. Get the event details and check for any recent updates on logistics. Use Google Sheets, Gmail, Slack, and Trello. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "da35ff79b5691ecacd365e904d6ae988581ebd15afde264d1a4d47f62a8c3ade"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "7242c4a43c4221f729468a9f086ce4dc9ee07748ccd0949e23ff19e35e2e4ed6"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "a85dd2b8c229bd2e1f7b8343b63d60c8eea3d56cbd81c00be4d251b4693adf0c"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "messages"
+      ],
+      "canonical_sha256": "e7eb076e30a631cac304334e59e68685b5d80a76c8d94dc06992f0d838b42583"
+    }
+  ],
+  "sources": {
+    "recs": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_career_fair",
+      "worksheet_id": "ws_recruiters",
+      "key_fields": [
+        "Email"
+      ],
+      "required_fields": [
+        "Recruiter",
+        "Role",
+        "Booth",
+        "Trello Card ID",
+        "Notes"
+      ]
+    },
+    "fair_email": {
+      "adapter": "public.request@1",
+      "member_key": "career-fair-details",
+      "fields": {
+        "message_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0
+            ]
+          ]
+        }
+      }
+    },
+    "slack_msgs": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "messages"
+      ],
+      "identity_paths": [
+        [
+          "channel_id"
+        ],
+        [
+          "ts"
+        ]
+      ],
+      "fields": {
+        "Channel": [
+          "channel_id"
+        ],
+        "Ts": [
+          "ts"
+        ]
+      },
+      "key_fields": [
+        "Channel",
+        "Ts"
+      ]
+    },
+    "mail_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "slack_reads": {
+      "adapter": "slack.message_reads@1"
+    },
+    "cards": {
+      "adapter": "service.record_writes@1",
+      "service": "trello",
+      "collection": [
+        "actions",
+        "card",
+        "card_v2",
+        "card_update"
+      ],
+      "kind": "create"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "recruiter-prep-card",
+      "signal_id": "hr.career_fair_recruiter_prep_card",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "recs",
+      "source": "cards",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Notes"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": ""
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "values_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Recruiter"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "values_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Trello Card ID"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "values_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Role"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "exists",
+              "population": "recs",
+              "max_members": 4096,
+              "where": {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "ne",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "member",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "values_text"
+                      ],
+                      "domain": "string"
+                    },
+                    "scope": "text",
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "field",
+                          "path": [
+                            "member",
+                            "Recruiter"
+                          ],
+                          "domain": "string"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "value": {
+                          "kind": "field",
+                          "path": [
+                            "member",
+                            "Role"
+                          ],
+                          "domain": "string"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "event-details-read",
+      "signal_id": "hr.career_fair_event_details_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "fair_email",
+      "source": "mail_reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "career-fair-details"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "body_plain"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "returned_fields"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "logistics-update-read",
+      "signal_id": "hr.career_fair_logistics_update_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "slack_msgs",
+      "source": "slack_reads",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Channel"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_EVENTS"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Ts"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "1775145600.000100"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "native_record_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "candidate",
+            "native_record_id"
+          ],
+          "domain": "string"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

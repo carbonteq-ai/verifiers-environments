@@ -1,0 +1,2861 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-helpcrunch-zoho-desk-bridge",
+  "revision": "round6_v1",
+  "public_request": "Some of our HelpCrunch customers should have their issues mirrored in Zoho Desk. There's a bridge configuration spreadsheet (ss_bridge) that defines how events map to tickets -- process the right customers and make sure the enterprise channel is updated.\n\nToday is February 07, 2026.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "d5d5deb9dab1ea9d469952e8c99bd81f059030c38a7cb241986bb030d70b30c8"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "74603a9b027b8dd325695ab9e9ae481f6a316e05cabfac528e2d2751319db0d1"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpcrunch",
+        "customers"
+      ],
+      "canonical_sha256": "c52b577fb0beb15dce00ffe879f758db1951a05218f96672a9a5a0784659cec3"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "b0618fef1cbbea58061f44fa37f0368ac0518aeead885e23d6f9ea7f3f83ad02"
+    }
+  ],
+  "sources": {
+    "customers": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpcrunch",
+        "customers"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "name": [
+          "name"
+        ],
+        "tags": [
+          "tags"
+        ],
+        "events": [
+          "events"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "event_types": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_bridge",
+      "worksheet_id": "ws_event_types",
+      "key_fields": [
+        "Event_Name"
+      ],
+      "required_fields": [
+        "Create_Ticket"
+      ]
+    },
+    "priorities": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_bridge",
+      "worksheet_id": "ws_priority_rules",
+      "key_fields": [
+        "Event_Name"
+      ],
+      "required_fields": [
+        "Zoho_Priority"
+      ]
+    },
+    "ticket_creates": {
+      "adapter": "service.record_writes@1",
+      "service": "zoho_desk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "create"
+    },
+    "ticket_deletes": {
+      "adapter": "service.record_writes@1",
+      "service": "zoho_desk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "delete"
+    },
+    "customer_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "helpcrunch",
+      "collection": [
+        "customers"
+      ],
+      "kind": "update"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "channel_request": {
+      "adapter": "public.request@1",
+      "member_key": "enterprise-channel-update",
+      "fields": {
+        "channel": {
+          "value": "C_ENT",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "event0-ticket-templated-subject",
+      "signal_id": "support.hc_zoho_bridge.event0_ticket_subject",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "customers",
+      "source": "ticket_creates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "enterprise"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "type0",
+                  "Create_Ticket"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "true"
+              }
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  0,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        0,
+                        "event_name"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "support_request"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "text",
+                      "parts": [
+                        "[Enterprise Support] ",
+                        {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "events",
+                            0,
+                            "data",
+                            "subject"
+                          ],
+                          "domain": "string"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        0,
+                        "event_name"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "bug_report"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "text",
+                      "parts": [
+                        "[Enterprise Bug] ",
+                        {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "events",
+                            0,
+                            "data",
+                            "subject"
+                          ],
+                          "domain": "string"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        0,
+                        "event_name"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "billing_inquiry"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "text",
+                      "parts": [
+                        "[Enterprise Billing] ",
+                        {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "events",
+                            0,
+                            "data",
+                            "subject"
+                          ],
+                          "domain": "string"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "deleted"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "none"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "effect_joins": [
+        {
+          "alias": "deleted",
+          "source": "ticket_deletes",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          "timing": "any",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "event0-ticket-priority",
+      "signal_id": "support.hc_zoho_bridge.event0_ticket_priority",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "customers",
+      "source": "ticket_creates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "enterprise"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "type0",
+                  "Create_Ticket"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "true"
+              }
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  0,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "priority"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "prio0",
+                "Zoho_Priority"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "event0-bridge-marker",
+      "signal_id": "support.hc_zoho_bridge.event0_bridge_marker",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "customers",
+      "source": "customer_updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "enterprise"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "type0",
+                  "Create_Ticket"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "true"
+              }
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  0,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "events"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "values_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "bridged-to-zoho"
+                },
+                "mode": "verbatim"
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "ticket"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "effect_joins": [
+        {
+          "alias": "ticket",
+          "source": "ticket_creates",
+          "where": {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "event0-unbridged-ticket",
+      "signal_id": "support.hc_zoho_bridge.event0_unbridged_ticket",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "customers",
+      "source": "ticket_creates",
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "prohibited_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  0,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "enterprise"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "type0",
+                        "Create_Ticket"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "true"
+                    }
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "ne",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        0,
+                        "data",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "events",
+            0,
+            "data",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "mode": "verbatim"
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "event0-duplicate-ticket",
+      "signal_id": "support.hc_zoho_bridge.event0_duplicate_ticket",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "customers",
+      "source": "ticket_creates",
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "prohibited_when": {
+        "op": "proven",
+        "arg": {
+          "op": "ne",
+          "left": {
+            "kind": "field",
+            "path": [
+              "request",
+              "events",
+              0,
+              "data",
+              "subject"
+            ],
+            "domain": "string"
+          },
+          "right": {
+            "kind": "literal",
+            "value": ""
+          }
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "earlier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "removed"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "none"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "earlier",
+          "source": "ticket_creates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "subject"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "events",
+                    0,
+                    "data",
+                    "subject"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        },
+        {
+          "alias": "removed",
+          "source": "ticket_deletes",
+          "where": {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "before",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          "timing": "any",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "event1-ticket-templated-subject",
+      "signal_id": "support.hc_zoho_bridge.event1_ticket_subject",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "customers",
+      "source": "ticket_creates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "enterprise"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "type1",
+                  "Create_Ticket"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "true"
+              }
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  1,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        1,
+                        "event_name"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "support_request"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "text",
+                      "parts": [
+                        "[Enterprise Support] ",
+                        {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "events",
+                            1,
+                            "data",
+                            "subject"
+                          ],
+                          "domain": "string"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        1,
+                        "event_name"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "bug_report"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "text",
+                      "parts": [
+                        "[Enterprise Bug] ",
+                        {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "events",
+                            1,
+                            "data",
+                            "subject"
+                          ],
+                          "domain": "string"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        1,
+                        "event_name"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "billing_inquiry"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "text",
+                      "parts": [
+                        "[Enterprise Billing] ",
+                        {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "events",
+                            1,
+                            "data",
+                            "subject"
+                          ],
+                          "domain": "string"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "deleted"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "none"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "effect_joins": [
+        {
+          "alias": "deleted",
+          "source": "ticket_deletes",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          "timing": "any",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "event1-ticket-priority",
+      "signal_id": "support.hc_zoho_bridge.event1_ticket_priority",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "customers",
+      "source": "ticket_creates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "enterprise"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "type1",
+                  "Create_Ticket"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "true"
+              }
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  1,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "priority"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "prio1",
+                "Zoho_Priority"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "event1-bridge-marker",
+      "signal_id": "support.hc_zoho_bridge.event1_bridge_marker",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "customers",
+      "source": "customer_updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "enterprise"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "type1",
+                  "Create_Ticket"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "true"
+              }
+            }
+          },
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  1,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "events"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "values_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "bridged-to-zoho"
+                },
+                "mode": "verbatim"
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "ticket"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "effect_joins": [
+        {
+          "alias": "ticket",
+          "source": "ticket_creates",
+          "where": {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "event1-unbridged-ticket",
+      "signal_id": "support.hc_zoho_bridge.event1_unbridged_ticket",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "customers",
+      "source": "ticket_creates",
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "prohibited_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "proven",
+            "arg": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "events",
+                  1,
+                  "data",
+                  "subject"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "enterprise"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "type1",
+                        "Create_Ticket"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "true"
+                    }
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "ne",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        1,
+                        "data",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "events",
+            1,
+            "data",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "mode": "verbatim"
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "event1-duplicate-ticket",
+      "signal_id": "support.hc_zoho_bridge.event1_duplicate_ticket",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "customers",
+      "source": "ticket_creates",
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "prohibited_when": {
+        "op": "proven",
+        "arg": {
+          "op": "ne",
+          "left": {
+            "kind": "field",
+            "path": [
+              "request",
+              "events",
+              1,
+              "data",
+              "subject"
+            ],
+            "domain": "string"
+          },
+          "right": {
+            "kind": "literal",
+            "value": ""
+          }
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "earlier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "removed"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "none"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "earlier",
+          "source": "ticket_creates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "subject"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "events",
+                    1,
+                    "data",
+                    "subject"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        },
+        {
+          "alias": "removed",
+          "source": "ticket_deletes",
+          "where": {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "before",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "data",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          "timing": "any",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "unbridged-customer-marked",
+      "signal_id": "support.hc_zoho_bridge.unbridged_customer_marked",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "customers",
+      "source": "customer_updates",
+      "lookups": [
+        {
+          "source": "event_types",
+          "alias": "type0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio0",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                0,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "event_types",
+          "alias": "type1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "source": "priorities",
+          "alias": "prio1",
+          "keys": {
+            "Event_Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "events",
+                1,
+                "event_name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ],
+      "prohibited_when": {
+        "op": "not",
+        "arg": {
+          "op": "any",
+          "args": [
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "enterprise"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "type0",
+                        "Create_Ticket"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "true"
+                    }
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "ne",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        0,
+                        "data",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "enterprise"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "type1",
+                        "Create_Ticket"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "true"
+                    }
+                  }
+                },
+                {
+                  "op": "proven",
+                  "arg": {
+                    "op": "ne",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "events",
+                        1,
+                        "data",
+                        "subject"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "events"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "values_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "bridged-to-zoho"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "enterprise-channel-updated",
+      "signal_id": "support.hc_zoho_bridge.enterprise_channel_updated",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "channel_request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "enterprise-channel-update"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "channel"
+          ],
+          "domain": "string"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

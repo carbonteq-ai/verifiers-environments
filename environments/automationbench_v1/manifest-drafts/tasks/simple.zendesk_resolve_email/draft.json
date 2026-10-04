@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-zendesk-retained-status",
+  "revision": "round6_simple_v1",
+  "public_request": "Support ticket ZD-501 about the password reset issue has been resolved. Update the Zendesk ticket status to 'solved', and send a resolution email to the customer at elena.voss@retail.example.com.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "403ff6ea73310752e3f404979663e0120f7bc17fc18cbe5839c484d4705c9d02"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "canonical_sha256": "6535653abf05c3023a38ce864034e112c3ecfb1ec61570016a82ce3cdc56a7ce"
+    }
+  ],
+  "sources": {
+    "initial_tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "status": [
+          "status"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "final_tickets": {
+      "adapter": "final.records@1",
+      "path": [
+        "task_evidence",
+        "final",
+        "zendesk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "status": [
+          "status"
+        ]
+      }
+    },
+    "writes": {
+      "adapter": "zendesk.ticket_updates@1",
+      "kind": "status_update"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "requested-ticket-solved",
+      "signal_id": "simple.zendesk_requested_ticket_solved",
+      "role": "goal",
+      "operator": "records.retained_when@1",
+      "population": "initial_tickets",
+      "source": "final_tickets",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ZD-501"
+        }
+      },
+      "retained_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "retained",
+            "status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "solved"
+        }
+      }
+    },
+    {
+      "check_id": "resolution-email-to-customer",
+      "signal_id": "simple.zendesk_resolve.email_to_customer",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "initial_tickets",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ZD-501"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "literal",
+          "value": "elena.voss@retail.example.com"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "to"
+          ],
+          "domain": "sequence"
+        }
+      }
+    }
+  ],
+  "credit": [
+    {
+      "check": "requested-ticket-solved",
+      "policy": "records_retained_completion_once@1",
+      "channel": "ticket-status-completion",
+      "effects": "writes",
+      "goal_fields": [
+        "status"
+      ],
+      "completion_selection": "earliest"
+    }
+  ]
+}
