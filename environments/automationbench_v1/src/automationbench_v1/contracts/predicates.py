@@ -171,9 +171,12 @@ class Mentions(MentionTerm):
     ("2:30 PM", "2pm", "14:30") equals the value; a meridiem-less one-digit hour
     ("2:30") is ambiguous.
 
+    A magnitude suffix is read exactly ("$120k" is 120000; a bare "1.2m" only
+    unknown near 1200000); values it could be rounded from stay unknown.
+
     Found in a readable line is known true. Found only in quoted (``>``) or
-    fenced lines, an ambiguous form ("4k", "2:30") or an oversized text is
-    unknown. Otherwise known false. Presence is not a positive assertion:
+    fenced lines, an ambiguous form ("2:30", "$4.2k" for 4250) or an oversized
+    text is unknown. Otherwise known false. Presence is not a positive assertion:
     negations ("not Acme") still mention the value.
     """
 
@@ -498,11 +501,13 @@ def _labeled_line(predicate: LabeledLine, context: Mapping) -> PredicateResult:
 _TOKEN = re.compile(r"\w+(?:['\u2019-]\w+)*")
 _SPLIT_TOKEN = re.compile(r"\w+")
 # A standalone number: not part of a word, clock time (11:30), reference or date
-# (PMT-2026-0402, 2026-02-01) or fraction-like code (1/2). An adjacent k/m/b
-# magnitude suffix is captured so it can be treated as ambiguous.
+# (PMT-2026-0402, 2026-02-01) or fraction-like code (1/2). Digit groups end in
+# a digit, so a trailing list comma ("$8,420, no") is punctuation. An adjacent
+# k/m/b magnitude suffix is captured (see ``_magnitude``).
 _NUMBER = re.compile(
-    r"(?<![\w.,$:/-])(?<!\w-)-?\$?\d[\d,]*(?:\.\d+)?([kKmMbB])?(?![\w:/])(?!-\d)(?![.,]\d)"
+    r"(?<![\w.,$:/-])(?<!\w-)-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?(?![\w:/])(?!-\d)(?![.,]\d)"
 )
+_MAGNITUDE = {"k": 1000, "m": 1000000, "b": 1000000000}
 
 
 _POSSESSIVE = re.compile(r"['\u2019]s$")
@@ -550,6 +555,12 @@ _CLOCK_BARE_TEXT = re.compile(r"(?<![\w:])([1-9]|1[0-2]):([0-5]\d)(?![\w:])(?!-\
 # "1:00–1:15 PM" / "10-10:30am": a trailing meridiem applies to both ends.
 _CLOCK_RANGE_TEXT = re.compile(
     r"(?<![\w:])(\d{1,2})(?::([0-5]\d))?\s*(?:-|\u2013|\u2014|to)\s*(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?(?![a-z])",
+    re.IGNORECASE,
+)
+# "13:00-13:30" / "9:00-17:00": a range with one unambiguous 24-hour end is 24-hour.
+_CLOCK_RANGE_24_TEXT = re.compile(
+    r"(?<![\w:])([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|\u2013|\u2014|to)\s*([01]?\d|2[0-3]):([0-5]\d)(?![\w:])"
+    r"(?!\s*[ap]\.?\s*m)",
     re.IGNORECASE,
 )
 _NOON_TEXT = re.compile(r"(?<![\w])(?:12\s+)?(noon|midnight)(?![\w])", re.IGNORECASE)
@@ -638,6 +649,10 @@ def _term_in_line(term: _Term, line: str) -> bool | None:
             if 1 <= int(m.group(1)) <= 12 and 1 <= int(m.group(3)) <= 12:
                 times += [twelve(m.group(1), m.group(2), m.group(5)), twelve(m.group(3), m.group(4), m.group(5))]
                 rest = rest.replace(m.group(0), " ")
+        for m in _CLOCK_RANGE_24_TEXT.finditer(rest):
+            if any(hour.startswith("0") or int(hour) >= 13 for hour in (m.group(1), m.group(3))):
+                times += [Fraction(int(m.group(1)) * 60 + int(m.group(2))), Fraction(int(m.group(3)) * 60 + int(m.group(4)))]
+                rest = rest.replace(m.group(0), " ")
         times += [twelve(m.group(1), m.group(2), m.group(3))
                   for m in _CLOCK_12_TEXT.finditer(rest) if 1 <= int(m.group(1)) <= 12]
         times += [Fraction(int(m.group(1)) * 60 + int(m.group(2))) for m in _CLOCK_24_TEXT.finditer(rest)]
@@ -647,18 +662,21 @@ def _term_in_line(term: _Term, line: str) -> bool | None:
         return None if _CLOCK_BARE_TEXT.search(rest) else False
     ambiguous = reformatted = False
     for match in _NUMBER.finditer(line):
-        if match.group(1):
+        suffix = match.group(1)
+        body = match.group(0)[:-1] if suffix else match.group(0)
+        try:
+            value = _decimal(body, term.format)
+        except _Unavailable:
+            if term.mode != "amount_reformatted":
+                continue
+            try:  # e.g. "36000" under a usd_marked source: compare loosely
+                value = _decimal(body, "usd_string")
+            except _Unavailable:
+                continue
+        equal = _magnitude(value, suffix, body, term.expected) if suffix else value == term.expected
+        if equal is None:
             ambiguous = True
             continue
-        try:
-            equal = _decimal(match.group(0), term.format) == term.expected
-        except _Unavailable:
-            equal = False
-            if term.mode == "amount_reformatted":
-                try:  # e.g. "36000" under a usd_marked source: compare loosely
-                    equal = _decimal(match.group(0), "usd_string") == term.expected
-                except _Unavailable:
-                    continue
         if not equal:
             continue
         if term.mode == "amount":
@@ -668,6 +686,22 @@ def _term_in_line(term: _Term, line: str) -> bool | None:
     if reformatted:
         return True
     return None if ambiguous else False
+
+
+def _magnitude(value: Fraction, suffix: str, body: str, expected) -> bool | None:
+    """"$120k" is 120000; only values it could round from stay unknown.
+
+    ``k`` (or a dollar-marked ``m``/``b``) equal to the value is true; a value
+    within the token's rounding is unknown (approximation or unit reading);
+    anything else is false, so the token never blocks unrelated amounts.
+    """
+    scale = _MAGNITUDE[suffix.lower()]
+    decimals = len(body.partition(".")[2])
+    if abs(expected - value * scale) > Fraction(scale, 2 * 10 ** decimals):
+        return False
+    if expected == value * scale and (suffix in "kK" or "$" in body):
+        return True
+    return None
 
 
 def _scan(text: str, judge) -> tuple[bool | None, str]:
