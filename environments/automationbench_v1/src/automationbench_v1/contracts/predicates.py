@@ -1035,6 +1035,7 @@ class _DateTerm:
     mode: str
     day: date
     assume_year: int | None
+    sole: bool = False  # sole applies to amounts and clock times only
 
 
 def _iso_day(value) -> date | None:
