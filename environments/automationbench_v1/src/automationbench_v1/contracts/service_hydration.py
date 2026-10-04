@@ -5,6 +5,8 @@ exact comparison of the two always fails on real traces. The named service is
 hydrated with the simulator's own schema and compared with the observed native
 service only where public state is specific:
 
+- Slack's own layout normalisation (messages nested under channels hoisted
+  into the top-level list) is applied to public state first;
 - every public top-level key must survive hydration (the schema silently drops
   some aliases, e.g. Gmail ``emails`` beside ``messages``);
 - top-level keys public state omits must equal their hydrated defaults exactly;
@@ -64,6 +66,18 @@ def public_service_matches(initial: Mapping, service: str, observed) -> bool:
         return True
     if not isinstance(public, Mapping) or not isinstance(observed, Mapping):
         return False
+    if service == "slack":
+        # Slack hoists messages nested under channels into the top-level list
+        # (and renames direct_messages); compare public state in that layout.
+        from automationbench.schema.slack.base import SlackState
+
+        public = _plain(SlackState.normalize_slack_state_fields(copy.deepcopy(public)))
+        if isinstance(public.get("channels"), list):
+            public["channels"] = [
+                {key: value for key, value in channel.items() if key != "messages"}
+                if isinstance(channel, dict) else channel
+                for channel in public["channels"]
+            ]
     try:
         hydrated = WorldState.model_validate({service: copy.deepcopy(public)}).model_dump(mode="json")[service]
     except (ValueError, TypeError, KeyError):
@@ -76,3 +90,32 @@ def public_service_matches(initial: Mapping, service: str, observed) -> bool:
     ):
         return False
     return _agrees(public, hydrated, observed)
+
+
+
+def public_collection(world: Mapping, service: str, key: str):
+    """``world[service][key]``; an omitted key (or service) is its schema default.
+
+    Public initial state is sparse: a top-level key the public service mapping
+    omits is hydrated to its schema default (an empty list for collections),
+    exactly as ``public_service_matches`` requires. Native snapshots are fully
+    hydrated, so they always carry the key and are returned unchanged. A key
+    present with any value is returned as written (callers still validate it).
+    None when the world or service is malformed or the schema has no empty-list
+    default for the key.
+    """
+    from automationbench.schema.world import WorldState
+
+    if not isinstance(world, Mapping):
+        return None
+    state = world.get(service, {})
+    if not isinstance(state, Mapping):
+        return None
+    if key in state:
+        return state[key]
+    model = WorldState.model_fields.get(service)
+    field = getattr(model.annotation, "model_fields", {}).get(key) if model is not None else None
+    if field is None:
+        return None
+    value = field.get_default(call_default_factory=True)
+    return [] if isinstance(value, list) and not value else None

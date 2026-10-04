@@ -25,7 +25,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation
 from .base import FrozenModel, Identifier
@@ -56,8 +56,13 @@ def _list_model(annotation):
     return None
 
 
-def collection_shape(service: str, collection: tuple[str, ...]) -> Literal["list", "actions"]:
-    """Validate a collection path against the installed simulator schema."""
+def collection_shape(service: str, collection: tuple[str, ...], *, declared_identity: bool = False
+                     ) -> Literal["list", "actions"]:
+    """Validate a collection path against the installed simulator schema.
+
+    A list whose items have no ``id`` (Xero: ``contact_id``, ``invoice_id``...)
+    is accepted only with ``declared_identity`` (explicit ``identity_paths``).
+    """
     from automationbench.schema.world import WorldState
 
     if service not in WorldState.model_fields:
@@ -69,7 +74,7 @@ def collection_shape(service: str, collection: tuple[str, ...]) -> Literal["list
     annotation = fields[collection[0]].annotation
     item = _list_model(annotation)
     if item is not None:
-        if len(collection) != 1 or "id" not in item.model_fields:
+        if len(collection) != 1 or "id" not in item.model_fields and not declared_identity:
             raise ValueError("record_writes_collection_identity_unavailable")
         return "list"
     if typing.get_origin(annotation) in (dict, typing.Dict):  # noqa: UP006
@@ -90,20 +95,24 @@ class RecordWriteSource(FrozenModel):
     collection: tuple[Identifier, ...] = Field(min_length=1, max_length=9)
     kind: RecordKind
     # Composite identity for list collections whose ``id`` repeats across a
-    # parent (Mailchimp subscribers: [["list_id"], ["id"]]). The record id is
-    # then the canonical JSON list of these string fields, matching
-    # ``initial.records@1`` composite identities. Omitted when empty.
+    # parent (Mailchimp subscribers: [["list_id"], ["id"]]), or the single
+    # native key of a collection without ``id`` (Xero: [["contact_id"]]). The
+    # record id is then the canonical JSON list of these string fields,
+    # matching ``initial.records@1`` identities. Omitted when empty.
     identity_paths: tuple[tuple[Identifier], ...] = Field(default=(), exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def installed_collection(self):
-        shape = collection_shape(self.service, self.collection)
+        shape = collection_shape(self.service, self.collection, declared_identity=bool(self.identity_paths))
         if self.identity_paths:
             from automationbench.schema.world import WorldState
 
             fields = WorldState.model_fields[self.service].annotation.model_fields  # type: ignore[union-attr]
             item = _list_model(fields[self.collection[0]].annotation)
-            if (shape != "list" or item is None or not 2 <= len(self.identity_paths) <= 4
+            # A single declared field is allowed only where the schema has no
+            # ``id`` (Xero ``contact_id``); composites need 2-4 fields.
+            least = 1 if item is not None and "id" not in item.model_fields else 2
+            if (shape != "list" or item is None or not least <= len(self.identity_paths) <= 4
                     or len(set(self.identity_paths)) != len(self.identity_paths)
                     or any(path[0] not in item.model_fields or item.model_fields[path[0]].annotation is not str
                            for path in self.identity_paths)):
@@ -206,7 +215,7 @@ def capture_record_writes(source: Mapping, spec: RecordWriteSource) -> EffectEvi
         if any(not isinstance(source.get(field), (list, tuple))
                for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("record_writes_execution_inventory_missing")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))
         return result()

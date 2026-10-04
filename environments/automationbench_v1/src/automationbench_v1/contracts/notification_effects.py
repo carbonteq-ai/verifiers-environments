@@ -8,7 +8,7 @@ from html.parser import HTMLParser
 from typing import Literal
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import notifications, operation, recipients, result_payload
 from .base import FrozenModel
@@ -187,7 +187,7 @@ def capture_notification_effects(source: dict, spec: NotificationEffectSource) -
         for field in ("tool_execution_events", "state_write_receipts"):
             if not isinstance(source.get(field), (tuple, list)):
                 raise TypeError("execution_inventory_missing")
-        index = EffectIndex(world_transitions(source))
+        index = EffectIndex(persisted_transitions(source))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))
         return result()

@@ -77,7 +77,14 @@ def test_derived_values_require_compatible_explicit_types(left, right, op, expec
 
 
 def test_derived_operand_does_not_silently_coerce_untyped_literals():
+    # Round 6: a decimal derivation against a plain number compares
+    # numerically; strings and calendar dates still never coerce.
     rule = parse_predicate(compare("eq", derived({"kind": "input", "format": "number", "literal": 1}), literal(1)))
+    assert evaluate_predicate(rule, {}).value is True
+    rule = parse_predicate(compare("eq", derived({"kind": "input", "format": "number", "literal": 1}), literal("1")))
+    assert evaluate_predicate(rule, {}).value is None
+    rule = parse_predicate(compare("eq", derived({"kind": "input", "format": "iso_date", "literal": "2026-01-01"}),
+                                   literal(1)))
     assert evaluate_predicate(rule, {}).value is None
 
 

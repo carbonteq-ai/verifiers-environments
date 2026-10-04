@@ -271,6 +271,27 @@ class Proven(Frozen):
     arg: Predicate
 
 
+class Present(Frozen):
+    """The field resolves to a non-null value.
+
+    True for any non-null value; false for an explicit null, or when the path
+    is decidably absent inside a known effect record (``effect.*`` /
+    ``joined.*``: a missing key, a missing list index such as
+    ``signers[1]`` with one signer, or a null container on the way); unknown
+    when the root (the record itself) is unavailable, when a key is missing
+    from any other root (rows, lookups, requests), or when a scalar sits where
+    a container is expected.
+    """
+
+    op: Literal["present"]
+    value: FieldValue
+
+
+# Roots whose records are complete captured snapshots, so a missing key or
+# index is decidably absent rather than unread.
+_KNOWN_RECORD_ROOTS = frozenset({"effect", "joined"})
+
+
 class Exists(Frozen):
     """Some member of a declared closed population satisfies ``where``.
 
@@ -288,7 +309,7 @@ class Exists(Frozen):
 
 
 type Predicate = Annotated[
-    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven | Exists,
+    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven | Exists | Present,
     Field(discriminator="op"),
 ]
 Junction.model_rebuild()
@@ -402,6 +423,34 @@ def resolve_operand(operand: Operand, context: Mapping) -> tuple[bool, Any, tupl
     return True, value, (operand.path,)
 
 
+def _present(path: Path, context: Mapping) -> PredicateResult:
+    paths = (path,)
+    if not isinstance(context, Mapping) or path[0] not in context:
+        return PredicateResult(None, "predicate_field_unavailable", paths)
+    known_record = path[0] in _KNOWN_RECORD_ROOTS
+    value: Any = context[path[0]]
+    for part in path[1:]:
+        if value is None:
+            break
+        if isinstance(part, int):
+            if not isinstance(value, (list, tuple)):
+                return PredicateResult(None, "predicate_field_unavailable", paths)
+            if part >= len(value):
+                return PredicateResult(False if known_record else None,
+                                       "predicate_field_absent" if known_record else "predicate_field_unavailable", paths)
+            value = value[part]
+        else:
+            if not isinstance(value, Mapping):
+                return PredicateResult(None, "predicate_field_unavailable", paths)
+            if part not in value:
+                return PredicateResult(False if known_record else None,
+                                       "predicate_field_absent" if known_record else "predicate_field_unavailable", paths)
+            value = value[part]
+    if value is None:
+        return PredicateResult(False, "predicate_field_null", paths)
+    return PredicateResult(True, "predicate_field_present", paths)
+
+
 def _scalar(value: Any) -> bool:
     return type(value) in {str, bool, int, type(None)} or (
         type(value) is float and math.isfinite(value)
@@ -455,6 +504,8 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
         return _mentions_together(predicate, context)
     if isinstance(predicate, Exists):
         return _exists(predicate, context)
+    if isinstance(predicate, Present):
+        return _present(predicate.value.path, context)
     if isinstance(predicate, Proven):
         result = _evaluate(predicate.arg, context)
         return PredicateResult(result.value is True, "predicate_proven" if result.value else "predicate_not_proven",
@@ -473,6 +524,19 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
                 return PredicateResult(None, "predicate_derived_operation_unavailable", paths)
             value = boolean.canonical_value == raw
             return PredicateResult(value if predicate.op == "eq" else not value, "predicate_decided", paths)
+        # A decimal derivation (days_between, arithmetic) against a plain
+        # number compares numerically; strings never acquire number semantics.
+        derived, raw = (left, right) if isinstance(left, ValueResult) else (right, left)
+        if (isinstance(derived, ValueResult) and not isinstance(raw, ValueResult)
+                and derived.kind in {"decimal", "day_count"} and type(raw) in {int, float}
+                and predicate.op != "in"):
+            x, y = Decimal(str(derived.canonical_value)), Decimal(str(raw))
+            if derived is right:
+                x, y = y, x
+            ordering = (x > y) - (x < y)
+            value = {"eq": ordering == 0, "ne": ordering != 0, "lt": ordering < 0, "lte": ordering <= 0,
+                     "gt": ordering > 0, "gte": ordering >= 0}[predicate.op]
+            return PredicateResult(value, "predicate_decided", paths)
         # Typed derivations are compared explicitly on both sides. Raw strings
         # and numeric literals must not silently acquire date/money semantics.
         if not isinstance(left, ValueResult) or not isinstance(right, ValueResult) or left.kind != right.kind:
@@ -579,9 +643,19 @@ _SPLIT_TOKEN = re.compile(r"\w+")
 # (PMT-2026-0402, 2026-02-01) or fraction-like code (1/2). Digit groups end in
 # a digit, so a trailing list comma ("$8,420, no") is punctuation. An adjacent
 # k/m/b magnitude suffix is captured (see ``_magnitude``).
+# A per-period unit after "/" ("$89/mo", "$1,200/year") does not hide the amount.
+_PERIOD_UNITS = r"(?:mo|mos|month|months|yr|yrs|year|years|wk|week|day|hr|hour|qtr|quarter|annum)"
 _NUMBER = re.compile(
-    r"(?<![\w.,$:/-])(?<!\w-)-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?(?![\w:/])(?!-\d)(?![.,]\d)"
+    # Start: not glued to a word/number, except a dollar amount right after
+    # "<digit>-" or "<digit>/" (the second end of "$2,790.00-$3,267.00").
+    r"(?:(?<![\w.,$:/-])(?<!\w-)|(?<=\d[-/])(?=\$))"
+    r"-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?"
+    # End: "/" only before a period unit or another dollar amount ("$89/$99").
+    r"(?![\w:])(?!/(?!\$|" + _PERIOD_UNITS + r"\b))(?!-\d)(?![.,]\d)",
+    re.IGNORECASE,
 )
+_PERIOD_SUFFIX = re.compile(r"(?:\s*/\s*|\s+per\s+)" + _PERIOD_UNITS + r"\.?$", re.IGNORECASE)
+_MAGNITUDE_TARGET = re.compile(r"(-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?)([kKmMbB])")
 _MAGNITUDE = {"k": 1000, "m": 1000000, "b": 1000000000}
 
 
@@ -624,9 +698,9 @@ def _word_hit(line: str, target: list[str], longer: list[list[str]], *, split: b
     )
 
 
-_CLOCK_12_TEXT = re.compile(r"(?<![\w:])(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?(?![a-z])", re.IGNORECASE)
-_CLOCK_24_TEXT = re.compile(r"(?<![\w:])(0\d|1[3-9]|2[0-3]):([0-5]\d)(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m)", re.IGNORECASE)
-_CLOCK_BARE_TEXT = re.compile(r"(?<![\w:])([1-9]|1[0-2]):([0-5]\d)(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m)", re.IGNORECASE)
+_CLOCK_12_TEXT = re.compile(r"(?<![\w:])(\d{1,2})(?::([0-5]\d)(?::00)?)?\s*([ap])\.?\s*m\.?(?![a-z])", re.IGNORECASE)
+_CLOCK_24_TEXT = re.compile(r"(?<![\w:])(0\d|1[3-9]|2[0-3]):([0-5]\d)(?::00(?:\.0+)?)?(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m\.?(?![a-z]))", re.IGNORECASE)
+_CLOCK_BARE_TEXT = re.compile(r"(?<![\w:])([1-9]|1[0-2]):([0-5]\d)(?::00(?:\.0+)?)?(?![\w:])(?!-\w)(?!\s*[ap]\.?\s*m\.?(?![a-z]))", re.IGNORECASE)
 # "1:00–1:15 PM" / "10-10:30am": a trailing meridiem applies to both ends.
 _CLOCK_RANGE_TEXT = re.compile(
     r"(?<![\w:])(\d{1,2})(?::([0-5]\d))?\s*(?:-|\u2013|\u2014|to)\s*(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?(?![a-z])",
@@ -635,7 +709,12 @@ _CLOCK_RANGE_TEXT = re.compile(
 # "13:00-13:30" / "9:00-17:00": a range with one unambiguous 24-hour end is 24-hour.
 _CLOCK_RANGE_24_TEXT = re.compile(
     r"(?<![\w:])([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|\u2013|\u2014|to)\s*([01]?\d|2[0-3]):([0-5]\d)(?![\w:])"
-    r"(?!\s*[ap]\.?\s*m)",
+    r"(?!\s*[ap]\.?\s*m\.?(?![a-z]))",
+    re.IGNORECASE,
+)
+# ISO timestamps are 24-hour as written: "2026-02-10T14:00:00Z", "2026-02-10 14:00:00+00:00".
+_CLOCK_ISO_TEXT = re.compile(
+    r"(?<=\d{4}-\d{2}-\d{2}[T ])([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d)(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?(?![\w:])",
     re.IGNORECASE,
 )
 _NOON_TEXT = re.compile(r"(?<![\w])(?:12\s+)?(noon|midnight)(?![\w])", re.IGNORECASE)
@@ -655,6 +734,32 @@ class _Term:
     sole: bool = False
 
 
+def _target_amount(value, format):
+    """A mention target amount and the text it was read from.
+
+    Beyond the strict format, a target may carry a per-period suffix
+    ("$299/mo", "$89 per month": the amount is 299/89 and the suffix is
+    dropped from the reformatting comparison) or an exact magnitude suffix
+    ("$4.2M" = 4200000; ``k`` always, ``m``/``b`` only dollar-marked).
+    """
+    try:
+        return _decimal(value, format), value
+    except _Unavailable:
+        if type(value) is not str or len(value) > 256:
+            raise
+    text = value.strip()
+    core = _PERIOD_SUFFIX.sub("", text)
+    magnitude = _MAGNITUDE_TARGET.fullmatch(core)
+    if magnitude is not None:
+        body, suffix = magnitude.groups()
+        if suffix not in "kK" and "$" not in body:
+            raise _Unavailable("value_decimal_format_unavailable")
+        return _decimal(body, format) * _MAGNITUDE[suffix.lower()], core
+    if core == text:
+        raise _Unavailable("value_decimal_format_unavailable")
+    return _decimal(core, format), core
+
+
 def _prepare(term: MentionTerm, context: Mapping):
     """Return (_Term | None, reason, paths); None means the term is unknown."""
     if term.mode == "date":
@@ -671,8 +776,10 @@ def _prepare(term: MentionTerm, context: Mapping):
             expected = Fraction(str(value.canonical_value))
         else:
             try:
-                expected = (clock_minutes(value) if term.mode == "clock_time"
-                            else _decimal(value, term.format))
+                if term.mode == "clock_time":
+                    expected = clock_minutes(value)
+                else:
+                    expected, source_text = _target_amount(value, term.format)
             except _Unavailable:
                 return None, "predicate_mentions_value_unavailable", paths
         literal = ""
@@ -759,7 +866,10 @@ def _clock_times(line: str) -> tuple[list[Fraction], bool]:
     def twelve(hour, minute, meridiem):
         return Fraction((int(hour) % 12 + (12 if meridiem.lower() == "p" else 0)) * 60 + int(minute or 0))
     times, rest = [], line
-    for m in _CLOCK_RANGE_TEXT.finditer(line):
+    for m in _CLOCK_ISO_TEXT.finditer(line):
+        times.append(Fraction(int(m.group(1)) * 60 + int(m.group(2))) + Fraction(int(m.group(3) or 0), 60))
+        rest = rest.replace(m.group(0), " ")
+    for m in _CLOCK_RANGE_TEXT.finditer(rest):
         if 1 <= int(m.group(1)) <= 12 and 1 <= int(m.group(3)) <= 12:
             times += [twelve(m.group(1), m.group(2), m.group(5)), twelve(m.group(3), m.group(4), m.group(5))]
             rest = rest.replace(m.group(0), " ")

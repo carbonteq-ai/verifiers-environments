@@ -127,3 +127,35 @@ def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
             )
         )
     return tuple(result)
+
+
+def _unpersisted(source: dict) -> set[tuple[str, str]]:
+    """Terminal calls that provably persisted no world change.
+
+    A tool-server call that raised before running (the runtime requires
+    ``state_persistence: not_attempted`` and no write revision for raised
+    receipts), or returned with ``not_attempted``/``unchanged`` persistence, and
+    has no state-write acknowledgement consumed no revision. The remaining
+    acknowledged calls must still form a revision- and world-linked chain, so
+    an unpersisted call that changed the live world breaks that chain instead
+    of hiding an effect.
+    """
+    acknowledged = {write["write_id"] for write in source.get("state_write_receipts", [])}
+    terminal = {}
+    for event in source.get("tool_execution_events", []):
+        receipt = json.loads(event["receipt_json"])
+        if receipt.get("phase") != "dispatch":
+            terminal[event["source"], receipt["invocation_id"]] = receipt
+    return {
+        key for key, receipt in terminal.items()
+        if key[0] == "tool_server" and key[1] not in acknowledged
+        and receipt.get("phase") in ("raised", "returned")
+        and receipt.get("state_persistence") in ("not_attempted", "unchanged")
+        and receipt.get("state_write_revision") is None and not receipt.get("state_conflict")
+    }
+
+
+def persisted_transitions(source: dict) -> tuple[WorldTransition, ...]:
+    """``world_transitions`` without calls that provably persisted nothing."""
+    skipped = _unpersisted(source)
+    return tuple(item for item in world_transitions(source) if (item.origin, item.invocation_id) not in skipped)

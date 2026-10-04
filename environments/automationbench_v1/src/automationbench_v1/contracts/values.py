@@ -86,10 +86,15 @@ _DECIMAL_FORMATS = frozenset({
     "number", "decimal_string", "usd_string", "usd_marked", "clock_time", "clock_24h", "duration_text",
     "duration_clock", "iso_instant",
 })
-_CLOCK_12 = re.compile(r"(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?\s*m\.?", re.IGNORECASE)
+_CLOCK_12 = re.compile(r"(\d{1,2})(?::([0-5]\d)(?::([0-5]\d))?)?\s*([ap])\.?\s*m\.?", re.IGNORECASE)
 # 24-hour forms are unambiguous only for 00–09 with a leading zero and 13–23;
 # a meridiem-less 10:00–12:59 could be morning or evening.
-_CLOCK_24 = re.compile(r"(0\d|1[3-9]|2[0-3]):([0-5]\d)")
+_CLOCK_24 = re.compile(r"(0\d|1[3-9]|2[0-3]):([0-5]\d)(?::([0-5]\d))?")
+# An ISO timestamp's time of day is 24-hour as written ("2026-02-03T10:00:00Z").
+_CLOCK_ISO = re.compile(
+    r"\d{4}-\d{2}-\d{2}[T ]([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d)(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?",
+    re.IGNORECASE,
+)
 _DURATION_PART = re.compile(
     r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)(?![a-z])", re.IGNORECASE
 )
@@ -97,7 +102,11 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def clock_minutes(text) -> Fraction:
-    """Minutes since midnight; a meridiem-less one-digit hour is ambiguous."""
+    """Minutes since midnight; a meridiem-less one-digit hour is ambiguous.
+
+    Seconds ("14:00:00", "2:00:30 PM") are read; an ISO timestamp's time of
+    day is taken as written (24-hour), whatever its offset.
+    """
     if type(text) is not str or len(text) > 32:
         raise _Unavailable("value_clock_time_unavailable")
     raw = text.strip()
@@ -110,11 +119,11 @@ def clock_minutes(text) -> Fraction:
         hour, minute = int(match.group(1)), int(match.group(2) or 0)
         if not 1 <= hour <= 12:
             raise _Unavailable("value_clock_time_unavailable")
-        hour = hour % 12 + (12 if match.group(3).lower() == "p" else 0)
-        return Fraction(hour * 60 + minute)
-    match = _CLOCK_24.fullmatch(raw)
+        hour = hour % 12 + (12 if match.group(4).lower() == "p" else 0)
+        return Fraction(hour * 60 + minute) + Fraction(int(match.group(3) or 0), 60)
+    match = _CLOCK_24.fullmatch(raw) or _CLOCK_ISO.fullmatch(raw)
     if match:
-        return Fraction(int(match.group(1)) * 60 + int(match.group(2)))
+        return Fraction(int(match.group(1)) * 60 + int(match.group(2))) + Fraction(int(match.group(3) or 0), 60)
     raise _Unavailable("value_clock_time_unavailable")
 
 

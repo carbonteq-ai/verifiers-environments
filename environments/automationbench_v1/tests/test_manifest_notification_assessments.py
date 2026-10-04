@@ -191,7 +191,7 @@ def test_unique_candidate_policy_abstains_multi_recipient_match(monkeypatch):
     )
 
 
-def test_per_candidate_multi_recipient_same_channel_requires_explicit_aggregation(monkeypatch):
+def test_per_candidate_multi_recipient_same_channel_merges_into_one_penalty(monkeypatch):
     _, _, trace = scored(monkeypatch, second=True, cardinality="per_candidate")
     assert (
         len(
@@ -203,4 +203,6 @@ def test_per_candidate_multi_recipient_same_channel_requires_explicit_aggregatio
         )
         == 2
     )
-    assert trace.credit_errors and not penalties(trace)
+    # Two harms on one call and channel merge into one -1 (round-6 D4).
+    assert not trace.credit_errors
+    assert [(part.value, len(part.parent_assessment_ids)) for part in penalties(trace)] == [(-1, 2)]

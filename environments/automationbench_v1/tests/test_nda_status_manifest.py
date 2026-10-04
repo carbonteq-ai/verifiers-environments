@@ -226,7 +226,9 @@ def test_actual_hash_bound_luna_neutral_replay_rescore_reload_and_original_bytes
     clean(trace)
     assert records(trace) and not any(record.value == 1 for record in records(trace))
     assert any(record.value == 0 for record in records(trace))
-    assert any(record.value is None for record in records(trace))
+    # Round 6: Luna's failed google_sheets_update_row({}) changed nothing, so
+    # the sheet inventory closes and every instance is decided (was unknown).
+    assert all(record.value is not None for record in records(trace))
     assert not penalties(trace) and trace.rewards == scalar
     original = tuple(trace.assessment_batches)
     expected = terminal_semantics(original)

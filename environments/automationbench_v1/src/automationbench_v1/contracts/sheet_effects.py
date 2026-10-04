@@ -10,12 +10,13 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 from automationbench.tools.zapier.google_sheets._common import parse_cells
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel, Identifier
 from .effects import EffectEvidence, EffectFact
 from .handler_scope import handler_footprints, outside_service
+from .service_hydration import public_service_matches
 from .tables import Digest, initial_sheet_world
 
 
@@ -207,7 +208,7 @@ def capture_sheet_effects(source: Mapping, spec: SheetEffectSource) -> EffectEvi
         for key in ("tool_execution_events", "state_write_receipts"):
             if not isinstance(source.get(key), (tuple, list)):
                 raise TypeError("sheet_execution_inventory_unavailable")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))
         return result()
@@ -240,6 +241,10 @@ def capture_sheet_effects(source: Mapping, spec: SheetEffectSource) -> EffectEvi
                 if name in _NO_SHEET_WRITES and _scope(before, spec) == _scope(after, spec):
                     continue
                 raise ValueError("sheet_operation_scope_unsupported")
+            returned = result_payload(occurrence.action)
+            if ((returned is None or returned.get("success") is not True or "error" in returned)
+                    and canonical_json(_plain(before.get("google_sheets"))) == canonical_json(_plain(after.get("google_sheets")))):
+                continue  # an acknowledged failed write that left every sheet unchanged
             target = _target(before_service, args)
             if target != (spec.spreadsheet_id, spec.worksheet_id):
                 if _scope(before, spec) != _scope(after, spec):
@@ -305,6 +310,14 @@ def capture_sheet_effects(source: Mapping, spec: SheetEffectSource) -> EffectEvi
         _collection(task["final"], spec)
         if task.get("complete") is not True:
             raise ValueError("sheet_finalization_unavailable")
+        if not index.occurrences:
+            # No persisted call: the selected table must be unchanged from
+            # public initial state to the final world.
+            if source["state_write_receipts"]:
+                raise ValueError("sheet_ack_inventory_mismatch")
+            if not public_service_matches(task["initial"], "google_sheets", task["final"].get("google_sheets")):
+                raise ValueError("sheet_unobserved_scope_change")
+            return result()
         chain = index.serial_chain()
         if (chain.status != "qualified" or chain.revision_interval is None
                 or chain.revision_interval[0] != 0):

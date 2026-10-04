@@ -11,12 +11,13 @@ from automationbench.tools.api.fetch import _url_to_internal_path
 from automationbench.tools.api.routes.zendesk import route_zendesk
 
 from ..capture import canonical_json
-from ..effect_evidence import world_transitions
+from ..effect_evidence import persisted_transitions
 from ..effect_index import EffectIndex
 from ..notification_evidence import operation, result_payload
 from .base import FrozenModel
 from .effects import EffectEvidence, EffectFact
 from .handler_scope import outside_service
+from .service_hydration import public_collection, public_service_matches
 
 
 class ZendeskTicketEffectSource(FrozenModel):
@@ -44,10 +45,11 @@ def _equal(left, right):
 
 
 def _tickets(world):
-    service = world.get("zendesk")
-    if not isinstance(service, Mapping) or not isinstance(service.get("tickets"), (list, tuple)):
+    # Sparse public state may omit tickets (or Zendesk): the schema default.
+    tickets = public_collection(world, "zendesk", "tickets")
+    if not isinstance(tickets, (list, tuple)):
         raise TypeError("zendesk_ticket_collection_unavailable")
-    return service["tickets"]
+    return tickets
 
 
 def _target(records, identity):
@@ -134,7 +136,7 @@ def capture_zendesk_ticket_effects(source: Mapping, spec: ZendeskTicketEffectSou
     try:
         if any(not isinstance(source.get(field), (list, tuple)) for field in ("tool_execution_events", "state_write_receipts")):
             raise ValueError("zendesk_execution_inventory_missing")
-        index = EffectIndex(world_transitions(dict(source)))
+        index = EffectIndex(persisted_transitions(dict(source)))
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         return EffectEvidence(source_id, selector_id, (), False, str(error))
     for occurrence in index.occurrences:
@@ -179,10 +181,10 @@ def capture_zendesk_ticket_effects(source: Mapping, spec: ZendeskTicketEffectSou
             first, last = chain.ordered[0], chain.ordered[-1]
             if first.before_json is None or last.after_json is None:
                 raise ValueError("zendesk_boundary_capture_unavailable")
-            if (not _equal(initial["zendesk"], index.world(first.before_json)["zendesk"])
+            if (not public_service_matches(initial, "zendesk", index.world(first.before_json)["zendesk"])
                     or not _equal(final["zendesk"], index.world(last.after_json)["zendesk"])):
                 raise ValueError("zendesk_initial_terminal_scope_mismatch")
-        elif not _equal(initial["zendesk"], final["zendesk"]):
+        elif not public_service_matches(initial, "zendesk", final["zendesk"]):
             raise ValueError("zendesk_unobserved_scope_change")
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         reasons.append(str(error))

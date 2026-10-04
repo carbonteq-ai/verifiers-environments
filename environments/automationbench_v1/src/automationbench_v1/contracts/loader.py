@@ -32,12 +32,32 @@ def load_contract(raw: bytes | str) -> ContractSpec:
     # validation; scoring re-admits the same manifest once per assessment.
     if isinstance(raw, (bytes, str)):
         return _admitted(raw)
-    return ContractSpec.model_validate(_decode(raw))
+    return _closed(ContractSpec.model_validate(_decode(raw)), None)
 
 
 @lru_cache(maxsize=32)
 def _admitted(raw: bytes | str) -> ContractSpec:
-    return ContractSpec.model_validate(_decode(raw))
+    return _closed(ContractSpec.model_validate(_decode(raw)), raw)
+
+
+def _closed(contract: ContractSpec, raw) -> ContractSpec:
+    """Admission is closed under canonical re-serialization.
+
+    Producers reload ``canonical_json(model_dump())``, which writes defaults
+    out (e.g. ``excluding: []`` on every term) and can push a compact contract
+    past the predicate structure budget; reject that at load, not at scoring.
+    """
+    canonical = json.dumps(contract.model_dump(mode="json"), ensure_ascii=False, sort_keys=True,
+                           separators=(",", ":"), allow_nan=False)
+    if raw is not None and (raw.decode("utf-8") if isinstance(raw, bytes) else raw) == canonical:
+        return contract
+    try:
+        ContractSpec.model_validate(_decode(canonical))
+    except ValueError as error:
+        raise ValueError("contract_canonical_form_inadmissible: the canonical re-save of this contract "
+                         "fails validation (often the predicate structure budget, since defaults are "
+                         "written out); simplify the largest predicate. " + str(error).splitlines()[0]) from error
+    return contract
 
 
 _DIGESTS: dict[int, tuple[weakref.ref, str]] = {}

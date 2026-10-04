@@ -5,8 +5,8 @@ import json
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
-from typing import Literal, Protocol, cast, get_args, get_origin
+from types import MappingProxyType, UnionType
+from typing import Literal, Protocol, Union, cast, get_args, get_origin
 
 from pydantic import (
     BaseModel,
@@ -47,12 +47,23 @@ def _model(service: str, collection: str) -> type[BaseModel]:
     return record_type
 
 
+def _string_keyed_mapping(annotation) -> bool:
+    candidates = [item for item in (get_args(annotation) if get_origin(annotation) in (Union, UnionType) else ())
+                  if item is not type(None)] or [annotation]
+    return len(candidates) == 1 and get_origin(candidates[0]) is dict and get_args(candidates[0])[:1] == (str,)
+
+
 def _field(model: type[BaseModel], path: Path) -> None:
-    # Canonical model field names only; no alias normalization, array offsets,
-    # untyped mapping traversal or wildcard population expansion.
+    # Canonical model field names only; no alias normalization, array offsets
+    # or wildcard population expansion. A string-keyed mapping field (HubSpot
+    # ``properties``) may be read one key deep as the last path step.
     for index, part in enumerate(path):
         if type(part) is not str or part not in model.model_fields:
             raise ValueError("population_field_path_unsupported")
+        if index == len(path) - 2 and _string_keyed_mapping(model.model_fields[part].annotation):
+            if type(path[-1]) is not str or not path[-1]:
+                raise ValueError("population_field_path_unsupported")
+            return
         if index != len(path) - 1:
             annotation = model.model_fields[part].annotation
             candidates = get_args(annotation) or (annotation,)
