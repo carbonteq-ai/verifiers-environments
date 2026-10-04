@@ -144,6 +144,12 @@ Redrafts may use these (all in the environment candidate):
    service>, "collection": [<list field>] | ["actions", <action_key>],
    "kind": "create"|"update"|"delete"}`; effect params `record`, `before`,
    `changed_fields`, `record_id`, `operation`.
+   Optional `"identity_paths": [["list_id"], ["id"]]` (list collections only,
+   2–4 string fields) keys records by a composite identity when `id` repeats
+   across a parent (Mailchimp gives a subscriber the same `id` in every
+   list); `record_id` is then the canonical JSON list (e.g.
+   `"[\"list_vip\",\"<md5>\"]"`), matching `initial.records@1`
+   `identity_paths` identities. Without it, repeated ids stay unknown.
 
 ## Mechanisms added after round 2 (2026-10-04)
 
@@ -205,3 +211,76 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
 
 Revise a task by overwriting its `tasks/<task_name>/` files and recording the
 coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
+
+## Slack reads and existential predicates (2026-10-04)
+
+19. Slack read evidence: effect source `{"adapter": "slack.message_reads@1",
+    "kind": "read_message"}` (`kind` may be omitted). One fact per message an
+    acknowledged read call returned: `slack_find_message`,
+    `slack_find_message_in_channel`, `slack_get_message`,
+    `slack_get_message_reactions`, `slack_list_channel_messages`,
+    `slack_get_channel_messages`, `slack_get_thread_replies`. Params:
+    `native_record_id` (canonical `["<channel_id>", "<ts>"]`, equal to
+    `candidate.native_record_id` of an `initial.records@1` Slack messages
+    population with `identity_paths` `[["channel_id"], ["ts"]]`),
+    `channel_id`, `message_ts`, `thread_ts` (or null), `text` and `user_id`
+    when returned, `returned_fields`, `channel_name` and `is_deleted` (from
+    the pre-call world, not returned), `operation`. Closure works like Gmail
+    reads: the returned message must exist in the pre-call world with the same
+    text/author/thread; failed, empty, user and channel-metadata reads return
+    nothing; Slack writes (sends, edits, reactions, channel changes) are not
+    reads; calls whose footprint excludes Slack and left it unchanged are
+    skipped; `api_fetch` and unknown tools leave the inventory incomplete; a
+    complete inventory needs every ACK and a public-initial/terminal Slack
+    reconciliation. Usable as an obligation `source` (not a guard source) and
+    as an `effect_joins` source in obligations and guards. "Read the pinned
+    guidelines before posting":
+
+        "sources": {"messages": {"adapter": "initial.records@1",
+                      "path": ["task_evidence", "initial", "slack", "messages"],
+                      "identity_paths": [["channel_id"], ["ts"]],
+                      "fields": {"Channel": ["channel_id"], "Ts": ["ts"]},
+                      "key_fields": ["Channel", "Ts"]},
+                    "reads": {"adapter": "slack.message_reads@1"},
+                    "posts": {"adapter": "slack.messages@1", "kind": "channel_message"}},
+        "checks": [{"check_id": "post-after-guidelines", "operator": "effects.required_when@1",
+          "semantics": "new_occurrence", "population": "messages", "source": "posts",
+          "required_when": <Channel == "C_guidelines" and Ts == "<pinned ts>">,
+          "effect_joins": [{"alias": "guide", "source": "reads", "timing": "before", "match": "any",
+            "where": {"op": "eq", "left": {"kind": "field", "path": ["joined", "native_record_id"]},
+                      "right": {"kind": "field", "path": ["candidate", "native_record_id"]}}}],
+          "effect_match": {"op": "all", "args": [
+            {"op": "eq", "left": {"kind": "field", "path": ["join", "guide"]},
+             "right": {"kind": "literal", "value": "matched"}},
+            {"op": "eq", "left": {"kind": "field", "path": ["effect", "channel_id"]},
+             "right": {"kind": "literal", "value": "C_marketing"}}]}, ...}]
+
+    Read-then-post is 1, post-then-read is 0 with `timing: "before"`, reading
+    another channel is 0, a missing ACK is unknown. For "read the channel" use
+    `joined.channel_id` instead of the message identity.
+20. Existential predicate over a population:
+    `{"op": "exists", "population": <source>, "where": <predicate>,
+    "max_members": 4096}`. `where` reads `member.*` (the population row's
+    declared fields) plus the enclosing context (`effect.*`, `request.*`,
+    lookups, `joined.*`...). True when some member is proven; false when every
+    member is decided false (an empty closed population is false); unknown
+    when the population is not closed/enumerated, exceeds `max_members`, or
+    no member is proven and some member is unknown. The population must be a
+    declared initial `google_sheets.rows@1` or `initial.records@1` source; it
+    joins the check's inputs and selector identity. Allowed in any predicate
+    of `effects.required_when@1` and `effects.prohibited_when@1` checks
+    (including join `where` and selection `where`); a lookup alias may not be
+    `population`. Joins cannot express this: they range over effects, and
+    selections/aggregates cannot read the effect. "The plan names at least one
+    eligible backlog idea":
+
+        "effect_match": {"op": "exists", "population": "ideas", "where": {"op": "all", "args": [
+          {"op": "eq", "left": {"kind": "field", "path": ["member", "Status"], "domain": "string"},
+           "right": {"kind": "literal", "value": "eligible"}},
+          {"op": "mentions", "text": {"kind": "field", "path": ["effect", "text"], "domain": "string"},
+           "value": {"kind": "field", "path": ["member", "Idea"], "domain": "string"}, "mode": "words"}]}}
+
+    As a guard `effect_match` ("names a parked idea") use
+    `match_cardinality: "per_candidate"` when the match does not depend on the
+    candidate row (mechanism 16). Wrap in `not` for "names no ineligible
+    idea"; unknown stays unknown.

@@ -23,6 +23,7 @@ from ..capture import canonical_json
 from .aggregates import AggregateEvidence, AggregateSpec, evaluate_aggregate
 from .base import FrozenModel, Identifier
 from .effects import EffectEvidence, EffectFact, EffectSource
+from .existentials import exists_context, exists_names, exists_size
 from .gmail_observations import GmailObservationSource
 from .guards import LookupSpec
 from .joins import EffectJoin, join_context, validate_join_paths
@@ -34,6 +35,7 @@ from .record_writes import RecordWriteSource
 from .requests import RequestSource
 from .sheet_effects import SheetEffectSource
 from .slack_effects import SlackEffectSource
+from .slack_reads import SlackReadSource
 from .tables import TableSource
 from .values import ValueExpression, evaluate_value, parse_value
 
@@ -266,6 +268,7 @@ def obligation_population_names(check: ObligationCheck) -> set[str]:
         *(lookup.source for lookup in check.lookups),
         *(item.aggregate.population for item in check.aggregates),
         *(item.population for item in check.selections),
+        *exists_names(check),
     }
 
 
@@ -328,9 +331,9 @@ def _bind(source, check, populations, effects, effect_source, population_sources
             raise ValueError("obligation_lookup_key_inventory_mismatch")
 
 
-def _context(check, row, populations):
+def _context(check, row, populations, shared=None):
     context = {"request": json.loads(row.cells_json), "candidate": {
-        "identity": list(row.identity), "native_record_id": native_record_id(row)}}
+        "identity": list(row.identity), "native_record_id": native_record_id(row)}} | (shared or {})
     for lookup in check.lookups:
         keys = {}
         for key, operand in lookup.keys.items():
@@ -434,7 +437,7 @@ def evaluate_obligations(
     populations: Mapping[str, Population],
     effects: EffectEvidence,
     *,
-    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | RecordWriteSource,
+    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | RecordWriteSource,
     population_sources: Mapping[str, TableSource | InitialCollectionSource | RequestSource],
     join_effects: Mapping[str, EffectEvidence] | None = None,
     join_sources: Mapping[str, object] | None = None,
@@ -502,12 +505,13 @@ def evaluate_obligations(
                 raise ValueError("obligation_effect_identity_conflict")
             facts[key] = fact
             channel[key] = (kind, predicate)
-    contexts = [_context(check, row, populations) for row in population.rows]
+    shared = exists_context(exists_names(check), populations)
+    contexts = [_context(check, row, populations, shared) for row in population.rows]
     extra = {"aggregate": totals} if check.aggregates else {}
     totals_unavailable = len(totals) != len(aggregates)
     matches, unique = {}, {}
     joined_size = sum(len(evidence.effects) for evidence in join_effects.values())
-    if len(facts) * len(contexts) * max(1, joined_size) > _JOIN_BUDGET:
+    if len(facts) * len(contexts) * max(1, joined_size) * max(1, exists_size(shared)) > _JOIN_BUDGET:
         return ObligationEvaluation(
             source_id, check_id, (), False, "obligation_join_budget_exceeded", check.semantics, aggregates,
         )

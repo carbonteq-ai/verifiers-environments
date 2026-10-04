@@ -221,19 +221,43 @@ class Proven(Frozen):
     arg: Predicate
 
 
+class Exists(Frozen):
+    """Some member of a declared closed population satisfies ``where``.
+
+    ``where`` reads ``member.*`` (the population row) plus the enclosing
+    context (``effect``, ``request``, lookups, joins...). True when some member
+    is proven, false when every member is decided false (an empty closed
+    population is false), unknown otherwise. The caller supplies closed
+    populations under ``EXISTS_CONTEXT``; an absent or oversized one is unknown.
+    """
+
+    op: Literal["exists"]
+    population: StrictStr = Field(min_length=1, pattern=r"\S")
+    where: Predicate
+    max_members: StrictInt = Field(default=4096, ge=1, le=65536)
+
+
 type Predicate = Annotated[
-    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven,
+    Comparison | Junction | Negation | LabeledLine | Mentions | MentionsTogether | Proven | Exists,
     Field(discriminator="op"),
 ]
 Junction.model_rebuild()
 Negation.model_rebuild()
 Proven.model_rebuild()
+Exists.model_rebuild()
 PREDICATE = TypeAdapter(Predicate)
 
 
 def context_paths(raw):
-    """Context paths named by raw field/input operands anywhere in a structure."""
+    """Context paths named by raw field/input operands anywhere in a structure.
+
+    ``member.*`` inside an ``exists`` is bound to its population row, not to
+    the enclosing context, and is not reported.
+    """
     if isinstance(raw, dict):
+        if raw.get("op") == "exists" and "where" in raw:
+            yield from (path for path in context_paths(raw["where"]) if path[:1] != ("member",))
+            return
         if raw.get("kind") in {"field", "input"} and raw.get("path") is not None:
             yield tuple(raw["path"])
         for value in raw.values():
@@ -270,6 +294,8 @@ def _validate_tree(predicate: Predicate) -> None:
             pending.extend((arg, depth + 1) for arg in item.args)
         elif isinstance(item, Negation):
             pending.append((item.arg, depth + 1))
+        elif isinstance(item, Exists):
+            pending.append((item.where, depth + 1))
 
 
 def parse_predicate(raw: Any) -> Predicate:
@@ -377,6 +403,8 @@ def _evaluate(predicate: Predicate, context: Mapping) -> PredicateResult:
         return _mentions_value(predicate, context)
     if isinstance(predicate, MentionsTogether):
         return _mentions_together(predicate, context)
+    if isinstance(predicate, Exists):
+        return _exists(predicate, context)
     if isinstance(predicate, Proven):
         result = _evaluate(predicate.arg, context)
         return PredicateResult(result.value is True, "predicate_proven" if result.value else "predicate_not_proven",
@@ -768,3 +796,40 @@ def evaluate_conditional(
         "valid" if result.value is not None else "unavailable", result.value,
         result.reason, _paths((condition, result)),
     )
+
+
+# Context key under which callers publish closed populations for ``exists``.
+EXISTS_CONTEXT = "population"
+
+
+def exists_populations(raw):
+    """Population names read by ``exists`` predicates anywhere in a raw structure."""
+    if isinstance(raw, dict):
+        if raw.get("op") == "exists" and type(raw.get("population")) is str:
+            yield raw["population"]
+        for value in raw.values():
+            yield from exists_populations(value)
+    elif isinstance(raw, (list, tuple)):
+        for value in raw:
+            yield from exists_populations(value)
+
+
+def _exists(predicate: Exists, context: Mapping) -> PredicateResult:
+    root = (EXISTS_CONTEXT, predicate.population)
+    published = context.get(EXISTS_CONTEXT)
+    members = published.get(predicate.population) if isinstance(published, Mapping) else None
+    if not isinstance(members, (list, tuple)) or len(members) > predicate.max_members:
+        return PredicateResult(None, "predicate_exists_population_unavailable", (root,))
+    paths: list[tuple] = [root]
+    unknown = False
+    for index, member in enumerate(members):
+        result = _evaluate(predicate.where, {**context, "member": member})
+        # Member reads are reported against the row they came from.
+        paths.extend((*root, index, *path[1:]) if path[:1] == ("member",) else path
+                     for path in result.evidence_paths)
+        if result.value is True:
+            return PredicateResult(True, "predicate_decided", tuple(dict.fromkeys(paths)))
+        unknown = unknown or result.value is None
+    return PredicateResult(None if unknown else False,
+                           "predicate_input_unavailable" if unknown else "predicate_decided",
+                           tuple(dict.fromkeys(paths)))

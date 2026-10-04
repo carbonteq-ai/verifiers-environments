@@ -25,7 +25,7 @@ _SLACK_READS = frozenset({
     "slack_find_message", "slack_find_message_in_channel", "slack_get_message",
     "slack_get_message_reactions", "slack_list_channel_messages", "slack_get_channel_messages",
     "slack_get_thread_replies", "slack_find_user_by_name", "slack_find_user_by_email",
-    "slack_get_conversation", "slack_get_conversation_members",
+    "slack_get_conversation", "slack_get_conversation_members", "slack_list_channels",
 })
 
 
