@@ -226,6 +226,30 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
     accepted form, including "$1.5k"), so list only values that must not
     appear; a legitimate "was $900" beside the right amount also fails.
 
+18. Sole values: `"sole": true` on an `amount`/`amount_reformatted`/
+    `clock_time` term (in `mentions` or a `mentions_together` term) means the
+    value must be the only value of its kind in the matching unit, so hedges
+    such as "$25,000 / $7,500", "$8,325 to $8,326" or "0.55, 0.54, 0.56" fail
+    without listing rivals:
+
+        {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body"], "domain": "string"},
+         "value": {"kind": "field", "path": ["request", "Total"], "domain": "string"},
+         "mode": "amount", "format": "usd_string", "sole": true}
+
+    Kind rules. A number joined to the value by a range or alternative ("-",
+    "–", "/", "~", "to", "or", "through") is always a second value. Otherwise
+    numbers are classed as money (`$`), grouped ("8,420", "120k"), decimal,
+    integer (>= 1000), count (< 1000), year (1900–2100) or percent (`%`);
+    dates, clock times and reference codes are never amounts. Money targets
+    (`usd_*` formats) fail on another money/grouped value and stay unknown on
+    a bare decimal or large integer; decimal targets fail only on another
+    decimal; integer targets (>= 1000) fail on money/grouped/integer; count
+    targets stay unknown on other counts. Counts, years and percents never
+    sink a money target. Clock times: any other readable time fails (both ends
+    of a range count), a bare ambiguous hour is unknown. Repeating the value
+    is fine. An undecidable rival (an ambiguous magnitude) keeps the unit
+    unknown.
+
 Engine corrections in the same round: amounts followed by a list comma
 ("$8,420, no") are read; k (and dollar-marked m/b) suffixes are read exactly
 ("$120k" = 120000) and only values they could be rounded from stay unknown;

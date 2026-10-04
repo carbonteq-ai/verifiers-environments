@@ -219,3 +219,61 @@ def test_contract_admission_and_digest_are_cached_by_content():
     for _ in range(2):
         with pytest.raises(ValueError, match="schema_version"):
             load_contract(broken)
+
+
+def _sole(text, value, mode="amount", fmt="usd_string"):
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    raw = {"op": "mentions", "text": {"kind": "field", "path": ["t"], "domain": "string"},
+           "value": {"kind": "literal", "value": value}, "mode": mode, "sole": True, **({"format": fmt} if fmt else {})}
+    return evaluate_predicate(parse_predicate(raw), {"t": text}).value
+
+
+@pytest.mark.parametrize("text,value,fmt,expected", [
+    ("Acme: $25,000 / $7,500", "$25,000", "usd_string", False),              # two candidate amounts
+    ("Variance $8,325 to $8,326", "$8,325", "usd_string", False),            # hedged range
+    ("total $18,525 to $18,527", "$18,525", "usd_string", False),
+    ("Owes $4,000, or 4100", "$4,000", "usd_string", False),                 # alternative joined to the value
+    ("Owes $4,000; 8,420 YTD", "$4,000", "usd_string", False),
+    ("Avg 0.55, 0.54, 0.56, 0.53", "0.55", "decimal_string", False),         # several averages
+    ("Acme: $25,000", "$25,000", "usd_string", True),
+    ("Paid $8,420 on 2026-04-01 (INV-2231)", "$8,420", "usd_string", True),  # date and ID are not amounts
+    ("Paid $8,420 on April 4, 2026", "$8,420", "usd_string", True),
+    ("Owes $4,000 (12% of budget) across 2 invoices", "$4,000", "usd_string", True),
+    ("Owes $4,000 total, $4,000 due", "$4,000", "usd_string", True),         # repeats are fine
+    ("Avg 0.55 over 3 weeks on $1,200 spend", "0.55", "decimal_string", True),
+    ("Owes $4,000 vs 3999.50", "$4,000", "usd_string", None),                # related kind: undecided
+    ("Owes $4,000 or 0.004m", "$4,000", "usd_string", None),              # could be the value again
+])
+def test_sole_amount_must_be_the_only_value_of_its_kind(text, value, fmt, expected):
+    assert _sole(text, value, "amount", fmt) is expected
+    assert mentions(text, value, "amount", fmt)[0] is not False or expected is False
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Break at 13:00", True),
+    ("Break 13:00-13:30", False),           # a range counts as two values
+    ("Break 1:00 PM or 1:30 PM", False),
+    ("Break 1:00 PM, lunch 2:30", None),    # ambiguous other time
+])
+def test_sole_clock_time(text, expected):
+    assert _sole(text, "1:00 PM", "clock_time", None) is expected
+
+
+def test_sole_applies_per_unit_in_together_and_is_closed():
+    from pydantic import ValidationError
+
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    raw = {"op": "mentions_together", "text": {"kind": "field", "path": ["t"], "domain": "string"}, "scope": "block",
+           "terms": [{"value": {"kind": "literal", "value": "Acme"}, "mode": "words"},
+                     {"value": {"kind": "literal", "value": "$25,000"}, "mode": "amount", "format": "usd_string",
+                      "sole": True}]}
+    predicate = parse_predicate(raw)
+    assert evaluate_predicate(predicate, {"t": "Acme\n$25,000\n\nBeta\n$7,500"}).value is True
+    assert evaluate_predicate(predicate, {"t": "Acme\n$25,000\nor maybe $7,500"}).value is False
+    assert evaluate_predicate(predicate, {"t": "Acme\n$25,000\n> was $7,500"}).value is None
+    assert "sole" not in parse_predicate({**raw, "terms": [raw["terms"][0], {**raw["terms"][1], "sole": False}]}
+                                         ).model_dump(mode="json")["terms"][1]
+    with pytest.raises(ValidationError, match="sole_requires_amount_or_clock_time"):
+        parse_predicate({**raw, "terms": [{**raw["terms"][0], "sole": True}, raw["terms"][1]]})
