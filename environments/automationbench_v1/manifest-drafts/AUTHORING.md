@@ -205,3 +205,65 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
 
 Revise a task by overwriting its `tasks/<task_name>/` files and recording the
 coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
+
+## Calendar-date mentions (2026-10-04)
+
+18. `mentions` / `mentions_together` term `mode: "date"`: does message text
+    state calendar date D? `value` is an ISO date: a literal/field string
+    `"2026-04-20"` or a `derived` calendar date (`iso_date`, `iso_timestamp`,
+    `date_text`, `add_business_days`, `add_calendar_months`). Optional
+    `assume_year` (integer) is the year of year-less prose dates.
+
+    ```json
+    {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body_plain"], "domain": "string"},
+     "mode": "date", "assume_year": 2026,
+     "value": {"kind": "derived", "expression": {"kind": "add_business_days",
+       "date": {"kind": "input", "format": "iso_date", "path": ["request", "Last Day"]},
+       "days": {"kind": "input", "format": "number", "literal": -5}, "holidays": []}}}
+    ```
+
+    Rules (true / false / unknown per line, then the usual readable-line scan):
+    - Recognised: `2026-04-20`, `2026/04/20`, ISO timestamps (date as
+      written), `4/20/2026`, `20/4/2026`, `4.20.2026`, `April 20, 2026`,
+      `Apr 20 2026`, `20 April 2026`, `the 20th of April`, `April 20th`,
+      weekday prefixes (`Monday, April 20`), listed days (`Feb 3, 10 and 17`).
+    - Numeric `a/b/YYYY` is read month-first and day-first: unknown when both
+      readings are valid and differ and D is one of them (`03/05/2026`); exact
+      when only one is valid (`25/03/2026`, `3/25/2026`) or a weekday picks one.
+      A stated weekday that contradicts the date is unknown.
+    - Year-less dates (`March 5`, `Mar 5th`, `3/5`) are true only with
+      `assume_year` (the task's public current year). Without it they stay
+      unknown when month/day (and any weekday) agree with D, false otherwise.
+      Year-less ranges that wrap a year never take `assume_year`.
+    - Ranges (`March 5–7, 2026`, `Mar 5 - Mar 7`, `between March 5 and 7`,
+      `2026-03-05 to 2026-03-07`) state their endpoints (true); interior days
+      are covered but not stated (unknown). `March 5 - 7pm` is a time.
+    - Unknown, never false, when the token could be D: relative words
+      (`today`, `tomorrow`, `next week`, `in 3 business days`), bare or
+      relative weekdays matching D's weekday (`next Friday`), `on the 5th`,
+      year-less `3/5`, lowercase `may`/`march` (verbs), quoted/fenced lines.
+    - False: every date-like token clearly differs from D, or no date at all.
+      A month with a year but no day (`March 2026`) names no day; reference
+      codes (`PMT-2026-03-05`) and versions (`v1.3.26`) are not dates.
+
+    `within` (on `mentions` only, instead of `value`): at least one readable
+    stated date and every stated date (range endpoints included) in the
+    inclusive interval → true; any readable date outside → false; no dates →
+    false; a token that might lie outside (ambiguous numeric, relative word,
+    year-less date without `assume_year` that could fall inside) → unknown.
+
+    ```json
+    {"op": "mentions", "text": {"kind": "field", "path": ["effect", "body_plain"], "domain": "string"},
+     "mode": "date", "assume_year": 2026,
+     "within": {"start": {"kind": "literal", "value": "2026-02-01"},
+                "end": {"kind": "literal", "value": "2026-02-28"}}}
+    ```
+
+    Value format `date_text` (calendar date) reads stored human dates with
+    an explicit year: `"February 3, 2026"`, `"Tue, Feb 3, 2026"`,
+    `"3 February 2026"`, ISO, and `M/D/YYYY` only when unambiguous. Year-less,
+    relative, weekday-contradicting or ambiguous text is unavailable:
+
+    ```json
+    {"kind": "derived", "expression": {"kind": "input", "format": "date_text", "path": ["record", "start_date"]}}
+    ```
