@@ -220,9 +220,10 @@ def _guard_names(contract):
     checks = [check for check in contract.checks if isinstance(check, GuardCheck)]
     table_names = {name for check in checks
                    for name in (check.population, *(lookup.source for lookup in check.lookups),
-                                *exists_names(check))}
+                                *exists_names(check), *(item.population for item in check.selections))}
     effect_names = {name for check in checks
-                    for name in (check.source, *(item.source for item in check.effect_joins))}
+                    for name in (check.source, *(item.source for item in check.effect_joins),
+                                 *(item.source for item in check.alternatives))}
     return table_names, effect_names
 
 
@@ -358,7 +359,8 @@ def guard_requests(source, contract, view, material, trace_subject):
         if not isinstance(check, GuardCheck):
             continue
         cases, potential = plan_guard_instances(
-            check, tables[check.population], effects[check.source]
+            check, tables[check.population], effects[check.source],
+            *(effects[item.source] for item in check.alternatives),
         )
         for case in (*cases, None):
             config = {
@@ -453,7 +455,8 @@ def assess_guard(task, request, context):
         if not isinstance(effect_source, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource)):
             raise ValueError("guard_requested_effect_source_invalid")
         cases, potential = plan_guard_instances(
-            check, tables[check.population], effects[check.source]
+            check, tables[check.population], effects[check.source],
+            *(effects[item.source] for item in check.alternatives),
         )
         authority = binding_reason(material["source"], contract)
         if authority is not None:
@@ -485,6 +488,8 @@ def assess_guard(task, request, context):
                 table_sources=selected_sources,
                 join_effects={item.alias: effects[item.source] for item in check.effect_joins},
                 join_sources={item.alias: contract.sources[item.source] for item in check.effect_joins},
+                alternative_effects={item.alias: effects[item.source] for item in check.alternatives},
+                alternative_sources={item.alias: contract.sources[item.source] for item in check.alternatives},
             )
         cache[key] = (material, contract, check, evaluation, cases, potential)
         while len(cache) > 8:
@@ -606,7 +611,8 @@ def plan_guard_credit(source, batches, context, contract):
         plan_key = (view.input_digest, check.check_id)
         if plan_key not in plans:
             cases, potential = plan_guard_instances(
-                check, tables[check.population], effects[check.source]
+                check, tables[check.population], effects[check.source],
+                *(effects[item.source] for item in check.alternatives),
             )
             plans[plan_key] = ({case.instance_key: case for case in cases}, potential)
         cases, potential = plans[plan_key]
