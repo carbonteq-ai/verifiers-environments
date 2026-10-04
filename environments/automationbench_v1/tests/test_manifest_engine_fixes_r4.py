@@ -59,3 +59,64 @@ def test_magnitude_suffix_does_not_hide_unrelated_reformatted_amounts():
 ])
 def test_24_hour_ranges_yield_both_endpoints(text, value, expected):
     assert mentions(text, value, "clock_time")[0] is expected
+
+
+def _guard(prohibited, lookups=None):
+    from automationbench_v1.contracts import guards
+
+    field = {"kind": "field", "path": ["request", "Email"], "domain": "string"}
+    return guards.GuardCheck.model_validate({
+        "check_id": "g", "signal_id": "s.g", "role": "harm", "operator": "effects.prohibited_when@1",
+        "population": "rows", "source": "e",
+        "lookups": lookups if lookups is not None else [{"source": "mail", "alias": "mail", "keys": {"From": field}}],
+        "prohibited_when": prohibited,
+        "effect_match": {"op": "eq", "left": {"kind": "literal", "value": 1}, "right": {"kind": "literal", "value": 1}}})
+
+
+def _status_is(alias, status):
+    return {"op": "eq", "left": {"kind": "field", "path": ["lookup", alias], "domain": "string"},
+            "right": {"kind": "literal", "value": status}}
+
+
+def _mail_population(messages, closed=True):
+    from automationbench_v1.contracts.populations import InitialCollectionSource, capture_population
+
+    source = InitialCollectionSource.model_validate({
+        "path": ["task_evidence", "initial", "gmail", "messages"], "fields": {"From": ["from_"], "Id": ["id"]},
+        "key_fields": ["From"]})
+    return capture_population({"task_evidence": {"initial": {"gmail": {"messages": messages}}}}, source)
+
+
+class _Row:
+    identity = ("google_sheets.rows@1", "s", "w", "2")
+    native_record_id = "2"
+
+    def __init__(self, email):
+        from automationbench_v1.capture import canonical_json
+
+        self.cells_json = canonical_json({"Email": email})
+
+
+@pytest.mark.parametrize("messages,email,status,expected", [
+    ([{"id": "m1", "from_": "bob@x"}], "alice@x", "not_found", True),
+    ([{"id": "m1", "from_": "alice@x"}], "alice@x", "not_found", False),
+    ([{"id": "m1", "from_": "alice@x"}], "alice@x", "matched", True),
+    ([{"id": "m1", "from_": "alice@x"}, {"id": "m2", "from_": "alice@x"}], "alice@x", "not_found", None),
+])
+def test_guards_publish_decided_lookup_outcomes(messages, email, status, expected):
+    from automationbench_v1.contracts import guards
+    from automationbench_v1.contracts.predicates import evaluate_predicate
+
+    guard = _guard(_status_is("mail", status))
+    context = guards._candidate_context(guard, _Row(email), {"mail": _mail_population(messages)})
+    assert evaluate_predicate(guard.prohibited_when, context).value is expected
+
+
+@pytest.mark.parametrize("path", [["lookup", "other"], ["lookup"], ["lookup", "mail", "x"]])
+def test_guard_lookup_status_references_are_closed(path):
+    from pydantic import ValidationError
+
+    prohibited = {"op": "eq", "left": {"kind": "field", "path": path, "domain": "string"},
+                  "right": {"kind": "literal", "value": "not_found"}}
+    with pytest.raises(ValidationError, match="guard_lookup_status_reference_unknown"):
+        _guard(prohibited)
