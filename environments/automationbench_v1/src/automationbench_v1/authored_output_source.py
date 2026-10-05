@@ -3,6 +3,7 @@
 import base64
 import copy
 import hashlib
+from .manifest_source import trace_finalized
 
 
 def build_authored_output_material(trace):
@@ -18,7 +19,7 @@ def build_authored_output_material(trace):
     return {
         "schema_version": 1,
         "trace_id": trace.id,
-        "complete": trace.is_completed and trace.ok and not trace.errors,
+        "complete": trace_finalized(trace),
         "sdk_declared": (
             sdk_info is not None or "codex_sdk/events.json" in artifacts
             or getattr(harness, "id", None) == "codex_sdk"

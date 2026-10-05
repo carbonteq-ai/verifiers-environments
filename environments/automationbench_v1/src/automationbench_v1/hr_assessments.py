@@ -13,6 +13,7 @@ import verifiers.v1 as vf
 
 from .hr_evidence import evaluate
 from .hr_rules import Finding
+from .manifest_source import trace_finalized
 from .taskset import AutomationBenchTask
 from .tools import AutomationBenchState
 
@@ -82,7 +83,7 @@ class ReviewedHrTask(AutomationBenchTask):
             "initial": self.data.initial_state,
             "final": final,
             "prompt": self.data.model_dump(mode="json")["prompt"],
-            "complete": trace.is_completed and trace.ok and not trace.errors,
+            "complete": trace_finalized(trace),
         }
 
     def assessment_requests(self, source):

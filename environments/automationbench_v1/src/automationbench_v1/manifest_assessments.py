@@ -67,7 +67,7 @@ from .manifest_retained_assessments import (
     plan_retained_credit,
     retained_requests,
 )
-from .manifest_source import admit_manifest_source, manifest_source_material
+from .manifest_source import admit_manifest_source, manifest_source_material, trace_finalized
 from .manifest_summary_assessments import (
     SUMMARY_PRODUCER,
     SummaryBackend,
@@ -147,7 +147,7 @@ class ManifestAssessmentTask(AutomationBenchTask):
             "task_name": self.data.task_name,
             "initial": public_initial_state(self.data.initial_state), "final": final,
             "prompt": self.data.model_dump(mode="json")["prompt"],
-            "complete": trace.is_completed and trace.ok and not trace.errors,
+            "complete": trace_finalized(trace),
             "authored_outputs": build_authored_output_material(trace),
         }
 

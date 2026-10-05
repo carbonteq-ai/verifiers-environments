@@ -129,6 +129,19 @@ def test_record_goal_is_credited_to_the_write_native_credit_names(monkeypatch, p
     assert sum(c["manifest_goal_credit"] for c in result) == pytest.approx(0.5)
 
 
+@pytest.mark.parametrize(("finalization", "decided"), [("completed", 1), ("failed", 0)])
+def test_live_scoring_reads_finalization_not_the_ok_flag_set_after_scoring(monkeypatch, finalization, decided):
+    """Verifiers scores after task finalization and sets ``trace.ok`` only after scoring returns."""
+    previous = RECORD_TASKS[0]
+    monkeypatch.setattr(manifest_assessments, "load_task_contract", lambda _: load_task_contract(previous.task_name))
+    task, _, trace, _, _ = recorded(previous)
+    trace.ok, trace.assessment_finalization_state = False, finalization
+    trace.assessment_batches, trace.credit_assignments = [], []
+    asyncio.run(task.score(trace))
+    assert not trace.assessment_errors and not trace.credit_errors
+    assert manifest_outcomes(trace)[1] == decided
+
+
 def test_joint_record_goals_count_each_goal_on_their_shared_write(monkeypatch):
     def joint(declaration):
         second = copy.deepcopy(declaration["checks"][0])

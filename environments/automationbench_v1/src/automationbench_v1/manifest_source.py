@@ -19,6 +19,19 @@ class AdmittedManifestInput:
         return json.loads(self.input_json)
 
 
+def trace_finalized(trace) -> bool:
+    """Whether the episode ended cleanly and its final state was captured.
+
+    Verifiers scores a rollout after task finalization and sets ``trace.ok`` only
+    after scoring returns, so ``ok`` is still False while the live rollout is
+    scored. The finalization state is set before scoring and survives on the
+    wire; traces that predate it fall back to ``ok``."""
+
+    state = getattr(trace, "assessment_finalization_state", None)
+    finalized = state == "completed" if state is not None else bool(trace.ok)
+    return bool(trace.is_completed and finalized and not trace.errors)
+
+
 def manifest_source_material(raw):
     """The source subset every manifest producer and credit planner reads.
 
