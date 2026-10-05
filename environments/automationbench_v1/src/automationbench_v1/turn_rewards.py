@@ -63,8 +63,9 @@ class AutomationBenchTurnRewardConfig(BaseModel):
         }
         if self.manifest_enabled:
             # 3: manifest goal credit and harm debit on the issuing step.
+            # 4: record goals count as required goals.
             identity |= {
-                "version": 3,
+                "version": 4,
                 "manifest_goal_share": self.manifest_goal_share,
                 "manifest_harm_penalty": self.manifest_harm_penalty,
                 "manifest_harm_cap": self.manifest_harm_cap,

@@ -1,6 +1,7 @@
 """Manifest goal credit and harm debit on the step that issued the tool call."""
 
 import asyncio
+import copy
 import json
 from types import SimpleNamespace
 
@@ -11,9 +12,12 @@ from test_manifest_obligation_alternatives import contract as goal_contract
 from test_manifest_obligation_alternatives import email
 from test_manifest_obligation_alternatives import world as goal_world
 from test_notification_evidence import run_operations
+from test_record_update_evidence import CONTRACTS as RECORD_TASKS
+from test_manifest_assessments import recorded
 
 from automationbench_v1 import manifest_assessments
-from automationbench_v1.manifest_step_credit import apply_manifest_step_credit, invocation_turns
+from automationbench_v1.contracts import load_contract, load_task_contract
+from automationbench_v1.manifest_step_credit import apply_manifest_step_credit, invocation_turns, manifest_outcomes
 from automationbench_v1.turn_rewards import AutomationBenchTurnRewardConfig, turn_evidence
 
 CONFIG = AutomationBenchTurnRewardConfig(
@@ -91,6 +95,60 @@ def test_goal_credit_is_a_share_on_the_witnessing_step(monkeypatch):
     assert [c["manifest_goals"] for c in result] == [0, 1]
     assert result[1]["manifest_goal_credit"] == pytest.approx(0.5)  # one required goal, fully passed
     assert result[0]["turn_reward"] == pytest.approx(0.0)
+
+
+def recorded_trace(monkeypatch, previous, change=None):
+    """Luna's recorded episode of a record-update task, scored with its (optionally changed) manifest."""
+    declaration = load_task_contract(previous.task_name).model_dump(mode="json")
+    if change:
+        change(declaration)
+    contract = load_contract(json.dumps(declaration))
+    monkeypatch.setattr(manifest_assessments, "load_task_contract", lambda _: contract)
+    task, _, trace, _, _ = recorded(previous)
+    asyncio.run(task.score(trace))
+    assert not trace.assessment_errors and not trace.credit_errors
+    return trace
+
+
+def record_credit(trace):
+    turns = turns_for(trace)
+    return components(apply_manifest_step_credit(evidence(trace, turns), turns=turns,
+                                                 events=trace.tool_execution_events, trace=trace, config=CONFIG))
+
+
+@pytest.mark.parametrize("previous", RECORD_TASKS, ids=lambda item: item.task_name)
+def test_record_goal_is_credited_to_the_write_native_credit_names(monkeypatch, previous):
+    trace = recorded_trace(monkeypatch, previous)
+    credited = [contribution.recipient.execution.invocation_id
+                for assignment in trace.credit_assignments if assignment.status == "complete"
+                for contribution in assignment.contributions]
+    occurrences, required, _ = manifest_outcomes(trace)
+    assert required == 1 and occurrences == credited and len(credited) == 1
+    result = record_credit(trace)
+    assert sum(c["manifest_goals"] for c in result) == 1
+    assert sum(c["manifest_goal_credit"] for c in result) == pytest.approx(0.5)
+
+
+def test_joint_record_goals_count_each_goal_on_their_shared_write(monkeypatch):
+    def joint(declaration):
+        second = copy.deepcopy(declaration["checks"][0])
+        second["check_id"] = "second-obligation"
+        declaration["checks"].append(second)
+        declaration["credit"] = [{"policy": "joint_verified_transition_once@1",
+                                  "checks": ["requested-state", "second-obligation"], "channel": "goal"}]
+
+    occurrences, required, _ = manifest_outcomes(recorded_trace(monkeypatch, RECORD_TASKS[0], joint))
+    assert required == 2 and len(occurrences) == 2 and len(set(occurrences)) == 1
+
+
+def test_failed_record_goal_is_decided_without_a_witness(monkeypatch):
+    def unreachable(declaration):
+        declaration["bindings"] = []
+        declaration["checks"][0]["expected"][0]["value"] = "a value no episode writes"
+
+    trace = recorded_trace(monkeypatch, RECORD_TASKS[0], unreachable)
+    assert manifest_outcomes(trace)[:2] == ([], 1)
+    assert all(c["manifest_goal_credit"] == 0 for c in record_credit(trace))
 
 
 def test_unmapped_episode_gets_no_manifest_credit(monkeypatch):

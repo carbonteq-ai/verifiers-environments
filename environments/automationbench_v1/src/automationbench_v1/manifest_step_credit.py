@@ -5,9 +5,11 @@ config selects manifest weights, each sampled assistant turn (one step: its
 reasoning and its tool calls) additionally receives:
 
 - goal credit: ``manifest_goal_share / R`` for every required manifest goal
-  finding that passed (value 1) whose earliest witnessing tool invocation was
-  issued by that turn, where ``R`` is the number of decided required goal
-  findings in the episode (so an episode's goal credit is at most the share);
+  that passed (value 1) whose earliest witnessing tool invocation was issued by
+  that turn, where ``R`` is the number of decided required goals in the episode
+  (so an episode's goal credit is at most the share). Required goals are
+  obligation findings marked required, witnessed by their earliest witness, and
+  record goals, witnessed by the write their manifest credit names;
 - harm debit: ``manifest_harm_penalty`` for every distinct (check, invocation)
   harm violation issued by that turn, applied in turn order until the episode's
   ``manifest_harm_cap`` is reached.
@@ -25,6 +27,11 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .contracts.credit import select_credit
+from .contracts.engine import Evaluation
+from .contracts.loader import load_contract
+from .contracts.models import CheckSpec
+from .manifest_assessments import OUTPUT_KIND as RECORD_OUTPUT
 from .manifest_guard_assessments import GUARD_OUTPUT
 from .manifest_obligation_assessments import OBLIGATION_OUTPUT
 from .turn_rewards import TURN_REWARD, AutomationBenchTurnRewardConfig
@@ -112,10 +119,50 @@ def _latest_payloads(trace: Any, kind: str) -> list[dict[str, Any]]:
     return payloads
 
 
-def manifest_outcomes(trace: Any) -> tuple[list[str], int, list[tuple[str, str]]]:
-    """(earliest goal witness occurrences, decided required goal count, harm (check, occurrence))."""
+def _record_goals(trace: Any) -> tuple[list[str], int]:
+    """(credited write occurrences of passed record goals, decided record goal count).
 
-    goal_occurrences, required = [], 0
+    Record goals (``record.fields_equal@1``) are unconditional. Each is decided when its
+    latest complete evaluation is valid; a passed goal is witnessed by the write that
+    ``select_credit`` credits, so step credit follows the manifest's own credit."""
+
+    latest: dict[str, tuple[Evaluation, str]] = {}
+    for batch in getattr(trace, "assessment_batches", ()) or ():
+        if batch.run.status != "complete":
+            continue
+        for receipt in batch.run.execution_evidence:
+            if getattr(receipt, "kind", None) != RECORD_OUTPUT:
+                continue
+            evaluation = Evaluation.model_validate_json(receipt.payload_json)
+            contract = json.loads(batch.views[0].input_json)["contract"]
+            for result in evaluation.results:
+                latest[result.check_id] = evaluation, _canonical(contract)
+    if not latest:
+        return [], 0
+    first, contract_json = next(iter(latest.values()))
+    if any((item.contract_digest, item.source_digest, item.evidence_json, text)
+           != (first.contract_digest, first.source_digest, first.evidence_json, contract_json)
+           for item, text in latest.values()):
+        return [], 0
+    contract = load_contract(contract_json)
+    goals = {item.check_id for item in contract.checks if isinstance(item, CheckSpec) and item.role == "goal"}
+    results = tuple(next(r for r in evaluation.results if r.check_id == check_id)
+                    for check_id, (evaluation, _) in latest.items())
+    combined = Evaluation(contract_digest=first.contract_digest, source_digest=first.source_digest,
+                          results=results, evidence_json=first.evidence_json)
+    required = sum(result.check_id in goals and result.status == "valid" for result in results)
+    occurrences = [selection.occurrence
+                   for selection in select_credit(contract, combined)
+                   for check_id in selection.check_ids if check_id in goals]
+    return occurrences, required
+
+
+def manifest_outcomes(trace: Any) -> tuple[list[str], int, list[tuple[str, str]]]:
+    """(earliest goal witness occurrences, decided required goal count, harm (check, occurrence)).
+
+    Required goals are obligation findings marked required and record goals."""
+
+    goal_occurrences, required = _record_goals(trace)
     for payload in _latest_payloads(trace, OBLIGATION_OUTPUT):
         if payload.get("kind") != "finding" or payload.get("required") is not True:
             continue
