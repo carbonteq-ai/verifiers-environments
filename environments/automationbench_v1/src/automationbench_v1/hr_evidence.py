@@ -4,7 +4,6 @@ Only acknowledged, conflict-free world deltas establish effects. Tool names,
 successful MCP returns and response prose do not establish domain delivery.
 """
 
-import hashlib
 import json
 import re
 from datetime import datetime
@@ -17,7 +16,7 @@ from automationbench.domains.hr.tasks import (
     get_hr_referral_bonus_tracking_task,
 )
 
-from .capture import CapturedAction
+from .capture import CapturedAction, SnapshotStore, raw_action_envelopes
 from .effect_evidence import world_transitions
 from .effect_index import EffectIndex
 from .hr_rules import (
@@ -150,6 +149,11 @@ def actions(source: dict, entity_names: tuple[str, ...]) -> tuple[tuple[Action, 
                     if available else None,
                 ))
     writes = {r["write_id"]: r for r in source.get("state_write_receipts", [])}
+    store = SnapshotStore(raw_action_envelopes(
+        json.loads(event["receipt_json"])
+        for event in source.get("tool_execution_events", [])
+        if event.get("source") == "tool_server"
+    ))
     for event in source.get("tool_execution_events", []):
         if event.get("source") != "tool_server":
             coverage = False
@@ -184,9 +188,9 @@ def actions(source: dict, entity_names: tuple[str, ...]) -> tuple[tuple[Action, 
             worlds = []
             for field in ("before_digest", "after_digest"):
                 digest = action[field]
-                text = envelope["snapshots"][digest]
-                if hashlib.sha256(text.encode()).hexdigest() != digest:
-                    raise ValueError("snapshot_digest_mismatch")
+                text = store.text(digest)  # verified against the digest
+                if text is None:
+                    raise ValueError("world_snapshot_unavailable")
                 worlds.append(json.loads(text))
             before, after = worlds
             # Gmail effects above use qualified operation/result/world binding.

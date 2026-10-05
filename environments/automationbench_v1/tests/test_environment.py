@@ -291,10 +291,13 @@ def test_calibration_capture_is_opt_in_host_material_with_explicit_coverage() ->
     asyncio.run(task.setup(trace, None))  # type: ignore[arg-type]
     state = cast(AutomationBenchState, trace.state)
     assert state.capture_actions
-    assert state.action_initial_digest in state.action_snapshots
+    assert state.action_initial_digest is not None
+    # World bytes are published once as tool-server evidence, never kept in synced state.
+    assert state.action_published == () and state.action_count == 0
     asyncio.run(task.finalize(trace, None))  # type: ignore[arg-type]
     captured = trace.info["automationbench_capture"]
     assert captured["events"] == []
+    assert captured["snapshots"] == "tool_server_execution_evidence"
     assert captured["initial_digest"] == state.action_initial_digest
     assert captured["coverage"]["native_call_alignment"] == "unavailable"
     assert captured["coverage"]["failed_mcp_retention"] == "unqualified"

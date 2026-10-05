@@ -19,7 +19,12 @@ from automationbench.domains.support.tasks import (
     get_support_hiver_slack_digest_task,
 )
 from automationbench.schema.world import WorldState
-from automationbench_v1.capture import canonical_json
+from automationbench_v1.capture import (
+    CapturedAction,
+    SnapshotStore,
+    canonical_json,
+    collect_local_evidence,
+)
 from automationbench_v1.effect_evidence import WorldTransition, world_transitions
 from automationbench_v1.effect_index import EffectIndex
 from automationbench_v1.notification_evidence import sheet_rows
@@ -66,25 +71,32 @@ class Fresh:
         )
         self.tools = AutomationBenchToolset(vf.ToolsetConfig())
         self.tools._inert_state = self.state
+        self.envelopes = []
 
     def run(self, name, **arguments):
-        self.tools.execute_tool(name, json.dumps(arguments))
+        with collect_local_evidence() as envelopes:
+            try:
+                self.tools.execute_tool(name, json.dumps(arguments))
+            finally:
+                self.envelopes.extend(envelopes)
 
     def index(self):
+        store = SnapshotStore(self.envelopes)
+        actions = [CapturedAction.model_validate(item["action"]) for item in self.envelopes]
         return EffectIndex(
             tuple(
                 WorldTransition(
                     "tool_server",
                     "fresh_" + str(i),
                     action,
-                    self.state.action_snapshots[action.before_digest],
-                    self.state.action_snapshots[action.after_digest],
+                    store.text(action.before_digest),
+                    store.text(action.after_digest),
                     "acknowledged",
                     "controlled_fixture_ack",
                     i,
                     i + 1,
                 )
-                for i, action in enumerate(self.state.action_events)
+                for i, action in enumerate(actions)
             )
         )
 
@@ -357,7 +369,7 @@ def test_executed_failed_send_then_completed_claim_has_no_delivery_evidence():
             to="ops-lead@company.example.com",
             subject="Support digest — 2026-02-10 — Infrastructure",
         )
-    assert fresh.state.action_events[0].status == "raised"
+    assert fresh.envelopes[0]["action"]["status"] == "raised"
     _log(fresh)
     assert digest_log_claims(fresh.index(), _contract())[0].finding.value == 1
 

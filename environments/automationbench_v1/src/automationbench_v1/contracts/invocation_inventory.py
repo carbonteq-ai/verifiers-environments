@@ -18,7 +18,7 @@ from verifiers.v1.interception.tool import ToolHookRequest
 from verifiers.v1.mcp.execution import ToolServerReceipt
 from verifiers.v1.trace import StateWriteReceipt, ToolExecutionEvent, ToolServerExecutionEvent
 
-from ..capture import canonical_json
+from ..capture import SnapshotStore, canonical_json, raw_action_envelopes
 from ..effect_evidence import world_transitions
 from ..effect_index import EffectIndex
 from ..native_invocation_source import build_native_invocation_material
@@ -511,6 +511,16 @@ def capture_invocation_inventory(
             except (ValueError, TypeError, KeyError, AttributeError) as error:
                 reasons.append(str(error))
         transitions = []
+        # Each world's bytes are published once per trace, possibly by another
+        # invocation's receipt, so resolve every group against the whole trace.
+        store = SnapshotStore()
+        for events in grouped_events.values():
+            for event in events:
+                try:
+                    for envelope in raw_action_envelopes([json.loads(event["receipt_json"])]):
+                        store.add(envelope)
+                except (ValueError, TypeError, KeyError, AttributeError):
+                    continue  # corrupt material stays unavailable to its own group
         for key, group_events in grouped_events.items():
             try:
                 acknowledgements = [
@@ -525,7 +535,8 @@ def capture_invocation_inventory(
                     {
                         "tool_execution_events": group_events,
                         "state_write_receipts": acknowledgements,
-                    }
+                    },
+                    store,
                 )
                 index_group = EffectIndex(group)
                 transitions.extend(index_group.occurrences)

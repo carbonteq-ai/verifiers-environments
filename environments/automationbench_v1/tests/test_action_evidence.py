@@ -11,7 +11,11 @@ import verifiers.v1 as vf
 
 from automationbench.schema.world import WorldState
 from automationbench_v1.api_tools import AutomationBenchApiToolset
-from automationbench_v1.capture import capture_action
+from automationbench_v1.capture import (
+    SnapshotStore,
+    capture_action,
+    collect_local_evidence,
+)
 from automationbench_v1.limited_tools import (
     AutomationBenchLimitedToolset,
     AutomationBenchLimitedToolsetConfig,
@@ -44,7 +48,10 @@ def test_capture_preserves_tool_result_and_committed_world(mode, monkeypatch):
         for enabled in (False, True)
     ]
     results = []
+    sinks = []
     for item in states:
+        sink_context = collect_local_evidence()
+        sinks.append(sink_context.__enter__())
         if mode == "meta":
             tools = AutomationBenchToolset(vf.ToolsetConfig())
             tools._inert_state = item
@@ -67,28 +74,32 @@ def test_capture_preserves_tool_result_and_committed_world(mode, monkeypatch):
             )
             tools._inert_state = item
             result = tools.invoke("salesforce_contact_update", id="003001", phone="+1-555-0101")
+        sink_context.__exit__(None, None, None)
         results.append(result)
     assert results[0] == results[1]
     assert states[0].world == states[1].world
-    assert states[0].action_events == ()
-    captured = states[1]
-    assert [event.occurrence_index for event in captured.action_events] == list(
-        range(len(captured.action_events))
-    )
-    assert captured.action_events[-1].before_digest != captured.action_events[-1].after_digest
-    result_json = captured.action_events[-1].result_json
+    assert sinks[0] == [] and states[0].action_count == 0
+    captured, envelopes = states[1], sinks[1]
+    actions = [envelope["action"] for envelope in envelopes]
+    assert [action["occurrence_index"] for action in actions] == list(range(len(actions)))
+    assert captured.action_count == len(actions)
+    assert actions[-1]["before_digest"] != actions[-1]["after_digest"]
+    result_json = actions[-1]["result_json"]
     assert result_json is not None
     assert json.loads(result_json) == results[1]
-    for digest, encoded in captured.action_snapshots.items():
-        assert hashlib.sha256(encoded.encode()).hexdigest() == digest
-    assert (
-        json.loads(captured.action_snapshots[captured.action_events[-1].after_digest])
-        == captured.world
-    )
+    store = SnapshotStore(envelopes)
+    for envelope in envelopes:
+        for digest, encoded in envelope["snapshots"].items():
+            assert hashlib.sha256(encoded.encode()).hexdigest() == digest
+    # Each distinct world is published once; the mutated world travels as a patch.
+    published = [digest for e in envelopes for digest in (*e["snapshots"], *e.get("patches", {}))]
+    assert len(published) == len(set(published)) == len(set(captured.action_published))
+    assert envelopes[-1]["patches"] and actions[-1]["after_digest"] not in envelopes[-1]["snapshots"]
+    assert json.loads(store.text(actions[-1]["after_digest"])) == captured.world
     restored = AutomationBenchState.model_validate_json(captured.model_dump_json())
-    assert restored.action_events == captured.action_events
-    assert restored.action_snapshots == captured.action_snapshots
-    assert all(event.native_join_status == "unqualified" for event in restored.action_events)
+    assert restored.action_count == captured.action_count
+    assert restored.action_published == captured.action_published
+    assert all(action["native_join_status"] == "unqualified" for action in actions)
 
 
 def test_read_only_and_failures_deduplicate_world_without_committing_partial_effects(monkeypatch):
@@ -96,8 +107,10 @@ def test_read_only_and_failures_deduplicate_world_without_committing_partial_eff
 
     current = state()
     before = copy.deepcopy(current.world)
+    sink_context = collect_local_evidence()
+    envelopes = sink_context.__enter__()
     assert capture_action(current, "read", {"x": 1}, lambda: "unchanged") == "unchanged"
-    assert len(current.action_snapshots) == 1
+    assert len(current.action_published) == 1
 
     def failing(*, world, **kwargs):
         world.salesforce.contacts[0].phone = "partial-mutation"
@@ -111,15 +124,18 @@ def test_read_only_and_failures_deduplicate_world_without_committing_partial_eff
     with pytest.raises(RuntimeError, match="upstream failed"):
         tools.invoke("salesforce_contact_update", id="003001")
     assert current.world == before
-    assert current.action_events[-1].status == "raised"
-    error_json = current.action_events[-1].error_json
+    assert envelopes[-1]["action"]["status"] == "raised"
+    error_json = envelopes[-1]["action"]["error_json"]
     assert error_json is not None
     assert json.loads(error_json)["type"] == "RuntimeError"
-    assert len(current.action_snapshots) == 1
+    assert len(current.action_published) == 1
+    # The unchanged world was already published, so later envelopes carry no bytes.
+    assert envelopes[-1]["snapshots"] == {} and "patches" not in envelopes[-1]
     with pytest.raises(ValueError, match="not enabled"):
         tools.invoke("forbidden", x="original")
-    assert current.action_events[-1].status == "rejected"
-    assert json.loads(current.action_events[-1].arguments_json) == {
+    sink_context.__exit__(None, None, None)
+    assert envelopes[-1]["action"]["status"] == "rejected"
+    assert json.loads(envelopes[-1]["action"]["arguments_json"]) == {
         "args": [],
         "kwargs": {"x": "original"},
     }
@@ -170,14 +186,15 @@ def test_native_state_boundary_failure_transport_remains_unqualified(monkeypatch
 
     with pytest.raises(RuntimeError, match="failed action"):
         asyncio.run(tools._with_state(failure)())
-    assert stored.action_events == ()  # Native wrapper does not push on failure.
+    assert stored.action_count == 0  # Native wrapper does not push on failure.
 
     def success():
         return capture_action(tools.state, "read", {}, lambda: "result")
 
     assert asyncio.run(tools._with_state(success)()) == "result"
-    assert len(stored.action_events) == 1
-    assert stored.action_events[0].native_join_status == "unqualified"
+    assert stored.action_count == 1
+    # No native invocation was active, so nothing counts as published.
+    assert stored.action_published == ()
 
 
 def test_candidate_native_buffer_retains_failed_action_snapshots(monkeypatch):
@@ -209,7 +226,7 @@ def test_candidate_native_buffer_retains_failed_action_snapshots(monkeypatch):
     with pytest.raises(RuntimeError, match="domain fixture failed"):
         asyncio.run(tools._with_state(failure)())
     assert [receipt.phase for receipt in receipts] == ["dispatch", "raised"]
-    assert stored.action_events == ()
+    assert stored.action_count == 0
     material = json.loads(receipts[1].evidence_json[0])
     assert material["kind"] == "automationbench_raw_action"
     assert material["action"]["status"] == "raised"

@@ -12,7 +12,7 @@ from pydantic import ConfigDict, Field, create_model
 from automationbench.tools import ALL_TOOLS
 from automationbench.tools.zapier.meta import ToolRegistry
 
-from .capture import CapturedAction, capture_action
+from .capture import capture_action
 from .world_codec import dump_world, load_world
 
 
@@ -61,8 +61,10 @@ class AutomationBenchState(vf.State):
     search_top_k: int = 20
     capture_actions: bool = False
     action_initial_digest: str | None = None
-    action_snapshots: dict[str, str] = Field(default_factory=dict)
-    action_events: tuple[CapturedAction, ...] = ()
+    # Capture keeps only bounded bookkeeping in the synced rollout state; world bytes
+    # and action records travel once, as tool-server execution evidence.
+    action_count: int = 0
+    action_published: tuple[str, ...] = ()
 
 
 class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState]):

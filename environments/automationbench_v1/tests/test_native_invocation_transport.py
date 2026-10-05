@@ -24,7 +24,7 @@ from verifiers.v1.session import RolloutSession
 from verifiers.v1.types import AssistantMessage, ToolCall, ToolMessage
 
 from automationbench.schema.world import WorldState
-from automationbench_v1.capture import canonical_json
+from automationbench_v1.capture import canonical_json, trace_snapshot_store
 from automationbench_v1.contracts.external_outputs import (
     ExternalOutputSource,
     capture_external_outputs,
@@ -255,7 +255,8 @@ async def _qualify(tmp_path):
     )
     receipt = json.loads(terminal.receipt_json)
     capture = json.loads(receipt["evidence_json"][0])
-    final = json.loads(capture["snapshots"][capture["action"]["after_digest"]])
+    store = trace_snapshot_store(restored.tool_execution_events)
+    final = json.loads(store.text(capture["action"]["after_digest"]))
     assert final == trace.state.world
     restored.state = AutomationBenchState(world=final, initial_state=initial)
     replay = capture_trace_source(restored, task_evidence=task.assessment_source(restored))

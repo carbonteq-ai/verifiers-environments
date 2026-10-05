@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 
 import verifiers.v1 as vf
 
-from ..capture import CapturedAction, canonical_json
+from ..capture import (
+    RAW_ACTION_KIND,
+    CapturedAction,
+    SnapshotStore,
+    canonical_json,
+    raw_action_envelopes,
+)
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,14 @@ def inspect_capture(episode: vf.WireEpisode) -> CaptureInspection:
                 record = event.model_dump(mode="json")
                 receipt = json.loads(record["receipt_json"])
                 invocations.setdefault(record["invocation_id"], []).append(receipt)
+        # World bytes may be carried by any complete invocation of this trace.
+        try:
+            store = SnapshotStore(raw_action_envelopes(
+                receipts[1] for receipts in invocations.values()
+                if [item["phase"] == "dispatch" for item in receipts] == [True, False]
+            ))
+        except ValueError as error:
+            raise ValueError("raw action snapshot bytes are corrupt or noncanonical") from error
         for invocation_id, receipts in invocations.items():
             observed += 1
             prefix = f"{trace.id}:{invocation_id}"
@@ -63,24 +76,37 @@ def inspect_capture(episode: vf.WireEpisode) -> CaptureInspection:
             found = False
             for index, encoded in enumerate(receipt["evidence_json"]):
                 raw = json.loads(encoded)
-                if not isinstance(raw, dict) or raw.get("kind") != "automationbench_raw_action":
+                if not isinstance(raw, dict) or raw.get("kind") != RAW_ACTION_KIND:
                     continue
                 found = True
-                if set(raw) != {"kind", "action", "snapshots"}:
+                if not {"kind", "action", "snapshots"} <= set(raw) <= {
+                    "kind", "action", "snapshots", "patches"
+                }:
                     raise ValueError("raw action evidence has unexpected fields")
                 action = CapturedAction.model_validate(raw["action"])
-                snapshots = raw["snapshots"]
-                if not isinstance(snapshots, dict) or set(snapshots) != {
-                    action.before_digest,
-                    action.after_digest,
-                }:
-                    raise ValueError("raw action evidence lacks its referenced snapshots")
-                for digest, snapshot in snapshots.items():
-                    if not isinstance(snapshot, str) or (
-                        hashlib.sha256(snapshot.encode()).hexdigest() != digest
-                        or canonical_json(json.loads(snapshot)) != snapshot
-                    ):
+                referenced = {action.before_digest, action.after_digest}
+                carried = raw["snapshots"]
+                patches = raw.get("patches", {})
+                if (
+                    not isinstance(carried, dict)
+                    or not isinstance(patches, dict)
+                    or not set(carried) | set(patches) <= referenced
+                ):
+                    raise ValueError("raw action evidence carries unreferenced snapshots")
+                snapshots = {}
+                for digest in referenced:
+                    # Verified against the digest; earlier envelopes may carry it.
+                    try:
+                        snapshot = store.text(digest)
+                    except ValueError as error:
+                        raise ValueError(
+                            "raw action snapshot bytes are corrupt or noncanonical"
+                        ) from error
+                    if snapshot is None:
+                        raise ValueError("raw action evidence lacks its referenced snapshots")
+                    if canonical_json(json.loads(snapshot)) != snapshot:
                         raise ValueError("raw action snapshot bytes are corrupt or noncanonical")
+                    snapshots[digest] = snapshot
                 if canonical_json(json.loads(action.arguments_json)) != action.arguments_json:
                     raise ValueError("raw action arguments are noncanonical")
                 actions.append(

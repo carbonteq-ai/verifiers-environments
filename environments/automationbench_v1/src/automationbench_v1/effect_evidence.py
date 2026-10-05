@@ -4,12 +4,11 @@
 values are not a second persisted trace format or generated-token coordinates.
 """
 
-import hashlib
 import json
 from dataclasses import dataclass
 from typing import Literal
 
-from .capture import CapturedAction
+from .capture import RAW_ACTION_KIND, CapturedAction, SnapshotStore
 
 
 @dataclass(frozen=True)
@@ -39,7 +38,7 @@ class WorldTransition:
         )
 
 
-def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
+def world_transitions(source: dict, store: SnapshotStore | None = None) -> tuple[WorldTransition, ...]:
     """Retain every occurrence, including failed calls and unacknowledged deltas.
 
     Returned status and a persistence acknowledgement only establish captured
@@ -48,6 +47,10 @@ def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
     Values remain scoped to this input trace and cutoff; tuple order does not
     prove a serial order of concurrent effects. An empty tuple does not prove
     complete observation coverage or that a guard passed.
+
+    World bytes are resolved through ``store`` when given (for example one built
+    over the whole trace while ``source`` holds a single invocation), else
+    through the envelopes in ``source`` itself.
     """
     writes = {}
     for write in source.get("state_write_receipts", []):
@@ -56,6 +59,9 @@ def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
             raise ValueError("duplicate_state_write_identity")
         writes[identity] = write
     observations = {}
+    envelopes_by_key = {}
+    own_store = store is None
+    store = SnapshotStore() if store is None else store
     for event in source.get("tool_execution_events", []):
         origin = event["source"]
         receipt = json.loads(event["receipt_json"])
@@ -65,6 +71,12 @@ def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
         if previous is not None and (previous["phase"] != "dispatch" or phase == "dispatch"):
             raise ValueError("duplicate_execution_lifecycle")
         observations[key] = receipt
+        envelopes = [json.loads(item) for item in receipt.get("evidence_json", [])]
+        envelopes_by_key[key] = envelopes
+        if own_store:
+            for envelope in envelopes:
+                if envelope.get("kind") == RAW_ACTION_KIND:
+                    store.add(envelope)
     result = []
     for (origin, invocation), receipt in observations.items():
         reason = "acknowledged_world_evidence"
@@ -95,8 +107,9 @@ def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
             "applied_revision"
         ) != receipt.get("state_write_revision"):
             reason = "state_revision_mismatch"
-        envelopes = [json.loads(item) for item in receipt.get("evidence_json", [])]
-        captures = [item for item in envelopes if item.get("kind") == "automationbench_raw_action"]
+        captures = [
+            item for item in envelopes_by_key[(origin, invocation)] if item.get("kind") == RAW_ACTION_KIND
+        ]
         if len(captures) > 1:
             raise ValueError("ambiguous_execution_capture")
         action = None
@@ -105,9 +118,13 @@ def world_transitions(source: dict) -> tuple[WorldTransition, ...]:
             envelope = captures[0]
             action = CapturedAction.model_validate(envelope["action"])
             for index, digest in enumerate((action.before_digest, action.after_digest)):
-                text = envelope["snapshots"][digest]
-                if hashlib.sha256(text.encode()).hexdigest() != digest:
-                    raise ValueError("snapshot_digest_mismatch")
+                # Verified against its digest; may come from another envelope of this trace.
+                text = store.text(digest)
+                if text is None:
+                    worlds = [None, None]
+                    if reason == "acknowledged_world_evidence":
+                        reason = "world_snapshot_unavailable"
+                    break
                 if not isinstance(json.loads(text), dict):
                     raise ValueError("world_snapshot_must_be_object")  # noqa: TRY004
                 worlds[index] = text

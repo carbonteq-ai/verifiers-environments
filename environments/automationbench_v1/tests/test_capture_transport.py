@@ -12,6 +12,7 @@ import pytest
 import verifiers.v1 as vf
 
 from automationbench_v1.calibration.evidence import inspect_capture
+from automationbench_v1.capture import SnapshotStore, raw_action_envelopes, trace_snapshot_store
 from automationbench_v1.taskset import AutomationBenchConfig, AutomationBenchTaskset
 from automationbench_v1.tools import AutomationBenchState
 
@@ -161,6 +162,7 @@ async def _qualify(tmp_path):
                 assert sorted(receipt["state_conflict"] for receipt in parallel) == [False, True]
                 assert sorted(receipt["state_write_revision"] for receipt in parallel) == [2, 3]
                 indices = []
+                store = SnapshotStore(raw_action_envelopes(terminal))
                 for receipt in terminal:
                     assert len(receipt["evidence_json"]) == 1
                     material = json.loads(receipt["evidence_json"][0])
@@ -176,20 +178,21 @@ async def _qualify(tmp_path):
                         json.loads(action["arguments_json"])
                         == json.loads(receipt["arguments_json"])["kwargs"]
                     )
-                    assert set(material["snapshots"]) == {
+                    # Each world travels once per rollout (full or as a verified patch).
+                    assert set(material["snapshots"]) | set(material.get("patches", {})) <= {
                         action["before_digest"],
                         action["after_digest"],
                     }
                     for digest, encoded in material["snapshots"].items():
                         assert hashlib.sha256(encoded.encode()).hexdigest() == digest
+                    for digest in (action["before_digest"], action["after_digest"]):
+                        assert store.text(digest) is not None
                     if receipt in parallel:
                         indices.append(action["occurrence_index"])
                 assert indices == [1, 1]  # Local occurrence collisions are not invocation identity.
                 last = next(receipt for receipt in parallel if receipt["state_write_revision"] == 3)
                 after = json.loads(last["evidence_json"][0])
-                assert trace.state.world == json.loads(
-                    after["snapshots"][after["action"]["after_digest"]]
-                )
+                assert trace.state.world == json.loads(store.text(after["action"]["after_digest"]))
                 saved = tmp_path / "native-trace.json"
                 saved.write_text(trace.model_dump_json())
                 restored = trace_class.model_validate_json(saved.read_text())
@@ -215,10 +218,9 @@ async def _qualify(tmp_path):
                     and json.loads(event.receipt_json)["state_write_revision"] == 3
                 )
                 restored_material = json.loads(retained_last["evidence_json"][0])
+                restored_store = trace_snapshot_store(restored.tool_execution_events)
                 assert (
-                    json.loads(
-                        restored_material["snapshots"][restored_material["action"]["after_digest"]]
-                    )
+                    json.loads(restored_store.text(restored_material["action"]["after_digest"]))
                     == trace.state.world
                 )
                 forged = json.loads(saved.read_text())

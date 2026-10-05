@@ -360,13 +360,22 @@ class AutomationBenchTask(
         del runtime
         state = cast(AutomationBenchState, trace.state)
         if state.capture_actions:
+            # Action records and world bytes are retained once, as tool-server
+            # execution evidence; this summary indexes them without copying worlds.
+            from .capture import raw_action_envelopes
+
+            receipts = [
+                json.loads(event.receipt_json)
+                for event in trace.tool_execution_events
+                if event.source == "tool_server"
+            ]
             trace.info["automationbench_capture"] = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "initial_digest": state.action_initial_digest,
-                "snapshots": dict(state.action_snapshots),
-                "events": [event.model_dump(mode="json") for event in state.action_events],
+                "snapshots": "tool_server_execution_evidence",
+                "events": [envelope["action"] for envelope in raw_action_envelopes(receipts)],
                 "coverage": {
-                    "scope": "successfully synchronized tool state",
+                    "scope": "retained tool-server execution evidence",
                     "failed_mcp_retention": "unqualified",
                     "concurrent_mcp_retention": "unqualified",
                     "native_call_alignment": "unavailable",
