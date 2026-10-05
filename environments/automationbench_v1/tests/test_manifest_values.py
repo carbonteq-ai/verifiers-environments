@@ -31,6 +31,91 @@ def calendar(value):
     return {"kind": "input", "format": "iso_date", "literal": value}
 
 
+@pytest.mark.parametrize("raw,expected", [("-28%", "-28"), ("-20%", "-20"),
+    ("0%", "0"), ("-0%", "0"), ("12.5%", "12.5"), ("150%", "150")])
+def test_percentage_point_input_exact_units_and_provenance(raw, expected):
+    expression = field("Traffic_Change", "percent_points_string")
+    result = evaluate_value(expression, {"request": {"Traffic_Change": raw}})
+    assert result.status == "qualified" and str(result.canonical_value) == expected
+    assert result.raw_values == ((("request", "Traffic_Change"), raw),)
+    assert parse_value(parse_value(expression).model_dump(mode="json")) == parse_value(expression)
+
+
+@pytest.mark.parametrize("raw", ["-28", "-28 %", " -28%", "+28%", "28%%", "2,000%",
+    "2e1%", "NaN%", "∞%", "28％", "01%", "", 28, True, None, "9" * 129 + "%"])
+def test_percentage_point_input_rejects_ambiguous_malformed_and_unbounded_values(raw):
+    result = evaluate_value(field("Traffic_Change", "percent_points_string"), {"request": {"Traffic_Change": raw}})
+    assert result.status == "unavailable" and result.canonical_value is None
+
+
+@pytest.mark.parametrize("raw,expected", [("-28%", True), ("-20%", True), ("-19%", False), ("-20", None)])
+def test_percentage_point_threshold_preserves_inclusive_policy_boundary(raw, expected):
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    predicate = parse_predicate({"op": "lte", "left": {"kind": "derived", "expression": field("Traffic_Change", "percent_points_string")},
+        "right": {"kind": "derived", "expression": decimal("-20%", "percent_points_string")}})
+    assert evaluate_predicate(predicate, {"request": {"Traffic_Change": raw}}).value is expected
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("2026-02-17T00:00:00", "2026-02-17"), ("2024-02-29T23:59:59.123456", "2024-02-29"),
+    ("2026-02-17T00:00:00Z", None), ("2026-02-17T00:00:00+02:00", None),
+    ("2026-02-17", None), ("2026-02-17 00:00:00", None),
+    ("2026-02-29T00:00:00", None), ("2026-02-17T24:00:00", None),
+    ("2026-02-17T12:30:60", None), ("2026-02-17T00:00:00 trailing", None),
+])
+def test_explicit_civil_datetime_date_preserves_written_date_without_timezone(raw, expected):
+    expression = {"kind": "input", "format": "iso_civil_datetime_date", "path": ["request", "DueDate"]}
+    result = evaluate_value(expression, {"request": {"DueDate": raw}})
+    assert result.canonical_value == expected
+    assert result.status == ("qualified" if expected else "unavailable")
+    assert result.raw_values == ((("request", "DueDate"), raw),)
+    if expected:
+        assert result.kind == "calendar_date"
+    assert parse_value(parse_value(expression).model_dump(mode="json")) == parse_value(expression)
+
+
+@pytest.mark.parametrize("start,end,holidays,expected", [
+    ("2026-02-17", "2026-02-26", [], 7), ("2026-02-24", "2026-02-26", [], 2),
+    ("2026-02-17", "2026-02-21", [], 3), ("2026-02-17", "2026-02-22", [], 3),
+    ("2026-02-17", "2026-02-23", [], 4), ("2026-02-20", "2026-02-23", [], 1),
+    ("2026-02-21", "2026-02-23", [], 1), ("2026-02-26", "2026-02-17", [], -7),
+    ("2026-02-17", "2026-02-17", [], 0),
+    ("2026-02-17", "2026-02-26", ["2026-02-18", "2026-02-21"], 6),
+])
+def test_business_day_difference_counts_explicit_signed_calendar_interval(start, end, holidays, expected):
+    expression = {"kind": "business_days_between", "start": calendar(start), "end": calendar(end), "holidays": holidays}
+    result = evaluate_value(expression, {})
+    assert result.status == "qualified" and result.kind == "day_count" and result.canonical_value == expected
+    assert parse_value(parse_value(expression).model_dump(mode="json")) == parse_value(expression)
+
+
+def test_business_day_difference_requires_calendar_and_bounded_explicit_holidays():
+    expression = {"kind": "business_days_between", "start": calendar("2000-01-01"),
+        "end": calendar("2026-02-26"), "holidays": []}
+    assert evaluate_value(expression, {}).reason == "value_business_day_difference_budget_exceeded"
+    with pytest.raises(ValueError):
+        parse_value({k: v for k, v in expression.items() if k != "holidays"})
+    for holidays in (["2026-02-30"], ["2026-02-01", "2026-02-01"]):
+        with pytest.raises(ValueError, match="value_business_day_holiday_invalid"):
+            parse_value({**expression, "holidays": holidays})
+    assert evaluate_value({**expression, "start": number(3)}, {}).reason == "value_date_operation_type_unavailable"
+
+
+def test_business_day_difference_can_drive_source_bound_overdue_predicate():
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    expression = {"kind": "business_days_between", "start": {
+        "kind": "input", "format": "iso_civil_datetime_date", "path": ["request", "DueDate"]},
+        "end": calendar("2026-02-26"), "holidays": []}
+    rule = parse_predicate({"op": "gt", "left": {"kind": "derived", "expression": expression},
+        "right": {"kind": "literal", "value": 3}})
+    for raw, expected in (("2026-02-17T00:00:00", True), ("2026-02-24T00:00:00", False),
+                          ("2026-03-10T00:00:00", False), ("2026-02-17T00:00:00Z", None)):
+        result = evaluate_predicate(rule, {"request": {"DueDate": raw}})
+        assert result.value is expected
+
+
 def test_policy_formula_preserves_verbatim_inputs_and_explicit_rounding():
     expr = rounded(operation("div", field("Total"), field("Months", "number")))
     result = evaluate_value(expr, {"request": {"Total": "$6,000.00", "Months": 12}})

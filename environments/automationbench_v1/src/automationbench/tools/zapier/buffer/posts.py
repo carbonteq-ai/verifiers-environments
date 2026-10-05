@@ -110,6 +110,9 @@ def buffer_add_to_queue(
         method=method,
         shared_now=method == "share_now",
         tags=tags or [],
+        due_at=int(scheduled_at.timestamp())
+        if scheduled_at is not None and method in ("schedule", "schedule_draft")
+        else None,
     )
 
     world.buffer.posts.append(post)

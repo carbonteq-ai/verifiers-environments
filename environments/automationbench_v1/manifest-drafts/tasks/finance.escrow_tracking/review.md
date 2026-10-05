@@ -38,3 +38,8 @@ Luna made three `search_tools` calls and stopped. Scalar rewards and episode byt
 
 ## Mechanism defects
 None.
+
+
+## Current-byte validation addendum (2026-10-05)
+
+The exact current draft was `8fe35e6d359a0f17ce8176884f8fede377b916dcfd383338aeb5dd6bdec83048`; the historical review draft hash above remains preserved as a prior revision. Fresh replay used native candidate modules at `/home/hammad/projects/verifiers-credit-candidate-20261003/verifiers/v1/__init__.py` and `/home/hammad/projects/verifiers-credit-candidate-20261003/verifiers/v1/episode.py`. It matched the public pack and retained episode, produced 25 terminal complete batches with no assessment or credit errors, and preserved findings and scalar rewards across same-trace rescore and wire reload/rescore. Source fingerprints were identical before and after. Full evidence: `/tmp/finance-current-byte-validation-luna-20261005-06/escrow_tracking-candidate-native.json` (SHA-256 `d7ba8fd97a960e17fd9a5e9be767f79e30f1b2cf806feaadcdbfa02886c12d4f`). Earlier installed-runtime run is retained at `None` and is not used as candidate-loader proof. This is retained-development validation only; the prior reference score and review conclusions remain unchanged, and it grants no qualification or eligibility.

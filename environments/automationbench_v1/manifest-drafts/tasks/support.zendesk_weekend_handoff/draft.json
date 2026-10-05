@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-zendesk_weekend_handoff",
+  "revision": "luna_batch06_partial_v1",
+  "public_request": "Prepare the weekend handoff for our support team. Identify the tickets that need weekend coverage, log them in ss_handoff (ws_weekend), and brief the on-call team (ws_oncall). Make sure critical issues get extra attention. Post the handoff summary to #support-weekend.\n\nUse Gmail for all email sends.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "22c7b367aa77d078fd56f9f1d5c746ace2813cccf1276693f75814568d72fd1f"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "canonical_sha256": "2da734678ab82a2765e6ec39d6c93e30aadf77dc3687d34510587af14e14ec3f"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "2f9a14da6e57cf8237b2c5a5be86d36965876edf12db933fc3ec5d423284047d"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "1bb76b6a037851819ada563672b977c8eff1c603cfac75db4eae394f27c4ed66"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "channel_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "slack",
+            "channels",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        },
+        "request_anchor": {
+          "value": "support.zendesk_weekend_handoff",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "status": [
+          "status"
+        ],
+        "priority": [
+          "priority"
+        ],
+        "requester_id": [
+          "requester_id"
+        ],
+        "tags": [
+          "tags"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "users": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "users"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "name": [
+          "name"
+        ],
+        "email": [
+          "email"
+        ],
+        "role": [
+          "role"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "oncall": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_handoff",
+      "worksheet_id": "ws_oncall",
+      "key_fields": [
+        "Email"
+      ],
+      "required_fields": [
+        "Name",
+        "Role"
+      ]
+    },
+    "handoff_log": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_handoff",
+      "worksheet_id": "ws_weekend"
+    },
+    "gmail_sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "slack_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "post-requested-channel",
+      "signal_id": "post-requested-channel",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "slack_posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "log-weekend-handoff",
+      "signal_id": "log-weekend-handoff",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "handoff_log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_handoff"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_weekend"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

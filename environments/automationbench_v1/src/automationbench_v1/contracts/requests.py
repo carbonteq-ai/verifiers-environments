@@ -98,6 +98,26 @@ class RequestSource(FrozenModel):
         return dict(fields)
 
 
+class RequestAlias(FrozenModel):
+    """Explicit name for an authenticated singleton public parameter source."""
+
+    alias: Identifier
+    source: Identifier
+
+
+def request_alias_context(aliases, populations):
+    context = {}
+    for item in aliases:
+        population = populations[item.source]
+        if not isinstance(population, RequestPopulationEvidence):
+            raise TypeError("request_alias_requires_request_population")
+        if (population.status == "qualified" and population.closed
+                and population.enumerated and len(population.rows) == 1
+                and not population.rows[0].missing_fields):
+            context[item.alias] = json.loads(population.rows[0].cells_json)
+    return context
+
+
 class RequestBinding(FrozenModel):
     """Structural copy of the public binding value, avoiding a models cycle."""
 

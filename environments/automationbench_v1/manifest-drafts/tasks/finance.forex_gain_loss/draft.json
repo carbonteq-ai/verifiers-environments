@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "manifest_id": "finance-forex_gain_loss-components",
+  "revision": "batch06_fx_lookup_arithmetic_v1",
+  "public_request": "Calculate the unrealized foreign exchange gains and losses for our open foreign-currency invoices. Compare the original booking rate against today's rate and determine the impact. Email the FX impact report to controller@company.example.com.  When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "a04d94bb9bf30b18f40388f0138c5e3eaf5754a511a2c71065f0db1c8a24f09a"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "canonical_sha256": "a1b1d67553e63578d64bccdba9151c22a019ba84189496040ea9c6ba6823de42"
+    }
+  ],
+  "sources": {
+    "invoices": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_fx_impact",
+      "worksheet_id": "ws_open_fx",
+      "key_fields": [
+        "Invoice"
+      ],
+      "required_fields": [
+        "Invoice",
+        "Currency",
+        "Foreign Amount",
+        "Booking Rate",
+        "USD at Booking",
+        "Customer"
+      ]
+    },
+    "rates": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_fx_impact",
+      "worksheet_id": "ws_current_rates",
+      "key_fields": [
+        "Currency"
+      ],
+      "required_fields": [
+        "Currency",
+        "Rate to USD",
+        "Date"
+      ]
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "invoice-fx-impact-report",
+      "signal_id": "finance.fx.per_invoice_impact",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "invoices",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Invoice"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Invoice"
+          ],
+          "domain": "string"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "controller@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Invoice"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "words"
+              },
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Currency"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "words"
+              },
+              {
+                "value": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "decimal",
+                    "op": "sub",
+                    "left": {
+                      "kind": "decimal",
+                      "op": "mul",
+                      "left": {
+                        "kind": "input",
+                        "format": "usd_string",
+                        "path": [
+                          "request",
+                          "Foreign Amount"
+                        ]
+                      },
+                      "right": {
+                        "kind": "input",
+                        "format": "decimal_string",
+                        "path": [
+                          "current",
+                          "Rate to USD"
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "input",
+                      "format": "usd_string",
+                      "path": [
+                        "request",
+                        "USD at Booking"
+                      ]
+                    }
+                  }
+                },
+                "mode": "amount",
+                "format": "usd_string"
+              }
+            ]
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "lookups": [
+        {
+          "source": "rates",
+          "alias": "current",
+          "keys": {
+            "Currency": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Currency"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

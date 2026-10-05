@@ -10,12 +10,17 @@ import verifiers.v1 as vf
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr, model_validator
 
 from .capture import canonical_json
+from .contracts.airtable_reads import AirtableReadSource
 from .contracts.base import FrozenModel
+from .contracts.buffer_reads import BufferChannelReadSource
 from .contracts.effects import EffectSource
 from .contracts.engine import binding_reason
 from .contracts.gmail_observations import GmailObservationSource
 from .contracts.linkedin_reads import LinkedInReadSource
 from .contracts.loader import canonical_contract_digest, load_contract
+from .contracts.mailchimp_reads import (
+    MailchimpSubscriberReadSource,
+)
 from .contracts.notification_effects import NotificationEffectSource
 from .contracts.obligations import (
     ObligationCheck,
@@ -34,7 +39,9 @@ from .contracts.sheet_effects import SheetEffectSource
 from .contracts.sheet_reads import SheetReadSource
 from .contracts.slack_effects import SlackEffectSource
 from .contracts.slack_reads import SlackReadSource
+from .contracts.slack_user_reads import SlackUserReadSource
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
+from .contracts.trello_reads import TrelloListReadSource
 from .manifest_guard_assessments import (
     EffectInput,
     _memo,
@@ -165,7 +172,7 @@ def _capture_obligation_inputs(source, contract, source_digest):
     effects = {
         name: asdict(capture_effect_input(source, spec, source_digest=source_digest))
         for name, spec in contract.sources.items()
-        if name in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource, RecordWriteSource))
+        if name in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, GmailObservationSource, SlackReadSource, SheetReadSource, AirtableReadSource, TrelloListReadSource, MailchimpSubscriberReadSource, SlackUserReadSource, BufferChannelReadSource, LinkedInReadSource, RecordWriteSource))
     }
     return {"obligation_population_evidence_json": canonical_json(populations),
             "obligation_effect_evidence_json": canonical_json(effects)}

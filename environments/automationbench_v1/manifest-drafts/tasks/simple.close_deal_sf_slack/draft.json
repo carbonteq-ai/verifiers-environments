@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-close_deal_sf_slack",
+  "revision": "luna_batch12_public_v1",
+  "public_request": "The NovaTech deal has been closed! Update the Salesforce opportunity 'NovaTech Enterprise Deal' (ID: opp_401) to stage 'Closed Won', and post a celebration message to the #sales Slack channel.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "ac046a927d101e1c8b40cd490d4cfb3798654b537572ae4049068700b858f07f"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "298d47df62f84d5d3399bb2782ea70f79f4eadd4cbec470747a240097c824974"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "novatech_close",
+      "fields": {
+        "opportunity_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "salesforce",
+            "opportunities",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "opportunities",
+              0
+            ]
+          ]
+        },
+        "opportunity_name": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "salesforce",
+            "opportunities",
+            0,
+            "name"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "opportunities",
+              0
+            ]
+          ]
+        },
+        "company": {
+          "value": "NovaTech",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "opportunities",
+              0,
+              "name"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "accounts",
+              0,
+              "account_name"
+            ]
+          ]
+        },
+        "channel_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "slack",
+            "channels",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              0
+            ]
+          ]
+        }
+      }
+    },
+    "opportunity": {
+      "adapter": "salesforce.record@1",
+      "object_type": "Opportunity",
+      "record_id": "opp_401",
+      "baseline_requirements": [
+        {
+          "field": "name",
+          "value": "NovaTech Enterprise Deal",
+          "comparison": "string"
+        }
+      ]
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "mark-novatech-closed-won",
+      "signal_id": "simple.close_deal_sf_slack.opportunity_closed_won",
+      "role": "goal",
+      "operator": "record.fields_equal@1",
+      "source": "opportunity",
+      "expected": [
+        {
+          "field": "stage_name",
+          "value": "Closed Won",
+          "comparison": "string"
+        }
+      ]
+    },
+    {
+      "check_id": "celebrate-novatech-sale",
+      "signal_id": "simple.close_deal_sf_slack.sales_channel_message",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "novatech_close"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "company"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim",
+            "format": null,
+            "excluding": []
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Closed Won"
+            },
+            "mode": "words",
+            "format": null,
+            "excluding": []
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "occurrence_bounds": {
+        "minimum": 1,
+        "maximum": 1
+      }
+    }
+  ],
+  "credit": []
+}

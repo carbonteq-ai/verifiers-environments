@@ -1,0 +1,506 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-social_mention_response-batch08-public-components",
+  "revision": "batch08-public-components-r1",
+  "public_request": "Review ss_mentions/ws_unresponded under the latest response priority rules, add eligible response drafts to ss_responses/ws_queue, and use the January 27 task date.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "b20f78fc28081fe5135a23e73b9ee034a36fef294504ac0fbf8efe24a21b3657"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "96ad070f9f5a656859fa5b2649f87f0f5a7164b142a46b2c8272a6690cb79a57"
+    }
+  ],
+  "sources": {
+    "mentions": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_mentions",
+      "worksheet_id": "ws_unresponded",
+      "key_fields": [
+        "author"
+      ],
+      "required_fields": [
+        "author",
+        "content",
+        "followers",
+        "mention_type",
+        "notes",
+        "platform",
+        "timestamp"
+      ]
+    },
+    "queue": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_responses",
+      "worksheet_id": "ws_queue"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_mentions",
+      "worksheet_id": "ws_unresponded"
+    },
+    "queue_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_responses",
+      "worksheet_id": "ws_queue"
+    },
+    "policy_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "mentions-policy",
+      "fields": {
+        "current_day": {
+          "value": "2026-01-27",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "high_priority": {
+          "value": "High",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "low_follower_floor": {
+          "value": "5000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "negative_floor": {
+          "value": "10000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              2,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "high-priority-mention-queued",
+      "signal_id": "marketing.social_mention.high_priority_queue_row",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "mentions",
+      "source": "queue",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "timestamp"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "2026-01-27"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "mention_type"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "Question"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "notes"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": ""
+                        }
+                      },
+                      {
+                        "op": "not",
+                        "arg": {
+                          "op": "mentions",
+                          "text": {
+                            "kind": "field",
+                            "path": [
+                              "request",
+                              "notes"
+                            ],
+                            "domain": "string"
+                          },
+                          "value": {
+                            "kind": "literal",
+                            "value": "do not duplicate"
+                          },
+                          "mode": "words"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "mention_type"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "Positive"
+                    }
+                  },
+                  {
+                    "op": "gte",
+                    "left": {
+                      "kind": "derived",
+                      "expression": {
+                        "kind": "input",
+                        "format": "decimal_string",
+                        "path": [
+                          "request",
+                          "followers"
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 5000
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "mention_type"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "Negative"
+                    }
+                  },
+                  {
+                    "op": "gte",
+                    "left": {
+                      "kind": "derived",
+                      "expression": {
+                        "kind": "input",
+                        "format": "decimal_string",
+                        "path": [
+                          "request",
+                          "followers"
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 10000
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "data_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "queue_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "reply_to"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "author"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "priority"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "High"
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "response_draft"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "policy_read",
+          "source": "policy_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_mention_priority"
+            }
+          }
+        },
+        {
+          "alias": "data_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_mentions"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_unresponded"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "queue_read",
+          "source": "queue_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_responses"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_queue"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

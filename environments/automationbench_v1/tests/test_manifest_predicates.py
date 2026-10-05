@@ -27,6 +27,31 @@ def derived(expression):
     return {"kind": "derived", "expression": expression}
 
 
+@pytest.mark.parametrize("text,expected", [("x" * 49, False), ("x" * 50, True),
+    ("x" * 51, True), ("", False), (None, None), (50, None), ("x" * 65537, None)])
+def test_explicit_character_budget_preserves_missing_and_boundary(text, expected):
+    length = {"kind": "text_length", "text": {"kind": "field", "path": ["effect", "reply"],
+        "domain": "string"}, "unit": "unicode_codepoints"}
+    rule = parse_predicate(compare("gte", length, literal(50)))
+    result = evaluate_predicate(rule, {"effect": {"reply": text}})
+    assert result.value is expected
+    assert result.evidence_paths == (("effect", "reply"),)
+    assert evaluate_predicate(rule, {"effect": {}}).value is None
+    assert parse_predicate(rule.model_dump(mode="json")) == rule
+
+
+def test_text_length_declares_codepoints_without_normalization():
+    length = {"kind": "text_length", "text": {"kind": "field", "path": ["request", "text"],
+        "domain": "string"}, "unit": "unicode_codepoints"}
+    rule = parse_predicate(compare("eq", length, literal(4)))
+    # One emoji, one letter, one combining mark, and one trailing space.
+    assert evaluate_predicate(rule, {"request": {"text": "😀e\u0301 "}}).value is True
+    for invalid in ({**length, "unit": "bytes"}, {k: v for k, v in length.items() if k != "unit"},
+                    {**length, "text": {**length["text"], "domain": "number"}}):
+        with pytest.raises(ValidationError):
+            parse_predicate(compare("eq", invalid, literal(4)))
+
+
 @pytest.mark.parametrize("op,truth,reverse,expected", [
     ("eq", True, False, True), ("eq", False, False, False),
     ("ne", True, False, False), ("ne", False, False, True),

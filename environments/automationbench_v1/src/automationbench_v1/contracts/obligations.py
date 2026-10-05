@@ -20,7 +20,9 @@ from pydantic import Field, StrictInt, field_validator, model_validator
 
 from ..capture import canonical_json
 from .aggregates import AggregateEvidence, AggregateSpec, evaluate_aggregate
+from .airtable_reads import AirtableReadSource
 from .base import FrozenModel, Identifier
+from .buffer_reads import BufferChannelReadSource
 from .effects import EffectEvidence, EffectFact, EffectSource
 from .execution_order import with_execution_order
 from .existentials import exists_context, exists_names, exists_size
@@ -28,12 +30,13 @@ from .gmail_observations import GmailObservationSource
 from .guards import LookupSpec
 from .joins import EffectJoin, join_context, validate_join_paths
 from .linkedin_reads import LinkedInReadSource
+from .mailchimp_reads import MailchimpSubscriberReadSource
 from .notification_effects import NotificationEffectSource
 from .populations import InitialCollectionSource, Population, lookup_population, native_record_id
 from .predicates import Predicate, evaluate_predicate, parse_predicate, resolve_operand
 from .predicates import context_paths as _fields
 from .record_writes import RecordWriteSource
-from .requests import RequestSource
+from .requests import RequestAlias, RequestSource, request_alias_context
 from .selections import (  # noqa: F401
     AlternativeEffect,
     OrderKey,
@@ -46,7 +49,9 @@ from .sheet_effects import SheetEffectSource
 from .sheet_reads import SheetReadSource
 from .slack_effects import SlackEffectSource
 from .slack_reads import SlackReadSource
+from .slack_user_reads import SlackUserReadSource
 from .tables import TableSource
+from .trello_reads import TrelloListReadSource
 
 
 def _observed_comparisons(raw):
@@ -69,6 +74,19 @@ class AggregateAlias(FrozenModel):
     aggregate: AggregateSpec
 
 
+class OccurrenceBounds(FrozenModel):
+    """Inclusive bounds on distinct qualified occurrences, not terminal objects."""
+
+    minimum: StrictInt = Field(ge=1, le=65536)
+    maximum: StrictInt = Field(ge=1, le=65536)
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.minimum > self.maximum:
+            raise ValueError("obligation_occurrence_bounds_reversed")
+        return self
+
+
 class ObligationCheck(FrozenModel):
     check_id: Identifier
     signal_id: Identifier
@@ -78,6 +96,7 @@ class ObligationCheck(FrozenModel):
     population: Identifier
     source: Identifier
     lookups: tuple[LookupSpec, ...] = ()
+    request_aliases: tuple[RequestAlias, ...] = Field(default=(), max_length=16, exclude_if=lambda value: not value)
     required_when: Predicate
     effect_match: Predicate
     initially_satisfied_when: Predicate | None = None
@@ -90,6 +109,7 @@ class ObligationCheck(FrozenModel):
     selections: tuple[SelectionAlias, ...] = Field(default=(), exclude_if=lambda value: not value)
     effect_joins: tuple[EffectJoin, ...] = Field(default=(), exclude_if=lambda value: not value)
     alternatives: tuple[AlternativeEffect, ...] = Field(default=(), exclude_if=lambda value: not value)
+    occurrence_bounds: OccurrenceBounds | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @field_validator("required_when", "effect_match", "initially_satisfied_when", mode="before")
     @classmethod
@@ -100,11 +120,19 @@ class ObligationCheck(FrozenModel):
 
     @model_validator(mode="after")
     def context_and_baseline(self):
+        if self.occurrence_bounds is not None and (self.semantics != "new_occurrence" or self.alternatives):
+            raise ValueError("obligation_occurrence_bounds_require_single_source_new_occurrence")
         if self.semantics == "new_occurrence" and self.initially_satisfied_when is not None:
             raise ValueError("obligation_new_occurrence_has_no_initial_discharge")
         aliases = [lookup.alias for lookup in self.lookups]
         if len(set(aliases)) != len(aliases) or set(aliases) & _RESERVED:
             raise ValueError("obligation_lookup_alias_conflict")
+        public_aliases = [item.alias for item in self.request_aliases]
+        if (len(set(public_aliases)) != len(public_aliases)
+                or set(public_aliases) & (_RESERVED | set(aliases))):
+            raise ValueError("obligation_request_alias_conflict")
+        if self.request_aliases and self.initially_satisfied_when is not None:
+            raise ValueError("obligation_request_alias_has_no_initial_discharge")
         totals = {item.alias for item in self.aggregates}
         if len(totals) != len(self.aggregates):
             raise ValueError("obligation_aggregate_alias_conflict")
@@ -120,14 +148,16 @@ class ObligationCheck(FrozenModel):
                 elif path[0] == "lookup":
                     if len(path) != 2 or path[1] not in aliases:
                         raise ValueError("obligation_lookup_status_reference_unknown")
-                elif len(path) < 2 or path[0] not in {"member", "request", "candidate", *aliases}:
+                elif len(path) < 2 or path[0] not in {"member", "request", "candidate", *aliases, *public_aliases}:
                     raise ValueError("obligation_selection_context_unknown")
             chosen.append(item.alias)
         joined = [item.alias for item in self.effect_joins]
         if len(set(joined)) != len(joined) or set(joined) & _RESERVED:
             raise ValueError("obligation_join_alias_conflict")
-        validate_join_paths(self.effect_joins, aliases, chosen)
-        available = {"request", "candidate"}
+        if set(public_aliases) & (set(chosen) | set(joined) | totals):
+            raise ValueError("obligation_request_alias_conflict")
+        validate_join_paths(self.effect_joins, [*aliases, *public_aliases], chosen)
+        available = {"request", "candidate", *public_aliases}
         for lookup in self.lookups:
             if any(
                 len(operand.path) < 2 or operand.path[0] not in available
@@ -135,7 +165,7 @@ class ObligationCheck(FrozenModel):
             ):
                 raise ValueError("obligation_lookup_context_unavailable")
             available.add(lookup.alias)
-        roots = {"request", "candidate", *aliases}
+        roots = {"request", "candidate", *aliases, *public_aliases}
         alternative_aliases = [item.alias for item in self.alternatives]
         if len(set(alternative_aliases)) != len(alternative_aliases):
             raise ValueError("obligation_alternative_alias_conflict")
@@ -220,6 +250,7 @@ def obligation_population_names(check: ObligationCheck) -> set[str]:
     """Every population a check reads, including declared aggregate populations."""
     return {
         check.population,
+        *(item.source for item in getattr(check, "request_aliases", ())),
         *(lookup.source for lookup in check.lookups),
         *(item.aggregate.population for item in check.aggregates),
         *(item.population for item in check.selections),
@@ -275,8 +306,10 @@ def _bind(source, check, populations, effects, effect_source, population_sources
         if pop.selector_digest != _digest(spec.model_dump(mode="json", exclude_none=isinstance(spec, RequestSource))):
             raise ValueError("obligation_population_selector_mismatch")
         if isinstance(spec, RequestSource):
-            if name != check.population or check.semantics != "new_occurrence" or check.initially_satisfied_when is not None:
+            if name == check.population and (check.semantics != "new_occurrence" or check.initially_satisfied_when is not None):
                 raise ValueError("request_population_requires_new_occurrence")
+            if name != check.population and name not in {item.source for item in check.request_aliases}:
+                raise ValueError("request_population_requires_explicit_alias")
         elif spec.path[:2] != ("task_evidence", "initial"):
             raise ValueError("obligation_requires_initial_population")
     for lookup in check.lookups:
@@ -289,6 +322,7 @@ def _bind(source, check, populations, effects, effect_source, population_sources
 def _context(check, row, populations, shared=None):
     context = {"request": json.loads(row.cells_json), "candidate": {
         "identity": list(row.identity), "native_record_id": native_record_id(row)}} | (shared or {})
+    context |= request_alias_context(getattr(check, "request_aliases", ()), populations)
     for lookup in check.lookups:
         keys = {}
         for key, operand in lookup.keys.items():
@@ -341,7 +375,7 @@ def evaluate_obligations(
     populations: Mapping[str, Population],
     effects: EffectEvidence,
     *,
-    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | SheetReadSource | LinkedInReadSource | RecordWriteSource,
+    effect_source: EffectSource | NotificationEffectSource | SheetEffectSource | SlackEffectSource | GmailObservationSource | SlackReadSource | SheetReadSource | AirtableReadSource | TrelloListReadSource | MailchimpSubscriberReadSource | SlackUserReadSource | BufferChannelReadSource | LinkedInReadSource | RecordWriteSource,
     population_sources: Mapping[str, TableSource | InitialCollectionSource | RequestSource],
     join_effects: Mapping[str, EffectEvidence] | None = None,
     join_sources: Mapping[str, object] | None = None,
@@ -505,6 +539,16 @@ def evaluate_obligations(
             status, value, reason = "abstained", None, "obligation_requirement_unavailable"
         elif initial is True:
             status, value, reason = "valid", 1.0, "obligation_initially_satisfied"
+        elif check.occurrence_bounds is not None:
+            bounds = check.occurrence_bounds
+            if len(witnesses) > bounds.maximum:
+                status, value, reason = "valid", 0.0, "obligation_occurrence_count_exceeded"
+            elif not scope_complete or unresolved:
+                status, value, reason = "abstained", None, "obligation_occurrence_count_unavailable"
+            elif len(witnesses) < bounds.minimum:
+                status, value, reason = "valid", 0.0, "obligation_occurrence_count_below_minimum"
+            else:
+                status, value, reason = "valid", 1.0, "obligation_occurrence_count_verified"
         elif witnesses:
             status, value, reason = "valid", 1.0, "obligation_witnessed_required_effect"
         elif initial is None and check.semantics != "new_occurrence":

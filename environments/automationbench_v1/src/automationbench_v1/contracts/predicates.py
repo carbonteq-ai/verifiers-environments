@@ -96,7 +96,21 @@ class DerivedValue(Frozen):
         return parse_value(value)
 
 
-type Operand = Annotated[LiteralValue | FieldValue | TextValue | DerivedValue, Field(discriminator="kind")]
+class TextLength(Frozen):
+    """Length of an explicitly projected string, without trimming or coercion."""
+
+    kind: Literal["text_length"]
+    text: FieldValue
+    unit: Literal["unicode_codepoints"]
+
+    @model_validator(mode="after")
+    def string_field(self):
+        if self.text.domain != "string":
+            raise ValueError("predicate_text_length_requires_string_field")
+        return self
+
+
+type Operand = Annotated[LiteralValue | FieldValue | TextValue | DerivedValue | TextLength, Field(discriminator="kind")]
 
 
 class Comparison(Frozen):
@@ -521,6 +535,11 @@ def parse_predicate(raw: Any) -> Predicate:
 
 
 def resolve_operand(operand: Operand, context: Mapping) -> tuple[bool, Any, tuple[Path, ...]]:
+    if isinstance(operand, TextLength):
+        known, text, paths = resolve_operand(operand.text, context)
+        if not known or type(text) is not str or len(text) > 65536:
+            return False, None, paths
+        return True, len(text), paths
     if isinstance(operand, DerivedValue):
         result = evaluate_value(operand.expression, context)
         return result.status == "qualified", result, result.evidence_paths
@@ -929,8 +948,10 @@ _NUMBER = re.compile(
     # "<digit>-" or "<digit>/" (the second end of "$2,790.00-$3,267.00").
     r"(?:(?<![\w.,$:/-])(?<!\w-)|(?<=\d[-/])(?=\$))"
     r"-?\$?\d(?:[\d,]*\d)?(?:\.\d+)?([kKmMbB])?"
-    # End: "/" only before a period unit or another dollar amount ("$89/$99").
-    r"(?![\w:])(?!/(?!\$|" + _PERIOD_UNITS + r"\b))(?!-\d)(?![.,]\d)",
+    # End: a colon followed by whitespace/end is punctuation; an attached
+    # clock/code suffix remains excluded. "/" only before a period unit or
+    # another dollar amount ("$89/$99").
+    r"(?!\w)(?!:\S)(?!/(?!\$|" + _PERIOD_UNITS + r"\b))(?!-\d)(?![.,]\d)",
     re.IGNORECASE,
 )
 _PERIOD_SUFFIX = re.compile(r"(?:\s*/\s*|\s+per\s+)" + _PERIOD_UNITS + r"\.?$", re.IGNORECASE)

@@ -35,6 +35,43 @@ def test_honest_sparse_gmail_reconciles():
     assert public_service_matches(gmail(), "gmail", native(gmail(), "gmail"))
 
 
+@pytest.mark.parametrize("include_messages", [False, True])
+def test_empty_legacy_gmail_inventory_reconciles_without_mutating_public(include_messages):
+    initial = {"gmail": {"drafts": [], "emails": []}}
+    if include_messages:
+        initial["gmail"]["messages"] = []
+    original = copy.deepcopy(initial)
+    observed = native(initial, "gmail")
+    assert public_service_matches(initial, "gmail", observed)
+    assert initial == original
+    observed["messages"] = native(gmail(), "gmail")["messages"]
+    assert not public_service_matches(initial, "gmail", observed)
+
+
+@pytest.mark.parametrize("alias", [None, {}, "", 0])
+def test_malformed_legacy_gmail_alias_is_not_discarded(alias):
+    initial = {"gmail": {"emails": alias}}
+    assert not public_service_matches(initial, "gmail", native({}, "gmail"))
+
+
+@pytest.mark.parametrize("include_messages", [False, True])
+def test_legacy_gmail_messages_reconcile_and_reject_content_tampering(include_messages):
+    initial = {"gmail": {"emails": [POLICY]}}
+    if include_messages:
+        initial["gmail"]["messages"] = [POLICY]
+    observed = native(initial, "gmail")
+    assert public_service_matches(initial, "gmail", observed)
+    observed["messages"][0]["body_plain"] = "Cap is $5,000"
+    assert not public_service_matches(initial, "gmail", observed)
+
+
+def test_legacy_gmail_alias_cannot_override_messages_or_other_dropped_keys():
+    initial = {"gmail": {"emails": [], "messages": [POLICY]}}
+    assert not public_service_matches(initial, "gmail", native(initial, "gmail"))
+    initial = {"gmail": {"emails": [], "unrecognized_inventory": []}}
+    assert not public_service_matches(initial, "gmail", native({}, "gmail"))
+
+
 @pytest.mark.parametrize(
     "field,value",
     [

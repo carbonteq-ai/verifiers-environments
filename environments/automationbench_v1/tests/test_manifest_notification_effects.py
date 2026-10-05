@@ -61,6 +61,20 @@ def test_native_send_records_acknowledged_identity_content_and_recipient_roles()
     assert params["bcc"] == ["hidden@example.com"]
 
 
+def test_public_legacy_empty_inbox_binds_real_send_and_still_requires_ack():
+    public = {"gmail": {"drafts": [], "emails": []}}
+    data = run_operations(public, [send()])
+    data["task_evidence"]["initial"] = copy.deepcopy(public)
+    evidence = capture(data)
+    assert evidence.complete and len(evidence.effects) == 1
+    assert evidence.effects[0].status == "qualified"
+    assert payload(evidence.effects[0])["body_plain"] == "Exact content"
+    data["state_write_receipts"] = []
+    missing_ack = capture(data)
+    assert not missing_ack.complete
+    assert all(fact.status != "qualified" for fact in missing_ack.effects)
+
+
 @pytest.mark.parametrize("body_type", ["plain", "html"])
 def test_native_signature_and_body_representation_are_explicit(body_type):
     evidence = capture(

@@ -31,3 +31,9 @@ Public pack `batch-04.json` task 1. Luna episode sha256 `b2d07a9e…0120`. Whole
 **Mechanism notes (no defect in 6–8).** There is no combinator that builds an instant from a date plus a clock. The residual workaround is exact, and a `date_at_clock` combinator would shorten it. The defect reproducers for the Gmail scopes are listed in the trello review.
 
 Coordinator change (2026-10-04): `request.utc_clock` ("10:00", declared UTC 24-hour) now uses the `clock_24h` value format. The later rule that meridiem-less 10:00–12:59 is ambiguous for `clock_time` would otherwise make the meeting-time check abstain.
+
+## Zoom current check addendum (2026-10-05)
+
+The current exact-SHA qualified package replay covers both newer guards, with valid/0.0 outcomes across five candidates for each. The targeted native replay test passed. The prior review prose omits a separate harmful-variant and missing-ACK demonstration for these two checks, so this addendum does not claim those controls.
+
+The cited test preceded the bounded `predicates.py` amount-parser update (current SHA-256 `cd2dcf3358cedb128f39f194b56105e712bf17906d8e8bd1ec61a5e2d413cab6`). These HOLD/duplicate guards use word mentions and eligibility, not amount parsing; the outcomes remain historical under their test execution source.

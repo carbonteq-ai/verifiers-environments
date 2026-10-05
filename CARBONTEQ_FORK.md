@@ -1,5 +1,169 @@
 # Environment source and vendored dependency ledger
 
+Local Trello label inventory repair (2026-10-05, unpublished): acknowledge
+audited native `trello_card_label` as a write beside list searches. The label
+does not emit a read; missing ACK keeps inventory unavailable. Root genuine
+handler reproducer and39related regressions pass. Task adoption remains separate
+from whole-task qualification; no pin or publication.
+
+Local amount punctuation repair (2026-10-05, unpublished): `_NUMBER` recognizes
+colon whitespace/end as punctuation, retaining exclusions for attached codes
+and clock times. Root independently reproduced Support's genuine Slack amount
+miss; five boundary cases and 411 related tests pass. Fresh handler positive,
+closed-deal adverse guard and missing-ACK controls retain reload/scalar parity.
+Original failed artifacts remain preserved; no pin, publication or qualification.
+
+Local Slack user-read increment (2026-10-05, unpublished): separate
+`slack.user_reads@1` authenticates native pure user lookups with shared receipt
+transport. Exact public Sarah Jones lookup reproducer:
+`/tmp/root-slack-user-lookup-reproducer.py/json` (genuine handlers, manufactured
+schema-valid lifecycle envelopes). Six focused tests cover coherent forgery,
+not-found returns, ordering, missing ACKs and wire reload/scalar parity.
+396 combined regressions pass; scoped Ruff and diff check pass. No dependency
+pin, publication, baseline amendment or whole-task qualification.
+
+Local physical-order/Buffer-read increment (2026-10-05, unpublished): optional
+OrderKey.source_position uses captured common-collection source_path index,
+never IDs/cells/iteration fallback. buffer.channel_reads@1 authenticates native
+channel returns and ACKs with shared transport; missing-org fallback does not
+fabricate identity. Five selection and seven read tests pass in368combined
+regressions, including archive/scalar parity. AUTHORING.md owns field/bound
+details. No baseline, dependency pin, publication or task qualification changes.
+
+Local native Buffer repair (2026-10-05, unpublished): add_to_queue persists
+supplied scheduled_at.timestamp() as due_at for schedule/schedule_draft.
+Explicit offset/reload/missing-schedule tests pass; naive datetime retains
+Python runtime-local meaning, missing public clock/timezone remains a task gap.
+Trello read whitelist admits separately authenticated card_update with ACK
+regression. Final shared gate328passes, scoped Ruff/diff pass. Root evidence:
+`/tmp/root-buffer-schedule-persistence-recheck.json`. No pin/publication/qualification.
+
+Local Mailchimp-read increment (2026-10-05, unpublished):
+`mailchimp.subscriber_reads@1` authenticates exact native audience subscriber
+listings, empty responses and queried scope using shared read transport. Nine
+new and 315 related tests pass; scoped Ruff/diff pass. Root independently checked
+public seven-row evidence at `/tmp/root-mailchimp-read-native-reproducer.json`.
+Worker adoption remains pending; qualification and publication unchanged.
+
+Local Trello-read increment (2026-10-05, unpublished): `trello.list_reads@1`
+authenticates three native lookup paths and shares dispatch/return/ACK/state
+reconciliation with Airtable. The board-list find-or-create handler contributes
+reads only on its unchanged find branch. Returned fields stay exact; requested
+filters never fabricate seed scope. Fifteen new and 300 related tests pass;
+scoped Ruff and diff checks pass. Root probe is
+`/tmp/root-trello-list-read-native-reproducer.json`. Worker adoption remains
+separate from qualification; no publication, dependency or baseline change.
+
+Local Airtable-read increment (2026-10-05, unpublished): environment-owned
+`airtable.record_reads@1` authenticates returned findRecord/findManyRecords fields
+against captured before-state and native dispatch/return/ACK evidence. Bounded
+private pure-handler replay distinguishes stored-table hits from seeded action
+fallback; requested base/table spelling does not infer storage scope. Thirteen
+new tests and 287 related regressions pass, with native reload/scalar parity and
+forged-result/missing-ACK contrasts. Saved public reproducer independently checked
+at `/tmp/root-airtable-read-native-reproducer.json`. Unsupported handlers remain
+explicit; this does not grant task qualification or downstream eligibility.
+
+Local conditional-number increment (2026-10-05, unpublished):
+`contracts.values.ConditionalNumber` adds at most sixteen source-declared numeric
+branches using existing typed three-valued predicates and exact arithmetic.
+All predicates must be known with exactly one matching branch; ambiguous,
+unmapped, malformed or missing evidence stays unavailable. No implicit zero or
+first-match precedence. Existing structural budgets and raw source projection
+admission apply. Twelve new tests cover policy categories, Boolean/range boundaries,
+overlap/unknown rejection, exact arithmetic, malformed/deep structures, a public
+11-versus-9 selector counterexample and genuine native handler/reload assessment.
+The 407-test combined value/selection/obligation/contract gate and scoped Ruff
+pass. No task-specific evaluator, scalar reward change or published pin is added;
+semantic category mapping and task qualification remain separate.
+
+Local bounded-occurrence increment (2026-10-05, unpublished): optional explicit
+`occurrence_bounds` extends new-occurrence obligations from at-least-one to an
+inclusive positive range over distinct qualified invocation/effect identities.
+Bounded success needs complete, unambiguous evidence; observed excess can fail
+without complete capture. Initial discharge/alternative channels and count
+credit rules are rejected. Legacy omitted declarations keep their digest.
+The 254-test obligation/native/schema gate passes, including fourteen new tests
+for genuine duplicate creates, range/empty/incomplete evidence, duplicate receipt
+identity, strict bounds, missing ACK and scored reload. An independent public
+Facebook photo comparison passes one create and fails two identical creates.
+This is candidate-relative outcome evidence, not global action safety or task
+qualification. No published pin changes.
+
+Local public-only authoring increment (2026-10-05, unpublished):
+`calibration.manifest_authoring.build_public_authoring_batches` prepares bounded
+proposal packs without recorded episodes. It accepts only explicitly public
+task fields, preserves caller-resolved development/reserved splits, and emits
+replay-unavailable and eligibility-not-granted labels. It rejects assertions,
+answers, trace paths and scorer outcomes rather than passing them into packs.
+The original development-only recorded-reference builder is unchanged.
+24 authoring tests and scoped Ruff/diff pass; a canonical cached public task
+also passed the builder without assertions or reference evidence. Inventory
+selection/ownership and permitted-input resolution remain coordinator duties.
+
+Local percentage-point input increment (2026-10-05, unpublished):
+`ValueInput.format=percent_points_string` parses a strictly marked signed
+decimal such as `-28%` as -28 percentage points, preserving raw field evidence
+and exact rational arithmetic. It does not implicitly convert to a fraction,
+trim whitespace or accept a missing marker. The 331-test values/predicates/
+contracts/obligations gate covers inclusive threshold boundaries, malformed
+and oversized input, provenance and wire round-trip; scoped Ruff/diff pass.
+Marketing's public traffic threshold motivated the reproduced shared gap;
+task adoption is separate from component regression qualification.
+
+Local final-Sheets count increment (2026-10-05, unpublished):
+`collections.counts_when@1` now admits authenticated final worksheet rows through
+the existing Sheet retention selector, with explicit bounded `member_fields`.
+Missing cells, unfinished capture and malformed identities remain unavailable.
+Counts are terminal outcomes, never causal action credit. A 213-test combined
+count, record-retention/credit and Sheet gate passes, including genuine updates,
+missing acknowledgements, native reload/rescore and tamper controls. Scoped
+Ruff and diff checks pass. Task adoption and whole-task qualification remain
+separate; no canonical allocation solver or dependency pin is introduced.
+
+Local parent-message regression increment (2026-10-05, unpublished): six
+Re:amaze/Gorgias real-handler tests verify the existing parent-record update
+adapter distinguishes newly appended replies from old matching text and rejects
+nonexistent-parent claims. No new primitive or runtime change is added. The
+77-test record/R7 combined gate and scoped Ruff pass; Support adoption remains
+in progress. Qualification and publication remain separate.
+
+Local Airtable field-write increment (2026-10-05, unpublished):
+`contracts/record_writes.py` extends the existing `service.record_writes@1`
+adapter with fixed `bases/tables/records` scope. Composite IDs and bounded,
+authenticated persisted fields distinguish real row updates from action-log
+claims, including nonexistent-row attempts. Native correct/wrong/missing-ACK
+rescore/reload and existing record/guard/contracts regressions pass in a
+204-test final gate, including repeated no-op and terminal-tamper controls.
+Scoped Ruff and diff checks pass. Worker task adoption is in progress;
+release qualification remains pending.
+
+Local text-measurement extension (2026-10-05, unpublished): predicate operands
+support bounded string length with explicit Unicode-codepoint units, preserving
+source field paths and unknown values without normalization or coercion. Public
+HelpScout criteria specify 50 characters; boundary/missing/type/Unicode/wire
+tests pass in a 228-test predicate/contract/obligation gate. Worker adoption and
+task-level replay remain pending. No dependency pin or publication change.
+
+Local terminal-count extension (2026-10-05, unpublished): retained-record
+manifests can count candidate-relative members of their same authenticated
+terminal collection. Finalized closed identities and decided membership are
+required; incomplete membership and comparison-budget excess remain unknown.
+Real Gorgias handler tests accept either valid surviving ticket and reject
+zero/two survivors. Held/exempt and different-email records remain independent.
+Counts are outcome-only; local single-record completion credit is rejected.
+The combined retained-record/credit/contract/obligation/selection gate passes
+280 tests. This does not establish whole-task qualification or release adoption.
+
+Local deterministic selection extension (2026-10-05, unpublished): explicit
+text order keys with declared ASCII case-insensitive or exact Unicode-codepoint
+collation support policy-defined alphabetic tie-breaks. Existing numeric/date
+declarations keep their serialized form; missing/unsupported text and true ties
+remain unavailable. A public-source signer reproducer now selects Brooks over
+Zhang after eligibility and seniority ranking. Twenty-eight selector integration
+tests and a combined 262-test selection/obligation/guard/value/contract gate
+pass. This is component coverage, not whole-task or action-credit qualification.
+
 Current checkpoint (2026-10-04, unpublished; supersedes historical entries below):
 the explicit `no_clarification@2` path now freezes communication bases before
 producer iteration. Owner core tests, independent mutation probes and all 28
@@ -239,6 +403,70 @@ source hashes, original bytes/scalars, execution recipients and reload/rescore
 idempotence; manufactured envelopes do not substitute for actual trace tests.
 The owning framework plan records exact results and incomplete coverage. All six
 environment wheels and their composition remain a later release gate.
+
+Local AutomationBench candidate delta (2026-10-05):
+`collections.counts_when@1` admits separate initial roster and terminal record
+populations in the strict manifest registry and existing native retained-assessment
+transport. Seven genuine-handler alternatives/malformed controls pass native
+archive rescore; incomplete finalization is additionally checked at the primitive.
+The combined retained-record/credit/contract/native gate passes 277 tests,
+including admission/tamper/budget controls. Terminal counts cannot authorize
+causal action credit. Public task adoption and review remain pending; this is
+unpublished component work.
+
+Additional local date delta: `iso_civil_datetime_date` validates naive ISO civil
+datetimes as written calendar dates without UTC conversion; explicit-holiday
+`business_days_between` counts signed weekdays over (earlier, later], bounded
+at 3,660 calendar days. Existing date/timestamp semantics are unchanged. The
+value/predicate/selection/contract/obligation gate passes 333 tests; public Sales
+date probes confirm seven calculations. Exclusions and task adoption remain open.
+
+Local evidence repair (2026-10-05): public service reconciliation now applies
+the native Gmail `emails` → `messages` alias normalization while rejecting
+conflicting simultaneous inventories rather than discarding declared content.
+Malformed aliases, changed message content/defaults and unrelated unknown keys
+remain unavailable. Root's genuine send using the Zoho vendor public input now
+has complete reconciled delivery evidence. The 53-test hydration/notification
+gate, scoped Ruff and diff checks pass, including a direct public-alias send
+and missing-ACK control. This dirty candidate is unpublished; worker task
+revalidation and whole-task qualification remain separate.
+
+The unpublished retained-record outcome API also accepts authenticated initial
+Sheet lookups while preserving the typed native-record population and identity.
+Projection admission, raw evidence recomputation, predicate preparation and
+Zendesk completion-credit recapture use the existing TableSource transport.
+The 272-test outcome/credit/count/schema gate includes ten new real-handler/native
+tests: missing and duplicate lookup keys or cells stay unknown; raw tampering and
+final/nested undeclared selectors are rejected; absent ACK preserves terminal
+outcome without creating credit; native scored reload consumes completion once.
+This is an additive mechanism gate, not public-task qualification or release.
+
+The unpublished retained-record/count native checker reuses authenticated whole-
+population preparation across findings. Exact canonical material, contract and
+check bytes identify each cache entry; every call still validates configuration
+and candidate identity. Eight entries accept at most 8 MiB of key bytes each;
+oversized inputs validate without retention. The 150-test outcome/credit gate
+and expanded 25 count tests pass. One identical recorded parking fixture scores
+in 33.870 seconds versus 78.810 with only caching disabled, with exact finding,
+reward and source parity. Combined score/rescore/reload stages improve 2.175x
+on that local sample; no general throughput or task-qualification claim follows.
+Evidence is in the consumer's reward-candidate parking benchmark JSON.
+
+Local Gmail thread-read candidate (2026-10-05): the environment read adapter
+projects authenticated `gmail_get_thread` full messages and `gmail_get_threads`
+returned metadata. Strict enclosing/member identity and count reconciliation
+preserves original content and missing-ACK abstention; no body backfill. The
+173-test Gmail/native obligation/contract gate and recorded dark-mode
+score/rescore/reload check pass with unchanged rewards/source bytes. This is an
+unpublished adapter increment, not task qualification or a simulator change.
+
+Local public-parameter alias increment (2026-10-05): explicit bounded aliases
+on obligation/guard checks expose authenticated public request parameters beside
+candidate rows. Missing authority remains unknown, names cannot overwrite row
+or reserved contexts, and baseline discharge cannot use authored aliases.
+468 request/goal/guard/native/contract/retained tests and scoped Ruff pass.
+The shared candidate context preserves retained-record callers without aliases.
+Unpublished environment change; no simulator change, pin update or qualification.
 
 For simulator changes: qualify and publish the sibling commit first; refresh
 exact vendor files and record hashes; qualify/package/publish the environment

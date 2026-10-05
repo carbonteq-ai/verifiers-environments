@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-zoho_desk_capacity_planning",
+  "revision": "luna_batch03_capacity_count_partial_v2",
+  "public_request": "Analyze our Zoho Desk ticket load for capacity planning. Use the agent roster and capacity benchmarks (spreadsheet 'ss_capacity', worksheets 'ws_roster' and 'ws_benchmarks') to determine workload distribution across departments. Redistribute tickets from overloaded agents, log the capacity report to 'ws_report', and post a summary to #capacity-planning.\n\nUse Gmail for all email sends.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "8e9ee2094a4f5be50c7a13dc431139db1da5dfc647febfea689bf9ea32988636"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "181a419b3d31a4c98d108448159abf0b9e3608258fd0feb5d0db88f4fc82dc27"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zoho_desk",
+        "tickets"
+      ],
+      "canonical_sha256": "fa26302a6d9e52af1c596dd853df6f56711934e908f580b5e500868511d5f399"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "request_anchor": {
+          "value": "support.zoho_desk_capacity_planning",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "output": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "benchmarks": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_capacity",
+      "worksheet_id": "ws_benchmarks",
+      "key_fields": [
+        "Department"
+      ],
+      "required_fields": [
+        "Max_Dept_Load",
+        "Priority_Weight"
+      ]
+    },
+    "report_appends": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_capacity",
+      "worksheet_id": "ws_report"
+    },
+    "tickets_initial": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zoho_desk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "assignee_id": [
+          "assignee_id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "assignee_id"
+      ]
+    },
+    "tickets_final": {
+      "adapter": "final.records@1",
+      "path": [
+        "task_evidence",
+        "final",
+        "zoho_desk",
+        "tickets"
+      ],
+      "fields": {
+        "assignee_id": [
+          "assignee_id"
+        ],
+        "department_id": [
+          "department_id"
+        ],
+        "status": [
+          "status"
+        ]
+      }
+    },
+    "roster": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_capacity",
+      "worksheet_id": "ws_roster",
+      "key_fields": [
+        "Agent_ID"
+      ],
+      "required_fields": [
+        "Department",
+        "Max_Tickets"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "check_id": "requested-summary-channel",
+      "signal_id": "support-zoho_desk_capacity_planning.requested-output",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "output",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "C_CAP"
+        }
+      }
+    },
+    {
+      "check_id": "all-department-rows-reported",
+      "signal_id": "support.zoho_capacity.department_report_row",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "benchmarks",
+      "source": "report_appends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Department"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Department"
+          ],
+          "domain": "string"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Department"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Department"
+          ],
+          "domain": "string"
+        }
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "terminal-agent-capacity",
+      "signal_id": "support.zoho_capacity.agent_capacity",
+      "role": "goal",
+      "operator": "collections.counts_when@1",
+      "population": "roster",
+      "source": "tickets_final",
+      "counts": [
+        {
+          "alias": "assigned",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "member",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "Open"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "member",
+                    "assignee_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Agent_ID"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "literal",
+          "value": true
+        },
+        "right": {
+          "kind": "literal",
+          "value": true
+        }
+      },
+      "counts_when": {
+        "op": "lte",
+        "left": {
+          "kind": "field",
+          "path": [
+            "count",
+            "assigned"
+          ],
+          "domain": "integer"
+        },
+        "right": {
+          "kind": "derived",
+          "expression": {
+            "kind": "input",
+            "format": "decimal_string",
+            "path": [
+              "request",
+              "Max_Tickets"
+            ]
+          }
+        }
+      },
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

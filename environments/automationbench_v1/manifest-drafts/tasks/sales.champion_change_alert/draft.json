@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "manifest_id": "sales.champion_change_alert",
+  "revision": "batch09-public-20261005-r1",
+  "public_request": "Monitor for champion job changes on active deals. Cross-reference Salesforce opportunity contacts with their current LinkedIn profiles to detect if any champions have left their companies. Alert the team and update records for any changes found.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "ac6feae4d5aea6485512def3a6dc79c6143dbde16fe58c3409ab98ff0a006bcc"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "73345e57339258cc70b5ce6997d3a6d6e95e92a7386fc2ce223be1b1ff66c289"
+    }
+  ],
+  "sources": {
+    "contacts": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "salesforce",
+        "contacts"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "email": [
+          "email"
+        ],
+        "description": [
+          "description"
+        ],
+        "account_id": [
+          "account_id"
+        ]
+      },
+      "required_fields": [
+        "id",
+        "email",
+        "description",
+        "account_id"
+      ],
+      "key_fields": [
+        "id"
+      ]
+    },
+    "profiles": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "linkedin",
+        "profiles"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "email": [
+          "email"
+        ],
+        "current_company": [
+          "current_company"
+        ]
+      },
+      "required_fields": [
+        "id",
+        "email",
+        "current_company"
+      ],
+      "key_fields": [
+        "id"
+      ]
+    },
+    "contact_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "salesforce",
+      "collection": [
+        "contacts"
+      ],
+      "kind": "update"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "gary-profile-cross-reference",
+      "fields": {
+        "profile_id": {
+          "value": "prof_gary",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "profiles"
+            ]
+          ]
+        },
+        "candidate_email": {
+          "value": "gary@newjob.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "profiles"
+            ]
+          ]
+        }
+      }
+    },
+    "profile_reads": {
+      "adapter": "linkedin.reads@1",
+      "kind": "read_record"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "cross-reference-gary-profile-before-alert",
+      "signal_id": "sales.champion_change_alert.linkedin_cross_reference",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "profile_reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "gary-profile-cross-reference"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_type"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "profile"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "profile_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "candidate_email"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

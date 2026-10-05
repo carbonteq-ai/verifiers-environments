@@ -29,3 +29,12 @@ Public pack batch-07 #4; Luna episode 92241e8c...6c1cb. Status: **qualified_cand
 
 ## Defects
 D1, Slack scope `users` (see review.json).
+
+
+## Current-byte validation addendum
+
+Executed against current draft SHA `da3ab4cd4801ef5b715c66b8dded3975500590948ae865a0784f555d897e8f6e` and retained episode SHA `92241e8c8c281d077e1d63a27a14d5a7b7c92d00660ab4cb8a9666c984a6c1cb`. The retained episode hash matches the prior review and development coverage; its prompt and normalized initial state match public pack input SHA `b5b917e7bf31b20394fe3441bffe1ddeb38cff378e36c0ffce4daac99069e2e1`. Draft binding against the episode and public pack returned no mismatch. The taskset wrapper differs for this task where noted in `review.json`; the public prompt binding remains authoritative.
+
+The native retained-development replay produced 12 latest-complete per-check findings and zero assessment/credit errors. Manifest and ordinary benchmark reward maps matched, and matched the retained pre-score reward map. Rescore and serialized-wire reload/rescore findings and reward maps matched; source episode bytes and module fingerprints remained stable.
+
+Evidence: [result JSON](/tmp/automationbench-luna-hr-linkage-closure-20261005/current-byte-validation/evidence/hr_intern_cohort_onboarding.result.json) (SHA-256 `bfaf615a2b5fcb935dce5f80210505dbac0fa12c7c4f639208ae3873232e7b52`); [scored WireEpisode](/tmp/automationbench-luna-hr-linkage-closure-20261005/current-byte-validation/evidence/hr_intern_cohort_onboarding.scored-wire.json) (SHA-256 `64684ddbb1eaa6e5408ca8f322a4a3c085a64d632d8935bb7f215359e5ae9f73`). This is component/replay evidence only; it does not revise the original score or establish whole-task qualification, action credit, or eligibility.

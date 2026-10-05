@@ -1,0 +1,428 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-zendesk_urgent_reply",
+  "revision": "batch22_v1",
+  "public_request": "An urgent support email just came in about a service outage. Read the email, create a high-priority Zendesk ticket, and reply to the customer acknowledging the issue.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "91b85c442b4d8ae199654adc6c96059ed55efaecdc2fef2447b2ac9f4f878f44"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "b8cb3a0cae42a4d096a28d40293771b29ea4c0da7aaf3f1215165764af587a89"
+    }
+  ],
+  "sources": {
+    "inquiry": {
+      "adapter": "public.request@1",
+      "member_key": "zendesk_urgent_reply",
+      "fields": {
+        "message_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "thread_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "thread_id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "sender_email": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "from_"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "original_subject": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "subject"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "email_body": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "body_plain"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        }
+      }
+    },
+    "reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "tickets_created": {
+      "adapter": "service.record_writes@1",
+      "service": "zendesk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "create"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "email-read-before-action",
+      "signal_id": "zendesk_urgent_reply.email_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "inquiry",
+      "source": "reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "zendesk_urgent_reply"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "body_plain"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "returned_fields"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "ticket-created-for-read-email",
+      "signal_id": "simple.zendesk_urgent_reply.ticket_for_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "inquiry",
+      "source": "tickets_created",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "zendesk_urgent_reply"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "priority"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "high"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "original_subject"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_read",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "reply-to-same-customer-thread",
+      "signal_id": "simple.zendesk_urgent_reply.reply_to_customer",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "inquiry",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "zendesk_urgent_reply"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "thread_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "thread_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "sender_email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_read",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

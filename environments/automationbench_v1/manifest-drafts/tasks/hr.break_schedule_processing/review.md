@@ -51,3 +51,12 @@ Public pack `batch-05.json` task 3; Luna episode `fceba59a...b507`. Whole task: 
 - **R4-D2.** `_CLOCK_24_TEXT`'s `(?!-\w)` drops the start of a 24-hour range, so "13:00-13:30" mentions only 1:30 PM. The result is a known false; it should be true, or at least unknown.
 - **R4-P1.** Scoring reloads the contract about 200 times per pass (43 s per pass for this draft).
 - **Round-3 defects rechecked:** R3-D4, R3-D5 and R3-L3 are fixed; R3-L2 remains.
+
+
+## Current-byte validation addendum
+
+Executed against current draft SHA `a3f5e628e0e161898ebf58b25035ec71258e4fa8695f81da8ae984bce33a9c66` and retained episode SHA `fceba59ac32640990c064f26b6976e25335844944807194de9524eb054bcb507`. The retained episode hash matches the prior review and development coverage; its prompt and normalized initial state match public pack input SHA `39056db854bed02b4c2eed3a88efa909087aed2ba8dad7e2bcaec98b0973ad27`. Draft binding against the episode and public pack returned no mismatch. The taskset wrapper differs for this task where noted in `review.json`; the public prompt binding remains authoritative.
+
+The native retained-development replay produced 24 latest-complete per-check findings and zero assessment/credit errors. Manifest and ordinary benchmark reward maps matched, and matched the retained pre-score reward map. Rescore and serialized-wire reload/rescore findings and reward maps matched; source episode bytes and module fingerprints remained stable.
+
+Evidence: [result JSON](/tmp/automationbench-luna-hr-linkage-closure-20261005/current-byte-validation/evidence/hr_break_schedule_processing.result.json) (SHA-256 `85984a04cfecdd281054e6287c46839045c72cff7b82bcce5ebe8311f4948574`); [scored WireEpisode](/tmp/automationbench-luna-hr-linkage-closure-20261005/current-byte-validation/evidence/hr_break_schedule_processing.scored-wire.json) (SHA-256 `c223521a8897ecdf7fb475fa600fc2b268e84223f83b6b82251e77f78f419c7c`). This is component/replay evidence only; it does not revise the original score or establish whole-task qualification, action credit, or eligibility.

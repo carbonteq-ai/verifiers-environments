@@ -321,6 +321,11 @@ def together(text, *terms):
 
 @pytest.mark.parametrize("text,expected", [
     ("Training: $3,000\nSecurity: $2,000", True),
+    ("Training: $3,000:", True),
+    ("Training: $3,000: approved", True),
+    ("Training: $3,000:\tapproved", True),
+    ("Training: $3,000:01", False),  # an attached clock/code suffix
+    ("Training: $3,000:code", False),
     ("Training — Engineering $3,000", True),
     ("Training: $2,000\nSecurity: $3,000", False),  # amounts swapped between lines
     ("Training\n$3,000", False),  # not beside each other

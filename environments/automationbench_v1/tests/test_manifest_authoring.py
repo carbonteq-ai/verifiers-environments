@@ -5,7 +5,10 @@ import json
 
 import pytest
 
-from automationbench_v1.calibration.manifest_authoring import build_authoring_batches
+from automationbench_v1.calibration.manifest_authoring import (
+    build_authoring_batches,
+    build_public_authoring_batches,
+)
 
 
 def selection(tmp_path, count=12):
@@ -60,3 +63,71 @@ def test_changed_or_disallowed_source_cannot_enter_review_batch(tmp_path, mutati
 def test_batch_limit_is_strict_and_bounded(tmp_path, limit):
     with pytest.raises(ValueError, match="bounded_integer"):
         build_authoring_batches(selection(tmp_path, 1), batch_size=limit)
+
+
+def public_selection():
+    return {"tasks": [{"task_name": "support.fixture", "domain": "support", "family": "fixture", "split": "reserved",
+        "public_input": {"task_name": "support.fixture", "domain": "support",
+            "prompt": [{"role": "user", "content": "Public request"}],
+            "initial_state": {"gmail": {"messages": []}}, "zapier_tools": ["gmail_send_email"]}}]}
+
+
+def test_public_only_reserved_authoring_preserves_split_without_trace_or_eligibility():
+    selection = public_selection()
+    batches = build_public_authoring_batches(selection)
+    task = batches[0]["tasks"][0]
+    assert task["split"] == "reserved" and task["training_eligibility"] == "not_granted"
+    assert task["replay_status"] == "unavailable_no_recorded_reference"
+    assert "qualification_source" not in task and "episode_path" not in json.dumps(batches)
+    assert build_public_authoring_batches(selection) == batches
+    selection["tasks"][0]["public_input"]["initial_state"]["gmail"]["messages"].append({"id": "later"})
+    assert task["public_input"]["initial_state"]["gmail"]["messages"] == []
+
+
+@pytest.mark.parametrize("where,key", [("entry", "source_episode_path"), ("entry", "official_rewards"),
+    ("public", "assertions"), ("public", "answer"), ("public", "artifacts")])
+def test_public_only_authoring_rejects_reference_and_hidden_material(where, key):
+    selection = public_selection()
+    entry = selection["tasks"][0]
+    (entry if where == "entry" else entry["public_input"])[key] = "HIDDEN"
+    with pytest.raises(ValueError, match="only_public_fields"):
+        build_public_authoring_batches(selection)
+
+
+@pytest.mark.parametrize("mutation", ["duplicate", "split", "identity", "tools"])
+def test_public_only_authoring_rejects_invalid_identity_split_or_tools(mutation):
+    selection = public_selection()
+    entry = selection["tasks"][0]
+    if mutation == "duplicate":
+        selection["tasks"].append(entry)
+    elif mutation == "split":
+        entry["split"] = "training"
+    elif mutation == "identity":
+        entry["public_input"]["task_name"] = "wrong"
+    else:
+        entry["public_input"]["zapier_tools"] = [None]
+    with pytest.raises((ValueError, TypeError)):
+        build_public_authoring_batches(selection)
+
+
+@pytest.mark.parametrize("limit", [True, 0, 101, 10.0])
+def test_public_only_batch_limit_remains_strict(limit):
+    with pytest.raises(ValueError, match="bounded_integer"):
+        build_public_authoring_batches(public_selection(), batch_size=limit)
+
+
+def test_public_only_batches_preserve_exact_ownership_order_and_split():
+    entries = []
+    for index in range(12):
+        entry = public_selection()["tasks"][0]
+        domain = "support" if index % 2 else "simple"
+        name = f"{domain}.fixture{index}"
+        entry.update(task_name=name, domain=domain, split="development" if index % 2 else "reserved")
+        entry["public_input"].update(task_name=name, domain=domain)
+        entries.append(entry)
+    batches = build_public_authoring_batches({"tasks": entries})
+    assert [len(batch["tasks"]) for batch in batches] == [10, 2]
+    tasks = [task for batch in batches for task in batch["tasks"]]
+    assert len({task["task_name"] for task in tasks}) == 12
+    assert [task["task_name"] for task in tasks] == [entry["task_name"] for entry in entries]
+    assert all(task["split"] == ("reserved" if task["domain"] == "simple" else "development") for task in tasks)

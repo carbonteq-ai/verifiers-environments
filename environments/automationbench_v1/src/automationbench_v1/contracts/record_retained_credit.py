@@ -26,6 +26,7 @@ from .retained_records import (
     _typed_context_populations,
     evaluate_retained_records,
 )
+from .tables import TableEvidence, TableSource
 from .zendesk_effects import ZendeskTicketEffectSource, validate_zendesk_ticket_effects
 
 if TYPE_CHECKING:
@@ -86,8 +87,8 @@ def _project_fields(fields, retention_source):
 
 def evaluate_record_retained_completion(
     source: Mapping, check: RetainedRecordCheck, rule: CreditSpec,
-    populations: Mapping[str, PopulationEvidence], retention: RecordRetentionEvidence,
-    effects: EffectEvidence, *, population_sources: Mapping[str, InitialCollectionSource],
+    populations: Mapping[str, PopulationEvidence | TableEvidence], retention: RecordRetentionEvidence,
+    effects: EffectEvidence, *, population_sources: Mapping[str, InitialCollectionSource | TableSource],
     retention_source: RetainedRecordSource, effect_source: ZendeskTicketEffectSource,
 ) -> CompletionEvaluation:
     from .models import CreditSpec
@@ -105,6 +106,8 @@ def evaluate_record_retained_completion(
     if not set(rule.goal_fields) <= read:
         raise ValueError("record_completion_goal_field_not_read")
     initial = population_sources[check.population]
+    if not isinstance(initial, InitialCollectionSource):
+        raise TypeError("record_completion_initial_identity_population_required")
     if any(alias not in retention_source.fields or initial.fields.get(alias) != retention_source.fields[alias] for alias in read):
         raise ValueError("record_completion_initial_goal_projection_mismatch")
     outcome = evaluate_retained_records(source, check, populations, retention,

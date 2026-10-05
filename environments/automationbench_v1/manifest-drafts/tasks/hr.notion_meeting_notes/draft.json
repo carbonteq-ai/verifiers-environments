@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-notion_meeting_notes",
+  "revision": "luna-manifest-authoring-batch03-20261005-v1",
+  "public_request": "Log the HR committee meeting decisions from today's notes into Notion. Create a page for each decision and email action item owners with their assignments. Use Notion, Gmail, and Google Sheets. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "a862656891f8690931b9f1a9e73aaf9c4aecb029dce91e9394c4d1d9d17ad9b4"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "0659ecb36e5442139876fabe5bebb7fa7f61f524bc70008ace7dd9f35a6641e5"
+    }
+  ],
+  "sources": {
+    "decisions": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_meeting",
+      "worksheet_id": "ws_decisions",
+      "key_fields": [
+        "Decision"
+      ],
+      "required_fields": [
+        "Deadline",
+        "Decision",
+        "Owner",
+        "Owner Email",
+        "Priority"
+      ]
+    },
+    "pages": {
+      "adapter": "service.record_writes@1",
+      "service": "notion",
+      "collection": [
+        "actions",
+        "create_page"
+      ],
+      "kind": "create"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "notion-page-per-decision",
+      "signal_id": "hr.committee_decision_page",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "decisions",
+      "source": "pages",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Decision"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Decision"
+          ],
+          "domain": "string"
+        }
+      },
+      "effect_match": {
+        "op": "any",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "params",
+                "title"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Decision"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "params",
+                "content"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Decision"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "owner-action-email",
+      "signal_id": "hr.committee_action_owner_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "decisions",
+      "source": "sends",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Owner Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Deadline"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Owner Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Owner"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Decision"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Deadline"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              }
+            ],
+            "scope": "text"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

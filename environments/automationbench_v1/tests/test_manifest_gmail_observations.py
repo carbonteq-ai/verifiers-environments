@@ -15,6 +15,7 @@ from automationbench.tools.zapier.gmail.message import (
     gmail_get_email_by_id,
     gmail_list_emails,
 )
+from automationbench.tools.zapier.gmail.thread import gmail_get_thread, gmail_get_threads
 from automationbench_v1.capture import canonical_json
 from automationbench_v1.contracts.gmail_observations import (
     GmailObservationSource,
@@ -31,6 +32,11 @@ def initial():
 
 def read(name="get", *, format="full", identity="message-1", url=None):
     args: dict[str, Any]
+    if name in {"thread", "threads"}:
+        args = {"label_ids": None}
+        function = gmail_get_thread if name == "thread" else gmail_get_threads
+        return zapier("gmail_get_thread" if name == "thread" else "gmail_get_threads", args,
+                      lambda world: function(world, **args))
     if name == "get":
         args = {"message_id": identity, "format": format}
         return zapier("gmail_get_email_by_id", args, lambda world: gmail_get_email_by_id(world, **args))
@@ -81,7 +87,7 @@ def mutate_return(source, change, *, local=True, native=True):
     return source
 
 
-@pytest.mark.parametrize("name", ["find", "list", "get", "api-get"])
+@pytest.mark.parametrize("name", ["find", "list", "get", "api-get", "thread"])
 def test_full_returned_native_paths_prove_original_body_sender_and_identity(name):
     value = evidence(material([read(name)]))
     assert value.complete and len(positive(value)) == 1
@@ -199,3 +205,56 @@ def test_raw_source_recapture_rejects_forged_receipt_metadata_or_params():
             params_json=canonical_json({"message_id": "wrong"})),))):
         with pytest.raises(ValueError, match="raw_source_or_projection"):
             validate_gmail_observations(forged, source, GmailObservationSource())
+
+
+def test_bulk_threads_prove_only_returned_metadata_and_distinct_members():
+    world = initial()
+    world["gmail"]["messages"].append({**world["gmail"]["messages"][0], "id": "message-2"})
+    value = evidence(material([read("threads")], world))
+    assert value.complete and len(positive(value)) == 2
+    params = [json.loads(cast(str, fact.params_json)) for fact in positive(value)]
+    assert {p["message_id"] for p in params} == {"message-1", "message-2"}
+    assert all(p["thread_id"] == "thread-1" and "body_plain" not in p for p in params)
+
+
+@pytest.mark.parametrize("name", ["thread", "threads"])
+def test_empty_thread_search_is_closed_without_fabricated_read(name):
+    source = material([read(name)], {"gmail": {"messages": []}})
+    value = evidence(source)
+    assert value.complete and not value.effects
+
+
+@pytest.mark.parametrize("change", ["thread-id", "member-thread", "count", "body", "duplicate"])
+def test_thread_return_cannot_invent_membership_count_or_content(change):
+    source = material([read("thread")])
+    def alter(result):
+        thread = result["thread"]
+        if change == "thread-id":
+            thread["id"] = "other-thread"
+        elif change == "member-thread":
+            thread["messages"][0]["thread_id"] = "other-thread"
+        elif change == "count":
+            thread["message_count"] = True
+        elif change == "body":
+            thread["messages"][0]["body_plain"] = "Invented"
+        else:
+            thread["messages"].append(copy.deepcopy(thread["messages"][0]))
+            thread["message_count"] = 2
+    value = evidence(mutate_return(source, alter))
+    assert not value.complete and not positive(value)
+
+
+def test_bulk_thread_count_and_thread_missing_ack_abstain():
+    source = material([read("threads")])
+    assert not positive(evidence(mutate_return(source, lambda r: r.update(result_count=9))))
+    source = material([read("thread")])
+    source["state_write_receipts"] = []
+    assert not positive(evidence(source))
+
+
+def test_thread_projection_revalidates_after_material_roundtrip():
+    source = material([read("thread")])
+    value = evidence(source)
+    restored = json.loads(canonical_json(source))
+    validate_gmail_observations(value, restored, GmailObservationSource())
+    assert evidence(restored) == value

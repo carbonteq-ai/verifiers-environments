@@ -20,6 +20,7 @@ from .operators import OPERATORS, fields_equal
 from .retained import RetainedRowCheck
 from .retained_records import RetainedRecordCheck
 from .summary_policy import SummaryExclusionCheck
+from .terminal_counts import TerminalCountCheck
 
 
 class CheckResult(BaseModel):
@@ -64,7 +65,7 @@ class Evaluation(BaseModel):
 def compile_contract(contract: ContractSpec) -> tuple[str, ...]:
     """Pure validation/planning: expected IDs do not depend on passing outcomes."""
     for check in contract.checks:
-        if not isinstance(check, (GuardCheck, ObligationCheck, RetainedRowCheck, RetainedRecordCheck, CreatedRetainedCheck, SummaryExclusionCheck, NoClarificationCheck)) and check.operator not in OPERATORS:
+        if not isinstance(check, (GuardCheck, ObligationCheck, RetainedRowCheck, RetainedRecordCheck, TerminalCountCheck, CreatedRetainedCheck, SummaryExclusionCheck, NoClarificationCheck)) and check.operator not in OPERATORS:
             raise ValueError("manifest_operator_unsupported")
     return tuple(check.check_id for check in contract.checks)
 

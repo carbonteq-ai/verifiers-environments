@@ -39,7 +39,7 @@ from .populations import (
 )
 from .predicates import Predicate, evaluate_predicate, parse_predicate
 from .retained import RetainedCase, RetainedEvaluation, RetainedFinding
-from .tables import Digest
+from .tables import Digest, TableEvidence, TableSource, capture_table
 
 
 def _digest(value):
@@ -74,6 +74,18 @@ class RetainedRecordSource(FrozenModel):
         return dict(value)
 
 
+class RetainedCount(FrozenModel):
+    """Candidate-relative count over the same closed terminal collection."""
+
+    alias: Identifier
+    where: Predicate
+
+    @field_validator("where", mode="before")
+    @classmethod
+    def predicate(cls, value):
+        return parse_predicate(value)
+
+
 class RetainedRecordCheck(FrozenModel):
     check_id: Identifier
     signal_id: Identifier
@@ -82,6 +94,7 @@ class RetainedRecordCheck(FrozenModel):
     population: Identifier
     source: Identifier
     lookups: tuple[LookupSpec, ...] = ()
+    counts: tuple[RetainedCount, ...] = Field(default=(), max_length=8, exclude_if=lambda value: not value)
     required_when: Predicate
     supported_when: Predicate | None = Field(default=None, exclude_if=lambda value: value is None)
     retained_when: Predicate
@@ -95,20 +108,52 @@ class RetainedRecordCheck(FrozenModel):
     @model_validator(mode="after")
     def context(self):
         aliases = [lookup.alias for lookup in self.lookups]
-        if len(set(aliases)) != len(aliases) or set(aliases) & {"request", "candidate", "retained", "effect"}:
+        if len(set(aliases)) != len(aliases) or set(aliases) & {"request", "candidate", "retained", "effect", "member", "count"}:
             raise ValueError("retained_record_lookup_alias_conflict")
         available = {"request", "candidate"}
         for lookup in self.lookups:
             if any(len(value.path) < 2 or value.path[0] not in available for value in lookup.keys.values()):
                 raise ValueError("retained_record_lookup_context_unknown")
             available.add(lookup.alias)
+        count_aliases = [item.alias for item in self.counts]
+        if len(set(count_aliases)) != len(count_aliases):
+            raise ValueError("retained_record_count_alias_conflict")
+        for item in self.counts:
+            if any(len(path) < 2 or path[0] not in available | {"member"}
+                   for path in _fields(item.where.model_dump(mode="python"))):
+                raise ValueError("retained_record_count_context_unknown")
         for name in ("required_when", "supported_when", "retained_when"):
             predicate = getattr(self, name)
-            roots = available | ({"retained"} if name == "retained_when" else set())
+            roots = available | ({"retained", "count"} if name == "retained_when" else set())
             if predicate is not None and any(len(path) < 2 or path[0] not in roots
                     for path in _fields(predicate.model_dump(mode="python"))):
                 raise ValueError("retained_record_predicate_context_unknown")
+            if predicate is not None and any(path[0] == "count" and (
+                    len(path) != 2 or path[1] not in count_aliases)
+                    for path in _fields(predicate.model_dump(mode="python"))):
+                raise ValueError("retained_record_count_alias_unknown")
         return self
+
+
+def admit_retained_record_projections(check, contexts, *, candidate_error="retained_record_candidate_projection_undeclared"):
+    """Apply the same projection admission at compilation and direct evaluation."""
+    contexts = {**contexts, "member": contexts["retained"]}
+    for path in _fields(check.model_dump(mode="python")):
+        if path[0] == "candidate":
+            if path[1] not in {"identity", "native_record_id"} or len(path) != 2:
+                raise ValueError(candidate_error)
+            continue
+        if path[0] == "count":
+            continue  # The typed check admits only declared, scalar count aliases.
+        selector = contexts[path[0]]
+        if isinstance(selector, TableSource):
+            if len(path) != 2 or path[1] not in (*selector.key_fields, *selector.required_fields):
+                raise ValueError("retained_record_predicate_projection_undeclared")
+            continue
+        if path[1] not in selector.fields:
+            raise ValueError("retained_record_predicate_projection_undeclared")
+        model = _model(cast(str, selector.path[2]), cast(str, selector.path[3]))
+        _field(model, (*selector.fields[path[1]], *path[2:]))
 
 
 class RetainedRecord(FrozenModel):
@@ -195,6 +240,11 @@ def _typed_context_populations(check, populations, selectors):
     working = {}
     for name, population in populations.items():
         spec = selectors[name]
+        if isinstance(spec, TableSource):
+            # Table cells retain their authenticated JSON domains. Predicate
+            # declarations decide numeric/string interpretation without coercion.
+            working[name] = population
+            continue
         model = _model(cast(str, spec.path[2]), cast(str, spec.path[3]))
         rows = []
         for row in population.rows:
@@ -285,20 +335,30 @@ def plan_retained_record_instances(check: RetainedRecordCheck, population: Popul
                  for identity in dict.fromkeys(row.identity for row in population.rows)), count
 
 
-def evaluate_retained_records(source: Mapping, check: RetainedRecordCheck, populations: Mapping[str, PopulationEvidence],
-        retention: RecordRetentionEvidence, *, population_sources: Mapping[str, InitialCollectionSource],
+def evaluate_retained_records(source: Mapping, check: RetainedRecordCheck, populations: Mapping[str, PopulationEvidence | TableEvidence],
+        retention: RecordRetentionEvidence, *, population_sources: Mapping[str, InitialCollectionSource | TableSource],
         retention_source: RetainedRecordSource) -> RetainedEvaluation:
     check = RetainedRecordCheck.model_validate(check.model_dump(mode="python", warnings=False))
     required_sources = {check.population, *(lookup.source for lookup in check.lookups)}
     if set(populations) != required_sources or set(population_sources) != required_sources:
         raise ValueError("retained_record_population_inventory_mismatch")
     for name in required_sources:
-        spec = InitialCollectionSource.model_validate(population_sources[name].model_dump(mode="python", warnings=False))
-        actual = capture_population(source, spec)
-        admitted = PopulationEvidence.model_validate(populations[name].model_dump(mode="python", warnings=False))
+        selector = population_sources[name]
+        if isinstance(selector, TableSource):
+            spec = TableSource.model_validate(selector.model_dump(mode="python", warnings=False))
+            if name == check.population or spec.path != ("task_evidence", "initial", "google_sheets"):
+                raise ValueError("retained_record_initial_lookup_required")
+            actual = capture_table(source, spec)
+            admitted = TableEvidence.model_validate(populations[name].model_dump(mode="python", warnings=False))
+        else:
+            spec = InitialCollectionSource.model_validate(selector.model_dump(mode="python", warnings=False))
+            actual = capture_population(source, spec)
+            admitted = PopulationEvidence.model_validate(populations[name].model_dump(mode="python", warnings=False))
         if canonical_json(admitted.model_dump(mode="json")) != canonical_json(actual.model_dump(mode="json")):
             raise ValueError("retained_record_initial_projection_mismatch")
     initial = population_sources[check.population]
+    if not isinstance(initial, InitialCollectionSource):
+        raise TypeError("retained_record_initial_identity_population_required")
     if initial.path[2:] != retention_source.path[2:] or initial.identity_path != retention_source.identity_path:
         raise ValueError("retained_record_collection_scope_mismatch")
     for lookup in check.lookups:
@@ -306,16 +366,7 @@ def evaluate_retained_records(source: Mapping, check: RetainedRecordCheck, popul
             raise ValueError("retained_record_lookup_key_inventory_mismatch")
     contexts = {"request": initial, "retained": retention_source,
                 **{lookup.alias: population_sources[lookup.source] for lookup in check.lookups}}
-    for path in _fields(check.model_dump(mode="python")):
-        if path[0] == "candidate":
-            if path[1] not in {"identity", "native_record_id"} or len(path) != 2:
-                raise ValueError("retained_record_candidate_projection_undeclared")
-            continue
-        selector = contexts[path[0]]
-        if path[1] not in selector.fields:
-            raise ValueError("retained_record_predicate_projection_undeclared")
-        model = _model(cast(str, selector.path[2]), cast(str, selector.path[3]))
-        _field(model, (*selector.fields[path[1]], *path[2:]))
+    admit_retained_record_projections(check, contexts)
     validate_record_retention(retention, source, retention_source)
     population = populations[check.population]
     working_populations = _typed_context_populations(check, populations, population_sources)
@@ -324,6 +375,9 @@ def evaluate_retained_records(source: Mapping, check: RetainedRecordCheck, popul
     if count > check.max_instances:
         return RetainedEvaluation(source_id, check_id, (), False, "retained_record_instance_budget_exceeded")
     findings = []
+    count_budget_ok = len(cases) * len(retention.rows) * len(check.counts) <= 65536
+    members = tuple((record, json.loads(record.cells_json)) for record in retention.rows) if (
+        check.counts and count_budget_ok and retention.closed and retention.finalized) else ()
     for case in cases:
         rows = [row for row in population.rows if row.identity == case.candidate_identity]
         row, native_id = rows[0], case.candidate_identity[3]
@@ -359,10 +413,25 @@ def evaluate_retained_records(source: Mapping, check: RetainedRecordCheck, popul
                 else:
                     context["retained"] = json.loads(matches[0].cells_json)
                     paths += (matches[0].source_path,)
+                    if check.counts:
+                        counts = {}
+                        if count_budget_ok and retention.closed:
+                            for count_spec in check.counts:
+                                total, decided = 0, True
+                                for member, cells in members:
+                                    membership = evaluate_predicate(count_spec.where, {**context, "member": cells})
+                                    paths += (member.source_path, *membership.evidence_paths)
+                                    if membership.value is None:
+                                        decided = False
+                                    elif membership.value:
+                                        total += 1
+                                if decided:
+                                    counts[count_spec.alias] = total
+                        context["count"] = counts
                     result = evaluate_predicate(check.retained_when, context)
                     paths += result.evidence_paths
                     if result.value is None:
-                        reason = "retained_record_predicate_unavailable"
+                        reason = "retained_record_count_budget_exceeded" if check.counts and not count_budget_ok else "retained_record_predicate_unavailable"
                     else:
                         status, value, reason = "valid", float(result.value), "retained_record_predicate_verified"
         findings.append(RetainedFinding(check.check_id, case.instance_key, check.signal_id, case.candidate_identity,

@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-link_building-batch07-public-components",
+  "revision": "batch07-public-components-r1",
+  "public_request": "Use the latest link-building qualification criteria on ss_prospects/ws_sites and send qualifying sites with raw DA scores to seo-lead@company.example.com.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "c97d8dfe23081644f23051c13666307e7b2446c0b4505b920bd451a019b21317"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "b7ef17444185761ffbbd82205ac8f30c4694fd2e5eea555bcf579d099987fd59"
+    }
+  ],
+  "sources": {
+    "sites": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_prospects",
+      "worksheet_id": "ws_sites",
+      "key_fields": [
+        "site"
+      ],
+      "required_fields": [
+        "accepts_guest_posts",
+        "contact_email",
+        "domain_authority",
+        "niche",
+        "notes",
+        "site"
+      ]
+    },
+    "emails": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "policies": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "from": [
+          "from_"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "body": [
+          "body_plain"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "from",
+        "subject",
+        "body"
+      ],
+      "identity_paths": [
+        [
+          "id"
+        ]
+      ]
+    },
+    "policy_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_prospects",
+      "worksheet_id": "ws_sites"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "link-building-policy",
+      "fields": {
+        "recipient": {
+          "value": "seo-lead@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "da_threshold": {
+          "value": "50",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              2,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "qualifying-site-in-seo-batch",
+      "signal_id": "marketing.qualifying_link_site_reported",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "sites",
+      "source": "emails",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "gt",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "domain_authority"
+                ]
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": 50
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "accepts_guest_posts"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "yes"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "do not contact"
+              },
+              "mode": "words"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "not accepting submissions"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "seo-lead@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "site"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "domain_authority"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "decimal_string"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prospect_sheet_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manager_criteria_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prospect_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_prospects"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_sites"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "manager_criteria_read",
+          "source": "policy_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_mgr_lb"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

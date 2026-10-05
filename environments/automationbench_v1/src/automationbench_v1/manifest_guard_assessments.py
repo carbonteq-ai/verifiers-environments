@@ -14,7 +14,9 @@ import verifiers.v1 as vf
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr, model_validator
 
 from .capture import canonical_json
+from .contracts.airtable_reads import AirtableReadSource, capture_airtable_reads
 from .contracts.base import FrozenModel
+from .contracts.buffer_reads import BufferChannelReadSource, capture_buffer_channel_reads
 from .contracts.effects import EffectEvidence, EffectFact, EffectSource, capture_effects
 from .contracts.engine import binding_reason
 from .contracts.existentials import exists_names
@@ -28,6 +30,10 @@ from .contracts.guards import (
 )
 from .contracts.linkedin_reads import LinkedInReadSource, capture_linkedin_reads
 from .contracts.loader import canonical_contract_digest, load_contract
+from .contracts.mailchimp_reads import (
+    MailchimpSubscriberReadSource,
+    capture_mailchimp_subscriber_reads,
+)
 from .contracts.notification_effects import NotificationEffectSource, capture_notification_effects
 from .contracts.populations import InitialCollectionSource, PopulationEvidence, capture_population
 from .contracts.record_writes import RecordWriteSource, capture_record_writes
@@ -36,7 +42,9 @@ from .contracts.sheet_effects import SheetEffectSource, capture_sheet_effects
 from .contracts.sheet_reads import SheetReadSource, capture_sheet_reads
 from .contracts.slack_effects import SlackEffectSource, capture_slack_effects
 from .contracts.slack_reads import SlackReadSource, capture_slack_reads
+from .contracts.slack_user_reads import SlackUserReadSource, capture_slack_user_reads
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
+from .contracts.trello_reads import TrelloListReadSource, capture_trello_list_reads
 from .manifest_source import manifest_source_material
 
 GUARD_PRODUCER = "automationbench.manifest_guards"
@@ -68,7 +76,7 @@ class FactInput(FrozenModel):
     effect_id: StrictStr | None
     invocation_id: StrictStr = Field(min_length=1)
     origin: Literal["tool_server"]
-    kind: Literal["create_task", "add_task_to_section", "send", "append", "update", "channel_message", "direct_message", "read_message", "read_sheet", "read_record", "create", "delete"]
+    kind: Literal["create_task", "add_task_to_section", "send", "append", "update", "channel_message", "direct_message", "read_message", "read_sheet", "read_record", "read_list", "read_subscribers", "read_user", "read_channels", "create", "delete"]
     params_json: StrictStr | None
     status: Literal["qualified", "unavailable"]
     reason: StrictStr = Field(min_length=1)
@@ -236,6 +244,16 @@ def _capture_effect_input(source, spec):
         return capture_gmail_observations(source, spec)
     if isinstance(spec, SlackReadSource):
         return capture_slack_reads(source, spec)
+    if isinstance(spec, SlackUserReadSource):
+        return capture_slack_user_reads(source, spec)
+    if isinstance(spec, BufferChannelReadSource):
+        return capture_buffer_channel_reads(source, spec)
+    if isinstance(spec, MailchimpSubscriberReadSource):
+        return capture_mailchimp_subscriber_reads(source, spec)
+    if isinstance(spec, TrelloListReadSource):
+        return capture_trello_list_reads(source, spec)
+    if isinstance(spec, AirtableReadSource):
+        return capture_airtable_reads(source, spec)
     if isinstance(spec, SheetReadSource):
         return capture_sheet_reads(source, spec)
     if isinstance(spec, LinkedInReadSource):
@@ -253,6 +271,7 @@ def _guard_names(contract):
     checks = [check for check in contract.checks if isinstance(check, GuardCheck)]
     table_names = {name for check in checks
                    for name in (check.population, *(lookup.source for lookup in check.lookups),
+                                *(item.source for item in check.request_aliases),
                                 *exists_names(check), *(item.population for item in check.selections))}
     effect_names = {name for check in checks
                     for name in (check.source, *(item.source for item in check.effect_joins),
@@ -288,7 +307,7 @@ def _capture_guard_inputs(source, contract, source_digest) -> dict:
     effects = {
         key: asdict(capture_effect_input(source, spec, source_digest=source_digest))
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource, AirtableReadSource, TrelloListReadSource, MailchimpSubscriberReadSource, SlackUserReadSource, BufferChannelReadSource, LinkedInReadSource))
     }
     return {
         "table_evidence_json": canonical_json(tables),
@@ -318,7 +337,7 @@ def restore_guard_inputs(material, contract):
     effect_sources = {
         key: spec
         for key, spec in contract.sources.items()
-        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource))
+        if key in effect_names and isinstance(spec, (EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource, RecordWriteSource, GmailObservationSource, SlackReadSource, SheetReadSource, AirtableReadSource, TrelloListReadSource, MailchimpSubscriberReadSource, SlackUserReadSource, BufferChannelReadSource, LinkedInReadSource))
     }
     if set(tables) != set(table_sources) or set(effects) != set(effect_sources):
         raise ValueError("guard_input_inventory_mismatch")
@@ -340,6 +359,7 @@ def required_tables(check):
     return {
         check.population,
         *(lookup.source for lookup in check.lookups),
+        *(item.source for item in getattr(check, "request_aliases", ())),
         *(item.aggregate.population for item in getattr(check, "aggregates", ())),
         *(item.population for item in getattr(check, "selections", ())),
         *exists_names(check),

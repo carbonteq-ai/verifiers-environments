@@ -23,3 +23,9 @@ Simulator: verbatim and prose-time correct paths score 1; the SEC-hold window fi
 guards and earns nothing; primary calendar earns no event credit; listing other windows'
 dates fires the announcement guard; schedule-then-delete fires the undo guard; notice with
 no event earns nothing; missing ACK stays unknown.
+
+## Calendar current check addendum (2026-10-05)
+
+A current-hash genuine-handler control set now covers `scheduled-window-cancelled`: unrelated deletion is valid/0, canceling the requested event is valid/1, and an unacknowledged cancellation abstains. The ordinary event, Airtable, and email goals remain valid/1 in the positive scenario. The read-before-act requirement remains unsupported. Full source hashes and candidate findings are in `/tmp/automationbench-ops-review-addenda-20261005/calendar_airtable_gmail_maintenance_notice-current-controls.json`.
+
+A later shared `predicates.py` change (current SHA-256 `cd2dcf3358cedb128f39f194b56105e712bf17906d8e8bd1ec61a5e2d413cab6`) only altered trailing-colon amount parsing. This cancellation check does not use that operator; the executed controls remain historical under their recorded helper hashes, not restamped to the new source.

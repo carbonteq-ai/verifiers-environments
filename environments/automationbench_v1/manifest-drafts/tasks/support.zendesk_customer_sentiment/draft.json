@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-zendesk_customer_sentiment-batch09-public",
+  "revision": "luna_batch09_public_component_v1",
+  "public_request": "Review our open Zendesk tickets and flag any that need special attention based on how the customer is feeling. Adjust priority and routing as appropriate. Check the sentiment config spreadsheet (ss_config, worksheet 'ws_config') for reporting parameters, include its Batch_Reference value, and post a sentiment summary to #customer-health.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "69a305841b850538753b6956c53d05d6405f568a021279df874f8e2fd7dd3371"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk"
+      ],
+      "canonical_sha256": "d11d37a475b49404a668cea6046a302b2781cafc1f922a46578de19f2fdc5d37"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "canonical_sha256": "abc9a7e730a952f5656bb1dede9734ed691d5af9b5fe652bb2a69c50fe9c28ee"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack"
+      ],
+      "canonical_sha256": "4b32af484ad3e0403be7eb5ed72304d6cdb70d063d98e58a0864d9efe2bbace3"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "candidate",
+      "fields": {
+        "case_key": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "google_sheets",
+            "rows",
+            0,
+            "cells",
+            "Value"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ]
+          ]
+        },
+        "batch_reference": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "google_sheets",
+            "rows",
+            0,
+            "cells",
+            "Value"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ]
+          ]
+        },
+        "channel_id": {
+          "value": "C_HEALTH",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              0,
+              "id"
+            ]
+          ]
+        }
+      }
+    },
+    "tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "priority": [
+          "priority"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "id": [
+          "id"
+        ],
+        "description": [
+          "description"
+        ],
+        "tags": [
+          "tags"
+        ],
+        "requester_id": [
+          "requester_id"
+        ],
+        "status": [
+          "status"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "status",
+        "priority",
+        "subject"
+      ]
+    },
+    "users": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "users"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "email": [
+          "email"
+        ],
+        "name": [
+          "name"
+        ],
+        "role": [
+          "role"
+        ],
+        "id": [
+          "id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "email",
+        "name"
+      ]
+    },
+    "config": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_config",
+      "worksheet_id": "ws_config",
+      "key_fields": [
+        "Key"
+      ],
+      "required_fields": [
+        "Value"
+      ]
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "post-customer-health-batch-summary",
+      "signal_id": "post-customer-health-batch-summary",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "case_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "batch_reference"
+          ],
+          "domain": "string"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "batch_reference"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

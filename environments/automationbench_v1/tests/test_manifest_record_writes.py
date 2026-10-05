@@ -253,6 +253,27 @@ def test_values_text_exposes_agent_chosen_fields():
     assert "Inspect Generator A-2" in payload(fact)["values_text"].splitlines()
 
 
+@pytest.mark.parametrize("shape", ["typed", "actions"])
+def test_persisted_effect_predicates_use_exact_record_projection(shape):
+    from automationbench_v1.contracts.predicates import evaluate_predicate, parse_predicate
+
+    if shape == "typed":
+        source, invocation, name, path = ZOOM, meeting(), "Safety training", ["effect", "record", "topic"]
+    else:
+        source = RecordWriteSource(service="monday", collection=("actions", "create_item"), kind="create")
+        invocation = call("monday_create_item", monday_create_item, board_id="b1", item_name="Inspect Generator A-2")
+        name, path = "Inspect Generator A-2", ["effect", "record", "params", "item_name"]
+    evidence = capture_record_writes(run_operations(world(), [invocation]), source)
+    assert evidence.complete and len(evidence.effects) == 1
+    context = {"effect": payload(evidence.effects[0])}
+    predicate = {"op": "eq", "left": {"kind": "field", "path": path, "domain": "string"},
+        "right": {"kind": "literal", "value": name}}
+    assert evaluate_predicate(parse_predicate(predicate), context).value is True
+    extra_wrapper = copy.deepcopy(predicate)
+    extra_wrapper["left"]["path"].insert(2, "record")
+    assert evaluate_predicate(parse_predicate(extra_wrapper), context).value is None
+
+
 def test_generated_fields_absent_from_public_records_do_not_block_closure():
     seeded = world()
     seeded["salesforce"] = {"tasks": [{"id": "t0", "subject": "Existing", "status": "Open"}]}

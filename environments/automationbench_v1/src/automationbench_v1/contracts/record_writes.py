@@ -58,7 +58,7 @@ def _list_model(annotation):
 
 
 def collection_shape(service: str, collection: tuple[str, ...], *, declared_identity: bool = False
-                     ) -> Literal["list", "actions"]:
+) -> Literal["list", "actions", "airtable_records"]:
     """Validate a collection path against the installed simulator schema.
 
     A list whose items have no ``id`` (Xero: ``contact_id``, ``invoice_id``...)
@@ -72,6 +72,10 @@ def collection_shape(service: str, collection: tuple[str, ...], *, declared_iden
     fields = getattr(model, "model_fields", {})
     if not collection or collection[0] not in fields:
         raise ValueError("record_writes_collection_unknown")
+    if service == "airtable" and collection == ("bases", "tables", "records"):
+        if declared_identity:
+            raise ValueError("record_writes_airtable_identity_fixed")
+        return "airtable_records"
     annotation = fields[collection[0]].annotation
     item = _list_model(annotation)
     if item is not None:
@@ -91,7 +95,8 @@ def collection_shape(service: str, collection: tuple[str, ...], *, declared_iden
 class RecordWriteSource(FrozenModel):
     adapter: Literal["service.record_writes@1"] = "service.record_writes@1"
     service: Identifier
-    # [<list field>] or ["actions", <action_key>, ...]: several action keys form
+    # [<list field>], Airtable ["bases", "tables", "records"], or
+    # ["actions", <action_key>, ...]: several action keys form
     # one inventory, so an equivalent write through a sibling action counts.
     collection: tuple[Identifier, ...] = Field(min_length=1, max_length=9)
     kind: RecordKind
@@ -125,6 +130,8 @@ def _collection(world, spec: RecordWriteSource):
     service = world.get(spec.service)
     if not isinstance(service, Mapping):
         raise TypeError("record_writes_service_unavailable")
+    if spec.service == "airtable" and spec.collection == ("bases", "tables", "records"):
+        return _airtable_records(service)
     value = service.get(spec.collection[0])
     if len(spec.collection) > 1:
         if not isinstance(value, Mapping):
@@ -139,6 +146,46 @@ def _collection(world, spec: RecordWriteSource):
     if not isinstance(value, (list, tuple)):
         raise TypeError("record_writes_collection_unavailable")
     return value
+
+
+def _airtable_records(service: Mapping) -> list[dict]:
+    """Flatten one fixed simulator layout; retain parent identity and actual fields.
+
+    No JSON query language is admitted. Duplicate parents are rejected even if
+    they happen to contain disjoint row IDs: the real handler may mutate multiple
+    matching parents. Parent display names are not row mutations or identities.
+    """
+    budget = 65_536
+
+    def children(parent, name):
+        nonlocal budget
+        value = parent.get(name)
+        if not isinstance(value, (list, tuple)):
+            raise TypeError("record_writes_airtable_collection_unavailable")
+        budget -= len(value)
+        if budget < 0:
+            raise ValueError("record_writes_airtable_inventory_budget_exceeded")
+        seen = set()
+        for item in value:
+            if not isinstance(item, Mapping) or type(item.get("id")) is not str or not item["id"]:
+                raise ValueError("record_writes_airtable_identity_unresolved")
+            if item["id"] in seen:
+                raise ValueError("record_writes_airtable_duplicate_identity")
+            seen.add(item["id"])
+        return value
+
+    flattened = []
+    for base in children(service, "bases"):
+        for table in children(base, "tables"):
+            for row in children(table, "records"):
+                if not isinstance(row.get("fields"), Mapping):
+                    raise TypeError("record_writes_airtable_fields_unavailable")
+                flattened.append({
+                    "id": canonical_json([base["id"], table["id"], row["id"]]),
+                    "base_id": base["id"], "table_id": table["id"],
+                    "record_id": row["id"], "fields": _plain(row["fields"]),
+                })
+    return flattened
 
 
 def _records(world, spec: RecordWriteSource) -> dict[str, tuple]:
@@ -277,6 +324,8 @@ def capture_record_writes(source: Mapping, spec: RecordWriteSource) -> EffectEvi
         initial, final = task["initial"], task["final"]
         if task.get("complete") is not True:
             raise ValueError("record_writes_task_finalization_unavailable")
+        if spec.service == "airtable" and spec.collection == ("bases", "tables", "records"):
+            _records(final, spec)
         expected = {item.invocation_id for item in index.occurrences if item.origin == "tool_server"}
         writes = source["state_write_receipts"]
         if len(writes) != len(expected) or {item["write_id"] for item in writes} != expected:

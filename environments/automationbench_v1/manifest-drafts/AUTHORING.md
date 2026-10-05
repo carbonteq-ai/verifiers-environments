@@ -1,5 +1,333 @@
 # Manifest authoring guide
 
+Native synthetic-control archives must retain the exact task data through wire
+serialization. Copy the retained native `TraceTask[WireTaskData]` task value
+when its public input is unchanged; keep typed `AutomationBenchData` separately
+for the scorer. Creating unparameterized `TraceTask(type="Task", data=...)` can
+serialize only base task fields and lose initial state/tools/assertions. A task
+type string alone does not fix that. Verify required data fields and exact public
+bindings on the deserialized wire before claiming self-contained replay parity.
+External-fixture reload results remain bounded as such and must not be restamped.
+
+Trello list-read inventory admits audited `trello_card_label` mutations beside
+reads only with native acknowledged receipts. Label mutations do not emit read
+facts; unknown changes and missing ACKs keep inventory unavailable. Ordered
+list-read joins still require explicit exact public returned list identity.
+
+## Slack user lookups (2026-10-05)
+
+Use `slack.user_reads@1`, kind `read_user`, for native email, ID, name or
+username lookups. It reconstructs the exact handler return from captured state,
+requires unchanged Slack state and acknowledged lifecycle receipts, and retains
+`record`, `native_record_id`, `query_operation`, `query_args`, `found` and
+`returned_count`. The 8 MiB Slack-state budget fails closed. Authenticated
+not-found responses produce a scoped zero-result fact; they invent no user ID.
+DM/channel sends emit no lookup facts. Other Slack operations remain unsupported
+for this source. Existing message-read semantics are unchanged.
+
+For lookup-before-DM obligations, join `joined.record.id` to
+`effect.recipient_user_id` with `returned_before_dispatch`, and bind the lookup
+arguments to public inputs. Six focused authenticity/order/ACK/archive tests
+pass in the 396-test shared gate. These are component checks, not task eligibility.
+
+## Public parameters beside row candidates (2026-10-05)
+
+Obligation and guard checks may declare up to 16 explicit
+`request_aliases: [{"alias": "policy", "source": "request_parameters"}]`.
+The named source must be `public.request@1`, authenticated by existing public
+bindings. Its closed, enumerated singleton publishes fields under `policy.*`;
+candidate row fields remain under `request.*`. Missing authority or fields
+leave the alias unavailable. Names cannot collide with reserved, lookup,
+selection, join or aggregate namespaces. No parameter alias can supply initial
+baseline discharge. Empty aliases are omitted from serialized declarations.
+Native goal/guard, missing-authority, missing-ACK and reload regressions are in
+`tests/test_manifest_request_aliases.py`. This capability supplies explicit
+public context; it does not establish whole-task qualification.
+
+## Conditional numeric policy rules (2026-10-05)
+
+Use `conditional_number` inside a derived value or selector ranking expression
+when a public policy explicitly maps categories or ranges to numeric points:
+
+```json
+{
+  "kind": "conditional_number",
+  "branches": [
+    {
+      "when": {"op": "eq", "left": {"kind": "field", "path": ["member", "tier"], "domain": "string"}, "right": {"kind": "literal", "value": "Enterprise"}},
+      "value": {"kind": "input", "format": "number", "literal": 4}
+    },
+    {
+      "when": {"op": "eq", "left": {"kind": "field", "path": ["member", "tier"], "domain": "string"}, "right": {"kind": "literal", "value": "Mid-Market"}},
+      "value": {"kind": "input", "format": "number", "literal": 2}
+    }
+  ]
+}
+```
+
+Conditions use the existing typed predicates; values use exact decimal arithmetic.
+All conditions are evaluated. Exactly one must be known true and all others known
+false. Missing/wrong-type inputs, an unknown condition, overlapping true branches,
+unmapped categories or a nonnumeric result are unavailable. There is no default
+zero or first-match priority. Explicitly declare a zero branch where policy says
+zero. At most sixteen branches are admitted within existing depth/node budgets.
+Paths/raw input evidence are retained and ordinary source projection admission
+still applies. `member` is valid only where the enclosing API supplies a member
+context; use the actual declared context elsewhere.
+
+This permits a weighted score to distinguish a public 11-point candidate from
+a 9-point candidate even when an unrelated existing lead_score ranks them in the
+opposite order. It does not invent title-to-seniority, timezone-to-region or other
+category mappings absent from public policy. Declare those gaps separately.
+The 407-test value/selection/obligation/schema gate includes native handler and
+reload coverage; task adoption and action-credit qualification remain separate.
+
+## Bounded fresh occurrences (2026-10-05)
+
+An `effects.required_when@1` check with `semantics: new_occurrence` may declare
+`occurrence_bounds: {minimum: 1, maximum: 1}` to require exactly one matching
+qualified occurrence per required candidate. Inclusive ranges are supported;
+bounds are strict positive integers up to 65536. Omission preserves the existing
+at-least-one semantics and declaration digest. Alternatives and initial discharge
+are excluded from this bounded mode. Counted identities are distinct native
+invocation/effect pairs, not repeated copies of a receipt or unique text strings.
+
+Passing a finite bound requires a closed population/effect inventory and no
+unresolved matching evidence. Missing ACK or ambiguous matching remains unknown.
+Observed excess proves failure even when additional capture is unavailable.
+Bounds cover only the declared effect predicate and candidate: they do not prove
+all unrelated actions were permitted or that terminal objects still exist.
+Bounded checks are outcome-only; credit declarations are rejected. Keep separate
+useful/harmful action checks until an explicit count attribution policy exists.
+
+## Retained-record goals with public Sheet lookups (2026-10-05)
+
+`records.retained_when@1` keeps its initial typed-record population and original
+native IDs. A lookup may additionally use a `google_sheets.rows@1` source at
+`task_evidence.initial.google_sheets`. Declare exact spreadsheet/worksheet IDs,
+all lookup key headers and projected cell headers. References to a Sheet alias
+are exactly `alias.<header>`; nested undeclared cells are rejected. Every lookup
+projection is recomputed against raw input. Missing, ambiguous and incomplete
+mapping evidence remains unknown. This supports candidate-relative public
+source-to-target rules without copying one example's target into every goal.
+
+Existing Zendesk completion credit can use such mappings; a verified terminal
+goal alone still does not establish a completing action. Initial satisfaction,
+ACK/persistence, native invocation identity and once-only consumption gates
+remain unchanged. Tests in `tests/test_retained_sheet_lookups.py` exercise real
+updates, ambiguous/missing mappings, raw tampering, missing ACK and scored
+native reload. These manufactured checks do not qualify a public task.
+
+## Diagnose declaration errors before changing capture (2026-10-05)
+
+A numeric `mentions` target cannot use a string-only input parser implicitly.
+For a numeric public request field, use this existing source-bound value:
+`{"kind":"derived","expression":{"kind":"input","format":"number","path":["request","count"]}}`.
+The mention's `format:"decimal_string"` then describes numbers scanned in the
+message. A literal string `"3"` is valid decimal text; numeric literal `3` with
+the string-only parser is unavailable. Do not silently coerce malformed inputs.
+
+An effect may match multiple candidate contexts even when `required_when` makes
+only one candidate applicable. The default unique witness policy still checks
+effect matching over all contexts. Make the effect predicate candidate-relative,
+or explicitly declare `match_cardinality:"per_candidate"` for a public report
+that legitimately serves multiple candidates. That outcome setting cannot use
+once-only effect credit without an explicit supported aggregation policy.
+Block-scoped mentions intentionally combine tokens within one block: they do
+not prove that platform/day/time describe the same item in a multi-item paragraph.
+Keep unsafe co-reference harm guards unavailable rather than fitting separators.
+
+## Author without a recorded reference (2026-10-05)
+
+`calibration.manifest_authoring.build_public_authoring_batches` takes entries
+with task_name, domain, family, existing split and public_input. That input must
+contain only task_name, domain, prompt, initial_state and zapier_tools. The
+coordinator verifies the canonical inputs, allowed split and exact ownership.
+Reserved tasks retain their reserved split; no held-out outcome or trace is an
+authoring input. These packs explicitly mark replay unavailable and training
+eligibility ungranted. Genuine-handler component controls are still possible;
+they do not substitute for a recorded reference or qualify the whole task.
+
+## Parse explicitly marked percentage points (2026-10-05)
+
+Use `input.format=percent_points_string` for source strings such as `-28%`.
+The exact value is -28 points, not -0.28. A threshold can use the same format
+and literal `-20%`, or a numerical -20; public policy owns the comparison and
+units. The parser requires a percent sign and strict signed decimal notation.
+Bare numbers, whitespace, localized formats and oversized values stay unknown.
+Convert to a fraction only through an explicit declared division by 100.
+
+## Count final worksheet members against an initial roster (2026-10-05)
+
+`collections.counts_when@1` accepts a final `google_sheets.row_writes@1`
+selector identifying one worksheet. Declare exact cell headers in the check's
+`member_fields` (nonempty, unique, maximum 64). Each count predicate may compare
+`member.<header>` with declared `request` fields; `counts_when` compares the
+resulting aliases under `count`. Missing cells or unclosed final evidence stay
+unknown. This is terminal outcome evidence, with no causal action credit.
+Use source policy for required counts; do not invent canonical allocation
+ordering, tie-breaks or success from a recorded reference assignment. Typed final
+record selectors keep their existing source-level field declarations.
+
+## Check the public scalar representation before comparing (2026-10-05)
+
+Spreadsheet cells such as CPU, disk and memory percentages may contain decimal
+strings (`"96"`), not JSON numbers. A raw `field` with domain `number` does not
+coerce those strings: the requirement becomes unknown. Use explicit documented
+value parsing (`decimal_string`) and bind thresholds to their public policy
+source. Preserve the stated operator: a strictly-greater policy must reject
+equality. Keep inactive/noise rows outside the requirement and test one eligible
+row, a threshold-equal row, an excluded row and missing evidence. An abstention
+is not an infrastructure gap until field paths, representations, joins and
+public request binding have been checked against the actual captured input.
+
+## Appended support messages through parent writes (2026-10-05)
+
+The existing `service.record_writes@1` adapter supports Re:amaze `conversations`
+and Gorgias `tickets`, kind `update`. A message append is a parent update with
+`effect.added_items.messages`; bind `effect.record_id` to the public parent ID,
+then use `any_item` on the appended list. Match the actual `body` (Re:amaze) or
+`body_text` (Gorgias) and required author/visibility fields. All old messages
+are in `effect.record.messages` and cannot prove a new reply. Real handlers
+on nonexistent parents do not produce a write witness. These paths retain the
+existing ACK, revision and closed-scope gates; they introduce no new primitive.
+Six service-specific regressions plus record/R7 tests pass in a 77-test gate.
+Worker source-bound adoption and native replay are separate requirements.
+
+## Trello acknowledged list reads (2026-10-05)
+
+Explicit physical selection ordering: an order_by item may instead declare
+`{"source_position":"source_path_index","direction":"asc"}` (or desc).
+This is exclusive with value/text ordering and opt-in. It uses captured row
+source_path's final nonnegative integer position within one common collection.
+Cross-collection parents, unavailable positions or incomplete populations are
+unavailable; row IDs and cell values never substitute for physical order.
+Selected member fields retain their original cells. Five regressions cover
+first eligible member, reversed iteration, missing/cross-source provenance,
+exclusive admission and genuine native archive/reward parity.
+
+Buffer channel reads: `{"adapter":"buffer.channel_reads@1",
+"kind":"read_channels"}` authenticates exact `buffer_list_channels` returns.
+Use effect.record fields id/organization_id/name/service/paused, native_record_id,
+queried_organization_id (query only), storage_kind/channel, found,returned_count.
+Native missing-organization fallback is preserved without backfilling identity.
+Empty results expose found=false/count=0. Authenticated add_to_queue writes emit
+no reads; unknown operations leave scope incomplete. Bounds4096rows/8MiB source.
+Require explicit matched join status for ordered read-before-post. Seven tests
+cover response forgery/scope/empty/fallback/ACK/order and native archive parity.
+Combined read/selection/contract gate368passes; task qualification remains separate.
+
+Mailchimp counterpart: `{"adapter":"mailchimp.subscriber_reads@1",
+"kind":"read_subscribers"}` authenticates `mailchimp_list_subscribers`
+against exact captured native state, dispatch, return and ACKs. Facts expose
+`effect.native_record_id`, `effect.record` (exact native display fields),
+`effect.list_id` (explicit queried scope), `effect.storage_kind="subscriber"`,
+`effect.found` and `effect.returned_count`. Empty results expose found=false,
+count=0 and queried list ID without inventing a subscriber. Audited
+`mailchimp_add_subscriber` mutations contribute no reads; other in-service
+operations remain unsupported. Bounds are 4,096 returned rows and 8 MiB source.
+Native hydration defaults such as unprovided last_changed timestamps are
+capture-specific, not public authority. Nine new tests and 315 related tests
+pass, including forged fields/count/scope, missing ACKs and ordered/late
+read-before-add native reload/scalar parity. Use an explicit join status matcher
+for required ordered reads. Root independently replayed the public seven-row
+aud_main reproducer; task adoption and whole-task qualification remain separate.
+
+Use `{"adapter":"trello.list_reads@1","kind":"read_list"}` as an
+obligation effect source or join source. Supported tools are `trello_board_list`,
+`trello_list_by_id` and `trello_to_board_list`. Facts expose
+`effect.native_record_id`, `effect.record` (exact returned payload),
+`effect.storage_kind`, `effect.found` and `effect.returned_count`.
+`trello_board_list` is find-or-create: only its unchanged, nonempty native find
+branch qualifies as read evidence. Creation remains a separate write operation.
+Pure empty searches expose found=false/count=0. Seed records may omit requested
+board/list fields; these fields are never backfilled. IDs and action records do
+not establish provider list persistence. Require public bindings on returned
+fields, and explicitly match `join.<alias> == "matched"` when a read-before-write
+join is mandatory; declaring a join alone does not require its success.
+
+Native arguments, exact returns, ACKs, private before/after state and global
+boundaries must reconcile. Known native `trello_card`, `trello_card_v2`, `trello_card_update` and
+`trello_list` writes are authenticated separately; unknown operations leave
+inventory incomplete. Bounds are 4,096 returned rows and 8 MiB captured service.
+Fifteen Trello tests plus 300 related tests pass, including ordered/late reads,
+forged returns, missing ACKs and native archive reload/scalar parity. Synthetic
+handler validation is separate from whole-task qualification and action credit.
+
+## Airtable persisted field writes (2026-10-05)
+
+Use `service.record_writes@1`, service `airtable`, collection
+`["bases", "tables", "records"]`, and kind `update` for actual row field changes.
+Match `effect.record.base_id`, `table_id`, `record_id` and
+`effect.record.fields.Status` (or another exact public field). `effect.before.fields`
+holds prior fields. Native row identity includes all three IDs; repeated row IDs
+in different tables or bases remain distinct. Parent display names are not row
+changes. The fixed layout rejects missing IDs/field maps, duplicate identities
+and more than 65,536 visited base/table/row entries. Closed scope still requires
+the full acknowledged revision chain and matching public/final boundaries.
+An action log with requested values, a nonexistent-row attempt or a repeated
+no-op is not a persisted field write. Source-bound manifest adoption and replay
+remain required; these manufactured component controls do not qualify a task.
+
+## Explicit character counts (2026-10-05)
+
+A comparison operand may measure a projected string:
+
+    {"kind": "text_length", "text": {"kind": "field", "path": ["request", "reply"], "domain": "string"},
+     "unit": "unicode_codepoints"}
+
+Compare it to a numeric threshold with `lt`, `gte`, etc. The declared field must
+be projected and string-typed. Count the text exactly as stored, including spaces,
+line breaks and combining characters; no trimming, normalization or prose
+interpretation occurs. Empty text has length zero; missing, non-string or text
+over 65,536 codepoints is unknown. This is not bytes, tokens or grapheme count.
+Bind any threshold to public policy. String length alone does not establish
+greeting, closing, accuracy or complete report compliance.
+
+## Candidate-relative terminal counts (2026-10-05)
+
+`records.retained_when@1` may declare up to eight `counts` on its same typed
+`final.records@1` collection. Each `where` sees `member.*` terminal projections
+plus the current initial `request.*`, candidate identity and initial lookups:
+
+    "counts": [{"alias": "open_siblings", "where": {"op": "all", "args": [
+      {"op": "eq", "left": {"kind": "field", "path": ["member", "Email"], "domain": "string"},
+                    "right": {"kind": "field", "path": ["request", "Email"], "domain": "string"}},
+      {"op": "eq", "left": {"kind": "field", "path": ["member", "Status"], "domain": "string"},
+                    "right": {"kind": "literal", "value": "open"}}
+    ]}}],
+    "retained_when": {"op": "eq", "left": {"kind": "field", "path": ["count", "open_siblings"], "domain": "integer"},
+                                "right": {"kind": "literal", "value": 1}}
+
+Project every member field in the final source. Only `retained_when` may read
+`count.<alias>`; counts cannot depend on other counts or `retained.*`. Unknown
+membership, nonfinal or incomplete/duplicate identity inventory yields no count,
+not zero. Work is bounded to 65,536 candidate/member/count comparisons per check;
+over-budget counts remain unavailable. Do not enable action-completion credit
+on these checks: they are outcome-only because sibling effects need a separate
+attribution policy. Existing declarations without counts keep their wire shape.
+Held/exempt records must be excluded from the membership predicate when policy
+allows them to remain open, with their preservation checked separately. This
+accepts any valid survivor; it does not choose a reference-specific primary.
+
+## Explicit text ordering (2026-10-05)
+
+Selection `order_by` keys may declare text instead of numeric/date values:
+
+    {"text": {"kind": "field", "path": ["member", "LastName"], "domain": "string"},
+     "collation": "ascii_casefold", "direction": "asc"}
+
+Use exactly one of `value` or `text`. Text requires explicit collation:
+`ascii_casefold` compares ASCII strings case-insensitively; non-ASCII is unknown.
+`unicode_codepoint` compares exact Unicode codepoints, not locale alphabetical
+order. Neither trims or normalizes supplied text. Missing/non-string, empty,
+over-1024-character, leading/trailing whitespace and ASCII control-bearing
+keys are unknown. Equal normalized keys remain unknown ties. Earlier order keys
+retain priority; eligibility is evaluated before ordering. Existing numeric/date
+declarations keep their serialized form. Declare the text field in projected
+and required population fields as usual. Do not impose this tie-break when the
+public policy specifies none.
+
 2026-10-04. Ten-task batch across six non-Simple domains. Its purpose is to
 author declarations with **existing** capabilities and to expose concrete,
 reusable gaps. It is not a promise that all ten become whole-task qualified.
@@ -134,6 +462,10 @@ Redrafts may use these (all in the environment candidate):
    "mode": "words"|"verbatim"|"amount", "format": <usd_string|decimal_string
    for amount>, "excluding": [longer names]}` and
    `"match_cardinality": "per_candidate"` on obligations (no once-only credit).
+   Amount token boundaries accept trailing colons followed by whitespace/end
+   as punctuation (`$50000: details`); attached clock/code suffixes remain
+   excluded (`3000:01`, `$3000:code`). This changes numeric mention parsing,
+   not source bindings, required formatting or whole-task qualification.
 3. Decided lookup outcomes: `{"kind": "field", "path": ["lookup", <alias>]}`
    is `matched` or `not_found`; ambiguous/unavailable stay unknown.
 4. Obligation `selections`: `{alias, population, where (member.*, request.*,
@@ -144,6 +476,14 @@ Redrafts may use these (all in the environment candidate):
    service>, "collection": [<list field>] | ["actions", <action_key>],
    "kind": "create"|"update"|"delete"}`; effect params `record`, `before`,
    `changed_fields`, `record_id`, `operation`.
+   Predicate context `effect` is the decoded `EffectFact.params_json` object;
+   it is not an extra enclosing record. Typed record fields use, for example,
+   `effect.record.topic` for Zoom; action-record fields use
+   `effect.record.params.item_name` for Monday. `effect.values_text` contains
+   persisted field text. Do not add a second `record` wrapper or assume a tool
+   argument alias matches its persisted field name. Verify the actual captured
+   record and its declared operand domain. Regression examples are in
+   `tests/test_manifest_record_writes.py::test_persisted_effect_predicates_use_exact_record_projection`.
    Optional `"identity_paths": [["list_id"], ["id"]]` (list collections only,
    2–4 string fields) keys records by a composite identity when `id` repeats
    across a parent (Mailchimp gives a subscriber the same `id` in every
@@ -194,6 +534,12 @@ parts `out_of_scope`. Coverage counts exclude out-of-scope obligations.
 12. Gmail reads: sends/drafts/labels/read-marks are not reads and no longer
     break read evidence; acknowledged failed searches return nothing;
     `gmail_list_emails` is an audited read for send scope.
+    `gmail.message_reads@1` also accepts `gmail_get_thread` full-message
+    responses and `gmail_get_threads` metadata responses. Enclosing thread
+    identity, member identities, strict message/result counts and all returned
+    content must reconcile against the pre-call world. Bulk metadata never
+    supplies a body it did not return; absent native acknowledgements remain
+    unavailable. This witnesses returned fields, not model conditioning.
 13. Clock values: meridiem-less 10:00–12:59 is ambiguous for `clock_time`;
     `clock_24h` reads declared 24-hour data; ranges like "1:00–1:15 PM" share
     the meridiem; "noon"/"midnight". Value expression `add_business_days`
@@ -550,6 +896,22 @@ coverage change in `review.json`; do not add versioned copies (`-v2`, `-v3`).
 
 ## Shared verification capabilities, round 7c (2026-10-05)
 
+`airtable.record_reads@1` emits acknowledged `read_record` facts for native
+`airtable_findRecord`/`airtable_findManyRecords`. Use for obligation sources or
+effect joins, never as harmful mutation guards. Fields: `effect.native_record_id`,
+`effect.record` (exact returned payload), `effect.storage_kind` (`stored_table`,
+`seeded_action`, `none`), `effect.found`, `effect.returned_count`. Empty search
+emits found=false/count=0. Native stored fields are under record.fields. Seeded
+fallback id is a returned audit identity, not proof of a stored provider row;
+requested base/table aliases do not establish storage scope because native
+fallback ignores them. Exact returned response is independently reconciled with
+the audited pure handler on private captured before-state. Missing fields are
+never backfilled. Bounds: 4,096 result records and 8 MiB captured Airtable source.
+Unsupported Airtable operations/writes leave inventory incomplete. Available
+qualified facts may witness a positive component, but cannot discharge missing
+requirements. Native dispatch/return, ACK, public hydration and terminal service
+scope must reconcile. Read facts do not prove model conditioning or correctness.
+
 Mechanisms 25–27 belong to the concurrent engine round r7
 (`any_item`/`all_items`, LinkedIn reads, the `prefix` mention mode). These
 are new:
@@ -837,3 +1199,35 @@ are new:
     or `$` before it). `"INS-"` matches `"INS-2026-014"`; it does not match
     `"INS-"` alone, `"XINS-1"` or quoted/fenced lines (unknown). Use it for
     "cite the incident/ticket number" when only the prefix is public.
+
+28. `collections.counts_when@1` evaluates each initial roster candidate against
+    counts over a separate final native record collection. Use an initial
+    `google_sheets.rows@1` or `initial.records@1` population and a `final.records@1`
+    source. Declare up to eight unique `counts` aliases, each with a `where`
+    predicate over `request`, `candidate.identity` and `member` projections.
+    `required_when` may read only `request` and `candidate.identity`;
+    `counts_when` may additionally read integer `count.<alias>` values.
+    Declare every request/member field in its source selector. This supports
+    roster members with zero tickets without requiring a final object carrying
+    the roster identity. Counts require closed, finalized terminal inventory and
+    decided membership; unknown membership never becomes a partial or zero count.
+    Candidate/member/count comparisons are bounded at 65,536 per check.
+    This is outcome evidence only; action-credit policies are rejected. Example
+    and genuine-handler/native replay controls are in
+    `tests/test_manifest_retained_records.py` and
+    `tests/test_manifest_terminal_counts.py`. Passing these manufactured controls
+    does not qualify a public task. Bind public capacity/routing rules separately.
+
+29. Date calculations have two additional explicit choices. Input format
+    `iso_civil_datetime_date` accepts a valid naive ISO `YYYY-MM-DDTHH:MM:SS`
+    (optional 1–6 fractional digits) as its written calendar date. It rejects
+    offsets and never imputes UTC. `business_days_between` has `start`, `end`
+    value expressions and required `holidays` (use `[]` only when public policy
+    establishes weekends-only counting). It returns a signed Mon–Fri day count
+    over `(earlier, later]`, negated for reversed dates, bounded to 3,660 calendar
+    days. Compare a derived count with an integer literal, e.g. `> 3`. Comparing
+    Saturday to a Friday business-day deadline alone is insufficient: Saturday
+    contributes no additional weekday. Existing `iso_date`, UTC timestamp and
+    calendar-day differences retain their meanings. Source-backed Sales date
+    probes and tests validate calculations, not completion-note/exemption rules
+    or whole-task qualification.

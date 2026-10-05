@@ -25,3 +25,12 @@ Missing ACKs give unknown.
 dates, so no check was written. Needs a calendar-date mentions mode.
 ## Findings
 Gap: no existential effect quantifier (workaround above, 62 lookups); no calendar-date mention mode. `repro_round4.py`.
+
+
+## Current-byte validation addendum — 20261005T080831Z-1791187711899997031
+
+Fresh replay used the current draft bytes `a2e3220e9e2c0858900052560d637ef2f536b366626f627279c376e2e557ef06` on the retained **development** episode `27982fabb451e01a217c1c43d623063164ffca99eb8a357cd0a7e177214cde7a`. The episode bytes and public task prompt, initial state, tool catalog, pack input, and all declared public bindings matched. Ordinary and manifest reward maps are equal; scalar noninterference, same-trace rescore, and serialized-wire reload/rescore checks passed without assessment errors.
+
+The newly scored episode is saved at `/tmp/automationbench-luna-marketing-linkage-closure-20261005/current_wires/20261005T080831Z-1791187711899997031/marketing.editorial_calendar.json` with SHA-256 `cc30ae8cdd755f3bc3e5f201b5f5fa3c154f78c0dcf87f193901ae68f97a2977`; the file hash was verified. Full findings, reward maps, public binding paths, and source inventories are recorded in `review.json` under `current_byte_validation_addendum`, linked to `/tmp/automationbench-luna-marketing-linkage-closure-20261005/current_byte_validation_20261005T080831Z-1791187711899997031.json` (SHA-256 `94511d99bc6e35c8ce3ab6bbf109110594472af157db4a652085bf82cfa22c76`).
+
+This is additive replay evidence only. The earlier review and its declared draft hash `e0b8a9d89db2e973cf6a2fd70c7b51d96ff0f09736dbac2f9a44be3bf0c08d7c` remain unchanged and historical; the whole-task status and prior outcome claims are not restamped by this run. No model or tool rollout was performed.

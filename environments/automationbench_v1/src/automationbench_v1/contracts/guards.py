@@ -30,6 +30,7 @@ from .predicates import (
 )
 from .predicates import context_paths as _fields
 from .record_writes import RecordWriteSource
+from .requests import RequestAlias, RequestSource, request_alias_context
 from .selections import AlternativeEffect, SelectionAlias, publish_selections
 from .sheet_effects import SheetEffectSource
 from .slack_effects import SlackEffectSource
@@ -64,6 +65,7 @@ class GuardCheck(FrozenModel):
     population: Identifier
     source: Identifier
     lookups: tuple[LookupSpec, ...] = ()
+    request_aliases: tuple[RequestAlias, ...] = Field(default=(), max_length=16, exclude_if=lambda value: not value)
     prohibited_when: Predicate
     effect_match: Predicate
     match_cardinality: Literal["unique_candidate", "per_candidate"] = "unique_candidate"
@@ -84,6 +86,9 @@ class GuardCheck(FrozenModel):
         reserved = {"request", "effect", "candidate", "joined", "join", "lookup", "member", "selected", "selection"}
         if len(set(aliases)) != len(aliases) or set(aliases) & reserved:
             raise ValueError("guard_lookup_alias_conflict")
+        public_aliases = [item.alias for item in self.request_aliases]
+        if len(set(public_aliases)) != len(public_aliases) or set(public_aliases) & (reserved | set(aliases)):
+            raise ValueError("guard_request_alias_conflict")
         chosen: list[str] = []
         for item in self.selections:
             if item.alias in chosen:
@@ -96,13 +101,15 @@ class GuardCheck(FrozenModel):
                 elif path[0] == "lookup":
                     if len(path) != 2 or path[1] not in aliases:
                         raise ValueError("guard_lookup_status_reference_unknown")
-                elif len(path) < 2 or path[0] not in {"member", "request", "candidate", *aliases}:
+                elif len(path) < 2 or path[0] not in {"member", "request", "candidate", *aliases, *public_aliases}:
                     raise ValueError("guard_selection_context_unknown")
             chosen.append(item.alias)
         alternatives = [item.alias for item in self.alternatives]
         if len(set(alternatives)) != len(alternatives):
             raise ValueError("guard_alternative_alias_conflict")
-        validate_join_paths(self.effect_joins, aliases, chosen)
+        if set(public_aliases) & (set(chosen) | {item.alias for item in self.effect_joins}):
+            raise ValueError("guard_request_alias_conflict")
+        validate_join_paths(self.effect_joins, [*aliases, *public_aliases], chosen)
         joined = {item.alias for item in self.effect_joins}
         named = [("prohibited_when", self.prohibited_when), ("effect_match", self.effect_match)]
         named += [("alternative", item.effect_match) for item in self.alternatives]
@@ -200,6 +207,7 @@ def _bound(
 def _candidate_context(check: GuardCheck, row, tables: Mapping[str, Any]):
     context = {"request": json.loads(row.cells_json), "candidate": {
         "identity": list(row.identity), "native_record_id": native_record_id(row)}}
+    context |= request_alias_context(check.request_aliases, tables)
     for lookup in check.lookups:
         table = tables[lookup.source]
         keys = {}
@@ -303,7 +311,9 @@ def evaluate_guard(
     channels = [(effect, None) for effect in effects.effects] + [
         (effect, item.effect_match) for item in check.alternatives for effect in alternative_effects[item.alias].effects
     ]
-    if check.population not in tables or any(item.source not in tables for item in check.lookups):
+    if any(not isinstance(table_sources.get(item.source), RequestSource) for item in check.request_aliases):
+        raise ValueError("guard_request_alias_requires_public_request")
+    if check.population not in tables or any(item.source not in tables for item in (*check.lookups, *check.request_aliases)):
         raise ValueError("guard_table_reference_unknown")
     population = tables[check.population]
     if len(population.rows) * len(channels) > check.max_instances:

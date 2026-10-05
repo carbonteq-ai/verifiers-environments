@@ -19,8 +19,10 @@ from automationbench.schema.salesforce.contact import Contact
 from automationbench.schema.salesforce.opportunity import Opportunity
 
 from .aggregates import _admit as admit_aggregate
+from .airtable_reads import AirtableReadSource
 from .authored_outputs import AuthoredOutputSource
 from .base import FrozenModel, Identifier
+from .buffer_reads import BufferChannelReadSource
 from .created_objects import CreatedRetainedCheck
 from .created_records import CreatedRecordSource
 from .effects import EffectSource
@@ -31,20 +33,28 @@ from .guards import GuardCheck
 from .hubspot_objects import HubSpotObjectSource
 from .jira_effects import JiraIssueSource
 from .linkedin_reads import LinkedInReadSource
+from .mailchimp_reads import MailchimpSubscriberReadSource
 from .no_clarification import NoClarificationCheck
 from .notification_effects import NotificationEffectSource
 from .obligations import ObligationCheck, _fields
-from .populations import InitialCollectionSource, _field, _model
+from .populations import InitialCollectionSource
 from .record_writes import RecordWriteSource
 from .requests import RequestSource
 from .retained import RetainedRowCheck
-from .retained_records import RetainedRecordCheck, RetainedRecordSource
+from .retained_records import (
+    RetainedRecordCheck,
+    RetainedRecordSource,
+    admit_retained_record_projections,
+)
 from .sheet_effects import SheetEffectSource
 from .sheet_reads import SheetReadSource
 from .slack_effects import SlackEffectSource
 from .slack_reads import SlackReadSource
+from .slack_user_reads import SlackUserReadSource
 from .summary_policy import SummaryExclusionCheck
 from .tables import TableSource
+from .terminal_counts import TerminalCountCheck, admit_terminal_count_projections
+from .trello_reads import TrelloListReadSource
 from .zendesk_effects import ZendeskTicketEffectSource
 
 
@@ -255,6 +265,7 @@ class ContractSpec(FrozenModel):
             | GmailObservationSource
             | SlackReadSource
             | SheetReadSource
+            | AirtableReadSource | TrelloListReadSource | MailchimpSubscriberReadSource | SlackUserReadSource | BufferChannelReadSource
             | LinkedInReadSource
             | JiraIssueSource
             | HubSpotObjectSource
@@ -272,6 +283,7 @@ class ContractSpec(FrozenModel):
             | ObligationCheck
             | RetainedRowCheck
             | RetainedRecordCheck
+            | TerminalCountCheck
             | CreatedRetainedCheck
             | SummaryExclusionCheck
             | NoClarificationCheck,
@@ -326,6 +338,8 @@ class ContractSpec(FrozenModel):
                     raise ValueError("record_check_requires_record_source")  # noqa: TRY004
                 for field in check.expected:
                     _validate_installed_field(source.object_type, field)
+            elif isinstance(check, TerminalCountCheck):
+                admit_terminal_count_projections(check, self.sources.get(check.population), source)
             elif isinstance(check, RetainedRecordCheck):
                 population = self.sources.get(check.population)
                 if not isinstance(source, RetainedRecordSource) or not isinstance(
@@ -337,26 +351,15 @@ class ContractSpec(FrozenModel):
                 projections = {"request": population, "retained": source}
                 for lookup in check.lookups:
                     lookup_source = self.sources.get(lookup.source)
-                    if not isinstance(lookup_source, InitialCollectionSource):
-                        raise ValueError("record_retained_requires_initial_lookup")  # noqa: TRY004
+                    if not isinstance(lookup_source, (InitialCollectionSource, TableSource)) or (
+                        isinstance(lookup_source, TableSource)
+                        and lookup_source.path != ("task_evidence", "initial", "google_sheets")
+                    ):
+                        raise ValueError("record_retained_requires_initial_lookup")
                     if set(lookup.keys) != set(lookup_source.key_fields):
                         raise ValueError("record_retained_lookup_key_inventory_mismatch")
                     projections[lookup.alias] = lookup_source
-                for predicate in (check.required_when, check.supported_when, check.retained_when):
-                    if predicate is None:
-                        continue
-                    for path in _fields(predicate.model_dump(mode="python")):
-                        if path[0] == "candidate":
-                            if len(path) != 2 or path[1] not in {"identity", "native_record_id"}:
-                                raise ValueError("record_retained_candidate_metadata_unknown")
-                            continue
-                        projection = projections[path[0]]
-                        if path[1] not in projection.fields:
-                            raise ValueError("record_retained_predicate_projection_undeclared")
-                        _field(
-                            _model(cast(str, projection.path[2]), cast(str, projection.path[3])),
-                            (*projection.fields[path[1]], *path[2:]),
-                        )
+                admit_retained_record_projections(check, projections, candidate_error="record_retained_candidate_metadata_unknown")
             elif isinstance(check, CreatedRetainedCheck):
                 if not isinstance(source, (JiraIssueSource, HubSpotObjectSource, CreatedRecordSource)):
                     raise ValueError("created_requires_issue_selector")  # noqa: TRY004
@@ -375,6 +378,16 @@ class ContractSpec(FrozenModel):
                     raise ValueError("slack_read_requires_obligation_check")  # noqa: TRY004
                 if isinstance(source, SheetReadSource) and not isinstance(check, ObligationCheck):
                     raise ValueError("sheet_read_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, SlackUserReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("slack_user_read_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, BufferChannelReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError('buffer_read_requires_obligation_check')  # noqa: TRY004
+                if isinstance(source, MailchimpSubscriberReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("mailchimp_read_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, TrelloListReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("trello_read_requires_obligation_check")  # noqa: TRY004
+                if isinstance(source, AirtableReadSource) and not isinstance(check, ObligationCheck):
+                    raise ValueError("airtable_read_requires_obligation_check")  # noqa: TRY004
                 if isinstance(source, LinkedInReadSource) and not isinstance(check, ObligationCheck):
                     raise ValueError("linkedin_read_requires_obligation_check")  # noqa: TRY004
                 if not isinstance(
@@ -387,6 +400,7 @@ class ContractSpec(FrozenModel):
                         GmailObservationSource,
                         SlackReadSource,
                         SheetReadSource,
+                        AirtableReadSource, TrelloListReadSource, MailchimpSubscriberReadSource, SlackUserReadSource, BufferChannelReadSource,
                         LinkedInReadSource,
                         RecordWriteSource,
                     ),
@@ -410,7 +424,7 @@ class ContractSpec(FrozenModel):
                     for alternative in check.alternatives:
                         if not isinstance(self.sources.get(alternative.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, SheetReadSource, AirtableReadSource, TrelloListReadSource, MailchimpSubscriberReadSource, SlackUserReadSource, BufferChannelReadSource, LinkedInReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_alternative_requires_effect_source")  # noqa: TRY004
                 if isinstance(check, GuardCheck):
@@ -426,10 +440,13 @@ class ContractSpec(FrozenModel):
                         )):
                             raise ValueError("guard_selection_requires_initial_population")  # noqa: TRY004
                 if isinstance(check, (ObligationCheck, GuardCheck)):
+                    for alias in check.request_aliases:
+                        if not isinstance(self.sources.get(alias.source), RequestSource):
+                            raise ValueError("request_alias_requires_public_request")  # noqa: TRY004
                     for join in check.effect_joins:
                         if not isinstance(self.sources.get(join.source), (
                             EffectSource, NotificationEffectSource, SheetEffectSource, SlackEffectSource,
-                            GmailObservationSource, SlackReadSource, SheetReadSource, LinkedInReadSource, RecordWriteSource,
+                            GmailObservationSource, SlackReadSource, SheetReadSource, AirtableReadSource, TrelloListReadSource, MailchimpSubscriberReadSource, SlackUserReadSource, BufferChannelReadSource, LinkedInReadSource, RecordWriteSource,
                         )):
                             raise ValueError("obligation_join_requires_effect_source")  # noqa: TRY004
                 for item in check.aggregates if isinstance(check, ObligationCheck) else ():
@@ -494,6 +511,8 @@ class ContractSpec(FrozenModel):
             )
             if any(not isinstance(checks[parent], expected_type) for parent in parents):
                 raise ValueError("credit_policy_check_capability_mismatch")
+            if any(getattr(checks[parent], "occurrence_bounds", None) is not None for parent in parents):
+                raise ValueError("bounded_occurrence_counts_are_outcome_only")
             if rule.policy == "required_effect_once@1" and any(
                 getattr(checks[parent], "match_cardinality", None) == "per_candidate" for parent in parents
             ):
@@ -505,6 +524,8 @@ class ContractSpec(FrozenModel):
             if rule.policy == "records_retained_completion_once@1":
                 check = checks[parents[0]]
                 assert isinstance(check, RetainedRecordCheck)
+                if check.counts:
+                    raise ValueError("record_terminal_counts_are_outcome_only")
                 initial, final = self.sources[check.population], self.sources[check.source]
                 assert isinstance(initial, InitialCollectionSource) and isinstance(
                     final, RetainedRecordSource

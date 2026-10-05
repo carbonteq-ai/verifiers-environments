@@ -1,0 +1,17 @@
+# sales.job_posting_contact batch09 public-only review
+
+This reserved evaluation task has no recorded Luna reference episode or score. The artifact is public-source-only authoring; it does not claim replay, task reward parity, training eligibility, or qualification.
+
+Assignment: `91fc8d7578dff2611d6edd4aa8537763067edfc44f6f6c9cbe96b89c0e6ce28b`. Public input: `2f7858f474e29ff60096a0fada7d2b7b8e41ec16c8d15965d7117687bc8c9373`. Current draft: `aab6f431a9ef140007dfeb3a46a3227a5ebbecc6b42f28f049375ecdb69a4c2d`.
+
+Both public job rows are logged and the Slack summary names the two companies and roles. Their dates are 2024-01-15 and 2024-01-18, and the public input supplies no current date to establish freshness. It does not identify a hiring decision-maker or direct person-to-job link. The missing Slack ACK does not invalidate the separately acknowledged sheet writes.
+
+Native genuine-handler component controls: 2. They used the complete public prompt, exact public initial input and declared tool catalog. Each control preserves dispatch/return envelopes, dynamic arguments, returned results, ACK/write receipts, pre/post state snapshots, actual numeric ordinary/manifest maps, and a serialized scored component episode that was reloaded and rescored.
+
+Control cases:
+- `sheet-and-slack`: sales.job_posting_contact.job_logged=1.0 (obligation_witnessed_required_effect), sales.job_posting_contact.job_logged.coverage=1.0 (obligation_scope_closed), sales.job_posting_contact.job_logged=1.0 (obligation_witnessed_required_effect), sales.job_posting_contact.job_logged.coverage=1.0 (obligation_scope_closed), sales.job_posting_contact.named_slack_summary=1.0 (obligation_witnessed_required_effect), sales.job_posting_contact.named_slack_summary.coverage=1.0 (obligation_scope_closed); missing ACK indices none; map equality True; scored reload equality True; source hashes stable True. Evidence: `/tmp/automationbench-luna-sales-batch09-public-20261005/controls/sales.job_posting_contact/sheet-and-slack/control.json`.
+- `slack-missing-ack`: sales.job_posting_contact.job_logged=1.0 (obligation_witnessed_required_effect), sales.job_posting_contact.job_logged.coverage=None (obligation_scope_unavailable), sales.job_posting_contact.job_logged=1.0 (obligation_witnessed_required_effect), sales.job_posting_contact.job_logged.coverage=None (obligation_scope_unavailable), sales.job_posting_contact.named_slack_summary=None (obligation_effect_scope_unavailable), sales.job_posting_contact.named_slack_summary.coverage=None (obligation_scope_unavailable); missing ACK indices [2]; map equality True; scored reload equality True; source hashes stable True. Evidence: `/tmp/automationbench-luna-sales-batch09-public-20261005/controls/sales.job_posting_contact/slack-missing-ack/control.json`.
+
+Each ordinary/manifest numeric map is the zero-assertion harness output because this pack has no assertions. Equal maps are only a fixture/harness check. Outcome evidence remains separate from action credit. Coverage is partial authoring only; action credit and qualification are not granted.
+
+Historical rejected `sheet-and-slack` task-context artifacts are retained at `/tmp/automationbench-luna-sales-batch09-public-20261005/sales.job_posting_contact-sheet-and-slack.failed-context.052051` with both archive hashes in `review.json`; they are excluded from the passing control count. The replacement control uses exact normalized public initial data.

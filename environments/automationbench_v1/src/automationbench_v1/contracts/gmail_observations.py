@@ -81,6 +81,38 @@ def _returned(name, args, result):
                 or result["total_count"] < len(messages)):
             raise ValueError("gmail_observation_find_count_unavailable")
         requested = args.get("id")
+    elif name in {"gmail_get_thread", "gmail_get_threads"}:
+        if result.get("success") is not True or "error" in result:
+            return (), None
+        if name == "gmail_get_thread":
+            if "thread" not in result:
+                raise ValueError("gmail_observation_thread_result_unavailable")
+            threads = () if result["thread"] is None else (result["thread"],)
+        else:
+            threads = result.get("threads")
+            if (not isinstance(threads, (list, tuple))
+                    or type(result.get("result_count")) is not int
+                    or result["result_count"] != len(threads)):
+                raise ValueError("gmail_observation_thread_count_unavailable")
+        messages = []
+        for thread in threads:
+            if not isinstance(thread, Mapping):
+                raise TypeError("gmail_observation_thread_result_unavailable")
+            _, identity = _aliases(thread, ("id", "thread_id", "threadId"))
+            members = thread.get("messages")
+            if (not isinstance(members, (list, tuple)) or not members
+                    or type(thread.get("message_count")) is not int
+                    or thread["message_count"] != len(members)):
+                raise ValueError("gmail_observation_thread_count_unavailable")
+            for message in members:
+                if not isinstance(message, Mapping):
+                    raise TypeError("gmail_observation_returned_message_unavailable")
+                found, member_thread = _aliases(message, ("thread_id", "threadId"), optional=True)
+                if found and member_thread != identity:
+                    raise ValueError("gmail_observation_thread_mismatch")
+                # The enclosing returned thread supplies membership, not body
+                # fields absent from the actual response (bulk is metadata only).
+                messages.append({**message, "thread_id": identity})
     elif name == "gmail_get_email_by_id":
         if result.get("success") is not True or "error" in result:
             return (), None  # an acknowledged failed get returned nothing

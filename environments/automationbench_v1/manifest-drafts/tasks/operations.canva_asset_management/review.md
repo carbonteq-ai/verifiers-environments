@@ -25,3 +25,9 @@ the count; a post with no export/move earns nothing; move-then-move-away fires t
 guard; PDF exports earn no export credit; missing ACK stays unknown.
 
 My call: a file named 'Q1_Banner.png' is not recognised as the design (scores 0).
+
+## Canva current check addendum (2026-10-05)
+
+Current-hash genuine-handler controls now cover `moved-design-moved-away` and `notice-names-unexported-design`. A clean path has zero guard findings; move-away and naming unexported assets each produce the declared harm finding; missing acknowledgements abstain. Existing export/move/post positive checks remain valid/1. The guidelines-read gap remains unsupported. Full results and source fingerprints are in `/tmp/automationbench-ops-review-addenda-20261005/canva_asset_management-current-controls.json`.
+
+Canva controls were rerun after the bounded shared amount-parser update; the rerun used the unchanged draft SHA and records the settled source fingerprint. Earlier output is retained at `/tmp/automationbench-ops-review-addenda-20261005/canva_asset_management-current-controls-pre-parser.json`.

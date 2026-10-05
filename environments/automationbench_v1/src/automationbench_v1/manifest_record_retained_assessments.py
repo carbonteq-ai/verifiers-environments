@@ -3,6 +3,7 @@
 import json
 import uuid
 from dataclasses import asdict, replace
+from functools import lru_cache
 from typing import Literal, cast
 
 import verifiers.v1 as vf
@@ -12,7 +13,7 @@ from .capture import canonical_json
 from .contracts.base import FrozenModel
 from .contracts.engine import binding_reason
 from .contracts.loader import canonical_contract_digest, load_contract
-from .contracts.populations import InitialCollectionSource, PopulationEvidence, capture_population
+from .contracts.populations import InitialCollectionSource, PopulationEvidence
 from .contracts.retained_records import (
     RetainedRecordCheck,
     RetainedRecordSource,
@@ -20,7 +21,13 @@ from .contracts.retained_records import (
     evaluate_retained_records,
     plan_retained_record_instances,
 )
-from .contracts.tables import Digest
+from .contracts.tables import Digest, TableEvidence, TableSource
+from .contracts.terminal_counts import (
+    TerminalCountCheck,
+    capture_terminal_count_population,
+    capture_terminal_count_retention,
+    evaluate_terminal_counts,
+)
 from .manifest_guard_assessments import digest, execution_subject, selectors_digest
 from .manifest_retained_assessments import (
     CompletionConsumption,
@@ -60,17 +67,17 @@ class RecordCompletionCreditConfig(FrozenModel):
 
 
 def capture_record_retained_inputs(source, contract):
-    checks = [check for check in contract.checks if isinstance(check, RetainedRecordCheck)]
+    checks = [check for check in contract.checks if isinstance(check, (RetainedRecordCheck, TerminalCountCheck))]
     names = {name for check in checks
              for name in (check.population, *(lookup.source for lookup in check.lookups))}
     final_names = {check.source for check in checks}
     result = {
         "retained_record_populations_json": canonical_json({
-            name: capture_population(source, contract.sources[name]).model_dump(mode="json")
+            name: capture_terminal_count_population(source, contract.sources[name]).model_dump(mode="json")
             for name in sorted(names)
         }),
         "retained_record_terminal_json": canonical_json({
-            name: capture_record_retention(source, contract.sources[name]).model_dump(mode="json")
+            name: capture_terminal_count_retention(source, contract.sources[name]).model_dump(mode="json")
             for name in sorted(final_names)
         }),
     }
@@ -90,11 +97,12 @@ def _restore(material, contract):
     actual = capture_record_retained_inputs(material["source"], contract)
     if any(material.get(name) != value for name, value in actual.items()):
         raise ValueError("retained_record_input_raw_source_or_selector_mismatch")
-    populations = {name: PopulationEvidence.model_validate(value)
+    populations = {name: (TableEvidence if isinstance(contract.sources[name], TableSource)
+                         else PopulationEvidence).model_validate(value)
                    for name, value in json.loads(actual["retained_record_populations_json"]).items()}
     # Derive terminal evidence again rather than admitting caller projections.
-    retained = {check.source: capture_record_retention(material["source"], contract.sources[check.source])
-                for check in contract.checks if isinstance(check, RetainedRecordCheck)}
+    retained = {check.source: capture_terminal_count_retention(material["source"], contract.sources[check.source])
+                for check in contract.checks if isinstance(check, (RetainedRecordCheck, TerminalCountCheck))}
     return populations, retained
 
 
@@ -111,7 +119,7 @@ def record_retained_requests(source, contract, view, material, trace_subject):
     populations, _ = _restore(material, contract)
     requests = []
     for check in contract.checks:
-        if not isinstance(check, RetainedRecordCheck):
+        if not isinstance(check, (RetainedRecordCheck, TerminalCountCheck)):
             continue
         cases, potential = plan_retained_record_instances(check, populations[check.population])
         for case in (*cases, None):
@@ -147,7 +155,7 @@ def assess_record_retained(task, request, context):
     material = admit_manifest_source(task, request, context).decode()
     contract = load_contract(canonical_json(material["contract"]))
     check = next((item for item in contract.checks if item.check_id == config.check_id), None)
-    if not isinstance(check, RetainedRecordCheck):
+    if not isinstance(check, (RetainedRecordCheck, TerminalCountCheck)):
         raise TypeError("retained_record_check_unknown")
     scope = config.instance_key == "scope"
     if (request.run.producer_id != RECORD_RETAINED_PRODUCER or request.run.producer_revision != "1"
@@ -163,27 +171,53 @@ def assess_record_retained(task, request, context):
     ),)
 
 
-def _outcome_output(material, contract, check, config, input_digest):
-    scope = config.instance_key == "scope"
+@lru_cache(maxsize=8)
+def _prepare_outcome(material_json, contract_json, check_json):
+    """Reuse validated whole-population work, keyed by exact material bytes.
+
+    Never key on a caller's digest. Parse private copies so mutation of callers
+    or returned projections cannot change a previously admitted cache entry.
+    """
+    material = json.loads(material_json)
+    contract = load_contract(contract_json)
+    raw_check = json.loads(check_json)
+    check_type = TerminalCountCheck if raw_check.get("operator") == "collections.counts_when@1" else RetainedRecordCheck
+    check = check_type.model_validate(raw_check)
     populations, retained = _restore(material, contract)
     cases, potential = plan_retained_record_instances(check, populations[check.population])
-    if (config.contract_digest != canonical_contract_digest(contract)
-            or config.source_digest != digest(material["source"])
-            or config.selectors_digest != selectors_digest(contract, check)
-            or config.potential_instances != potential):
-        raise ValueError("retained_record_configuration_mismatch")
     names = {check.population, *(lookup.source for lookup in check.lookups)}
-    evaluation = evaluate_retained_records(
-        material["source"], check, {name: populations[name] for name in names}, retained[check.source],
-        population_sources={name: cast(InitialCollectionSource, contract.sources[name]) for name in names},
-        retention_source=cast(RetainedRecordSource, contract.sources[check.source]),
-    )
+    if isinstance(check, TerminalCountCheck):
+        evaluation = evaluate_terminal_counts(
+            material["source"], check, populations[check.population], retained[check.source],
+            population_source=contract.sources[check.population], retention_source=contract.sources[check.source],
+        )
+    else:
+        evaluation = evaluate_retained_records(
+            material["source"], check, {name: populations[name] for name in names}, retained[check.source],
+            population_sources={name: contract.sources[name] for name in names},
+            retention_source=cast(RetainedRecordSource, contract.sources[check.source]),
+        )
     authority = binding_reason(material["source"], contract)
     if authority is not None:
         evaluation = replace(evaluation, findings=tuple(
             replace(finding, status="abstained", value=None, reason=authority, required=None)
             for finding in evaluation.findings
         ), scope_complete=False, reason=authority)
+    digests = (canonical_contract_digest(contract), digest(material["source"]), selectors_digest(contract, check))
+    return populations, retained, cases, potential, evaluation, digests
+
+
+def _outcome_output(material, contract, check, config, input_digest):
+    scope = config.instance_key == "scope"
+    key = (canonical_json(material), canonical_json(contract.model_dump(mode="json")),
+           canonical_json(check.model_dump(mode="json")))
+    # Bound retained key bytes to 64 MiB (eight entries of at most 8 MiB).
+    # Oversized material still receives identical uncached validation.
+    prepare = _prepare_outcome if sum(len(part.encode("utf-8")) for part in key) <= 8 * 1024 * 1024 else _prepare_outcome.__wrapped__
+    populations, retained, cases, potential, evaluation, digests = prepare(*key)
+    if ((config.contract_digest, config.source_digest, config.selectors_digest) != digests
+            or config.potential_instances != potential):
+        raise ValueError("retained_record_configuration_mismatch")
     finding = None
     if not scope:
         case = next((item for item in cases if item.instance_key == config.instance_key), None)
@@ -202,7 +236,9 @@ def _outcome_output(material, contract, check, config, input_digest):
         required=finding.required if finding is not None else None,
         evidence_paths=finding.evidence_paths if finding is not None else (),
     )
-    return output, populations, retained
+    # Retention values are frozen and include immutable mapping proxies;
+    # copy their enclosing map rather than attempting to pickle the proxies.
+    return output, dict(populations), dict(retained)
 
 
 def validate_record_retained_batches(source, batches, context, contract):
@@ -234,7 +270,7 @@ def validate_record_retained_batches(source, batches, context, contract):
                 or canonical_contract_digest(load_contract(canonical_json(material["contract"]))) != canonical_contract_digest(contract)):
             raise ValueError("record_completion_current_input_mismatch")
         check = next((item for item in contract.checks if item.check_id == config.check_id), None)
-        if not isinstance(check, RetainedRecordCheck):
+        if not isinstance(check, (RetainedRecordCheck, TerminalCountCheck)):
             raise TypeError("record_completion_current_check_unknown")
         expected, populations, retained = _outcome_output(material, contract, check, config, view.input_digest)
         receipts = [item for item in run.execution_evidence if item.kind == RECORD_RETAINED_OUTPUT]
@@ -385,7 +421,7 @@ async def manifest_record_retained_identity(task, request):
     population_sources = {}
     for name in names:
         spec = contract.sources[name]
-        if not isinstance(spec, InitialCollectionSource):
+        if not isinstance(spec, (InitialCollectionSource, TableSource)):
             raise TypeError("record_completion_population_type_mismatch")
         population_sources[name] = spec
     retention_source, effect_source = contract.sources[check.source], contract.sources[rule.effects]
@@ -393,7 +429,7 @@ async def manifest_record_retained_identity(task, request):
             or digest(effect_source.model_dump(mode="json")) != config.effects_selector_digest):
         raise ValueError("record_completion_source_type_or_effect_selector_mismatch")
     evaluation = evaluate_record_retained_completion(safe, check, rule,
-        {name: capture_population(safe, spec) for name, spec in population_sources.items()},
+        {name: capture_terminal_count_population(safe, spec) for name, spec in population_sources.items()},
         capture_record_retention(safe, retention_source), capture_zendesk_ticket_effects(safe, effect_source),
         population_sources=population_sources, retention_source=retention_source, effect_source=effect_source)
     finding = next((item for item in evaluation.findings if item.instance_key == consumption.instance_key), None)

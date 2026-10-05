@@ -24,6 +24,7 @@ from pydantic import (
     StrictInt,
     StrictStr,
     TypeAdapter,
+    field_validator,
     model_validator,
 )
 
@@ -52,8 +53,9 @@ class DateInputConstraints(FrozenModel):
 class ValueInput(FrozenModel):
     kind: Literal["input"]
     format: Literal[
-        "number", "decimal_string", "usd_string", "usd_marked", "iso_date", "iso_timestamp",
+        "number", "decimal_string", "percent_points_string", "usd_string", "usd_marked", "iso_date", "iso_timestamp",
         "clock_time", "clock_24h", "duration_text", "duration_clock", "iso_instant", "date_text",
+        "iso_civil_datetime_date",
     ]
     path: Path | None = None
     literal: StrictStr | StrictInt | StrictFloat | None = None
@@ -83,7 +85,7 @@ class ValueInput(FrozenModel):
 # midnight, text durations are minutes, clock durations are seconds and ISO
 # instants are UTC epoch seconds.
 _DECIMAL_FORMATS = frozenset({
-    "number", "decimal_string", "usd_string", "usd_marked", "clock_time", "clock_24h", "duration_text",
+    "number", "decimal_string", "percent_points_string", "usd_string", "usd_marked", "clock_time", "clock_24h", "duration_text",
     "duration_clock", "iso_instant",
 })
 _CLOCK_12 = re.compile(r"(\d{1,2})(?::([0-5]\d)(?::([0-5]\d))?)?\s*([ap])\.?\s*m\.?", re.IGNORECASE)
@@ -264,6 +266,25 @@ class DecimalExpression(FrozenModel):
     right: ValueExpression
 
 
+class NumberBranch(FrozenModel):
+    # Raw predicate serialization avoids a values/predicates import cycle.
+    # Admission and evaluation still use the shared typed predicate contract.
+    when: dict
+    value: ValueExpression
+
+    @field_validator("when", mode="before")
+    @classmethod
+    def admit_predicate(cls, raw):
+        from .predicates import parse_predicate
+
+        return parse_predicate(raw).model_dump(mode="python")
+
+
+class ConditionalNumber(FrozenModel):
+    kind: Literal["conditional_number"]
+    branches: tuple[NumberBranch, ...] = Field(min_length=1, max_length=16)
+
+
 class RoundedValue(FrozenModel):
     kind: Literal["round"]
     value: ValueExpression
@@ -318,13 +339,34 @@ class CalendarMonthOffset(FrozenModel):
     invalid_day: Literal["unavailable", "clamp"]
 
 
+class BusinessDayDifference(FrozenModel):
+    """Signed Mon–Fri count over (earlier, later], with explicit holidays."""
+
+    kind: Literal["business_days_between"]
+    start: ValueExpression
+    end: ValueExpression
+    holidays: tuple[StrictStr, ...]
+
+    @model_validator(mode="after")
+    def iso_holidays(self):
+        for value in self.holidays:
+            try:
+                if date.fromisoformat(value).isoformat() != value:
+                    raise ValueError
+            except ValueError as exc:
+                raise ValueError("value_business_day_holiday_invalid") from exc
+        if len(set(self.holidays)) != len(self.holidays) or len(self.holidays) > 366:
+            raise ValueError("value_business_day_holiday_invalid")
+        return self
+
+
 type ValueExpression = Annotated[
     ValueInput | DecimalExpression | RoundedValue | DateDifference | DateInterval | CalendarMonthOffset
-    | BusinessDayOffset,
+    | BusinessDayOffset | BusinessDayDifference | ConditionalNumber,
     Field(discriminator="kind"),
 ]
 for _model in (DecimalExpression, RoundedValue, DateDifference, DateInterval, CalendarMonthOffset,
-               BusinessDayOffset):
+               BusinessDayOffset, BusinessDayDifference, NumberBranch, ConditionalNumber):
     _model.model_rebuild()
 VALUE_EXPRESSION = TypeAdapter(ValueExpression)
 
@@ -375,6 +417,11 @@ def _decimal(raw, format):
         if format == "decimal_string":
             valid = re.fullmatch(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?", raw)
             text = raw
+        elif format == "percent_points_string":
+            # Explicit percentage-point units: -28% becomes -28, not -0.28.
+            # Require the marker; no whitespace, localized forms or coercion.
+            valid = re.fullmatch(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?%", raw)
+            text = raw[:-1]
         else:
             # Explicit USD format: optional dollar prefix (required for
             # usd_marked), leading minus, strict three-digit comma groups.
@@ -420,6 +467,28 @@ def _bounded(value):
 
 
 def _evaluate(expr, context, evidence, rounding):
+    if isinstance(expr, ConditionalNumber):
+        from .predicates import evaluate_predicate, parse_predicate
+
+        results = [evaluate_predicate(parse_predicate(branch.when), context) for branch in expr.branches]
+        for result in results:
+            for path in result.evidence_paths:
+                raw = context
+                try:
+                    for part in path:
+                        raw = raw[part]
+                except (KeyError, IndexError, TypeError):
+                    raw = None
+                evidence.append((path, raw))
+        if any(result.value is None for result in results):
+            raise _Unavailable("value_conditional_input_unavailable")
+        matches = [branch for branch, result in zip(expr.branches, results, strict=True) if result.value]
+        if len(matches) != 1:
+            raise _Unavailable("value_conditional_unmapped" if not matches else "value_conditional_ambiguous")
+        kind, value = _evaluate(matches[0].value, context, evidence, rounding)
+        if kind != "decimal":
+            raise _Unavailable("value_conditional_result_type_unavailable")
+        return kind, value
     if isinstance(expr, ValueInput):
         raw = _resolve(expr, context, evidence)
         if expr.format in _DECIMAL_FORMATS:
@@ -443,6 +512,10 @@ def _evaluate(expr, context, evidence, rounding):
                     raise ValueError("noncanonical date")
             elif expr.format == "date_text":
                 value = date_from_text(raw)
+            elif expr.format == "iso_civil_datetime_date":
+                if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?", raw) is None:
+                    raise ValueError("naive ISO civil datetime required")
+                value = datetime.fromisoformat(raw).date()
             else:
                 if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])", raw) is None:
                     raise ValueError("offset ISO timestamp required")
@@ -511,6 +584,17 @@ def _evaluate(expr, context, evidence, rounding):
         raise _Unavailable("value_date_operation_type_unavailable")
     if isinstance(expr, DateDifference):
         return "day_count", (end - start).days
+    if isinstance(expr, BusinessDayDifference):
+        direction = 1 if end >= start else -1
+        earlier, later = (start, end) if direction == 1 else (end, start)
+        span = (later - earlier).days
+        if span > 3660:
+            raise _Unavailable("value_business_day_difference_budget_exceeded")
+        holidays = {date.fromisoformat(item) for item in expr.holidays}
+        total = sum(day.weekday() < 5 and day not in holidays
+                    for ordinal in range(earlier.toordinal() + 1, later.toordinal() + 1)
+                    for day in (date.fromordinal(ordinal),))
+        return "day_count", direction * total
     value_kind, value = _evaluate(expr.value, context, evidence, rounding)
     if value_kind != "calendar_date" or start > end:
         raise _Unavailable("value_date_interval_unavailable")

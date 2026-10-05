@@ -7,8 +7,9 @@ service only where public state is specific:
 
 - Slack's own layout normalisation (messages nested under channels hoisted
   into the top-level list) is applied to public state first;
-- every public top-level key must survive hydration (the schema silently drops
-  some aliases, e.g. Gmail ``emails`` beside ``messages``);
+- Gmail's native ``emails`` alias is normalized to ``messages``; conflicting
+  simultaneous inventories fail closed rather than silently discarding one;
+- every public top-level key must survive hydration after known normalization;
 - top-level keys public state omits must equal their hydrated defaults exactly;
 - lists must have the same length and agree element by element (positional);
 - inside records, every public field kept by the schema must equal the observed
@@ -182,6 +183,16 @@ def public_service_matches(initial: Mapping, service: str, observed) -> bool:
         return True
     if not isinstance(public, Mapping) or not isinstance(observed, Mapping):
         return False
+    if service == "gmail" and "emails" in public:
+        # Follow the native alias mapping without its silent conflict removal.
+        # Both declarations must agree before any public content is removed.
+        if not isinstance(public["emails"], list):
+            return False
+        if "messages" in public and canonical_json(public["messages"]) != canonical_json(public["emails"]):
+            return False
+        from automationbench.schema.gmail.base import GmailState
+
+        public = _plain(GmailState.normalize_gmail_state_fields(copy.deepcopy(public)))
     if service == "slack":
         # Slack hoists messages nested under channels into the top-level list
         # (and renames direct_messages); compare public state in that layout.

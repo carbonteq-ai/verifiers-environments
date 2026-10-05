@@ -1,0 +1,441 @@
+{
+  "schema_version": 1,
+  "manifest_id": "sales-cross-platform-account-health-score",
+  "revision": "batch04-20261005-r1",
+  "public_request": "Run the quarterly health check on our Enterprise accounts. Pull signals from all the usual platforms, score them, and update Salesforce accordingly. Flag anything that needs attention and post a summary to #account-health.",
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "sales.cross_platform_account_health_score",
+      "fields": {
+        "signal_sheet_id": {
+          "value": "ss_health_scoring",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "spreadsheets",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "signal_worksheet_id": {
+          "value": "ws_signals",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "worksheets",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "threshold_worksheet_id": {
+          "value": "ws_thresholds",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "worksheets",
+              1,
+              "id"
+            ]
+          ]
+        },
+        "health_channel_id": {
+          "value": "C_HEALTH",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              1,
+              "id"
+            ]
+          ]
+        },
+        "healthy_name": {
+          "value": "HealthyCorp",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "accounts"
+            ]
+          ]
+        },
+        "atrisk_name": {
+          "value": "AtRisk Industries",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "accounts"
+            ]
+          ]
+        },
+        "critical_name": {
+          "value": "Critical Systems",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "accounts"
+            ]
+          ]
+        }
+      }
+    },
+    "signal_policy_read": {
+      "adapter": "google_sheets.reads@1",
+      "spreadsheet_id": "ss_health_scoring",
+      "worksheet_id": "ws_signals"
+    },
+    "classification_policy_read": {
+      "adapter": "google_sheets.reads@1",
+      "spreadsheet_id": "ss_health_scoring",
+      "worksheet_id": "ws_thresholds"
+    },
+    "health_summary": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "read-signal-weights",
+      "signal_id": "sales.cross_platform_account_health_score.scoring_policy_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "signal_policy_read",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales.cross_platform_account_health_score"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "signal_worksheet_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "cell_values_returned"
+              ],
+              "domain": "boolean"
+            },
+            "right": {
+              "kind": "literal",
+              "value": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "read-classification-thresholds",
+      "signal_id": "sales.cross_platform_account_health_score.classification_policy_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "classification_policy_read",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales.cross_platform_account_health_score"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "threshold_worksheet_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "cell_values_returned"
+              ],
+              "domain": "boolean"
+            },
+            "right": {
+              "kind": "literal",
+              "value": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "post-health-summary-to-requested-channel",
+      "signal_id": "sales.cross_platform_account_health_score.requested_channel_summary",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "health_summary",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales.cross_platform_account_health_score"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "health_channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "healthy_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "atrisk_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "critical_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "a33e5e36c3379db870f30e39263bea8e098efc3048d0917612845771459ee2b1"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "3281f8770fdb71fbab6485c04efcd0ab61760a397a9be3b3da6dbfc04a1b099e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "worksheets"
+      ],
+      "canonical_sha256": "abaaddd654d2f3bb6c27dc1b4a26b029715c4cf9b07dd07bbd0baa4c8eb2c47e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "spreadsheets"
+      ],
+      "canonical_sha256": "690184d077648b41d02c6904f45575951af6b55bab6a4ff193120fb89a770bf8"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "salesforce",
+        "accounts"
+      ],
+      "canonical_sha256": "c4b84807ac064bfe9250d3f11f457832c35e590fba365461bdbd09b005d7ce4d"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "salesforce",
+        "opportunities"
+      ],
+      "canonical_sha256": "65db0bba826654a74aeb854a1d1b86b9d954e0ecffc4c16c399410a12437a430"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "d16cdf38b8879bfdd0e16492e5372a6d441abd4660686cc804e698043e5112d9"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zoom",
+        "meetings"
+      ],
+      "canonical_sha256": "6cd62fe0ae4cbc6b9ea0c70ed5532017a64ab5e6a1607f55aed060740f90602c"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "linkedin",
+        "connections"
+      ],
+      "canonical_sha256": "22171ed827446ab7979b9af435eb2116e8636e2478015e58f50434ca1cf98316"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "4110323c109b038017f24bbae82359955610fe107cd9c2bfb51b2b86d2e34657"
+    }
+  ]
+}
