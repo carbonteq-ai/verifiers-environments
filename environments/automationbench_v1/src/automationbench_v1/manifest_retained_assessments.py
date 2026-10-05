@@ -34,7 +34,7 @@ from .manifest_guard_assessments import (
     execution_subject,
     selectors_digest,
 )
-from .manifest_source import admit_manifest_source
+from .manifest_source import admit_manifest_source, manifest_source_material
 
 RETAINED_PRODUCER = "automationbench.manifest_retained_rows"
 RETAINED_OUTPUT = "automationbench.manifest_retained_result@1"
@@ -299,8 +299,7 @@ def validate_retained_batches(source, batches, context, contract):
         raise ValueError("retained_current_source_mismatch")
     current = {(run.run_id, run.invocation_id, run.attempt_id) for run in context.current_assessment_runs}
     raw = json.loads(source.source_json)
-    safe = {"task_evidence": raw["task_evidence"], "tool_execution_events": raw.get("tool_execution_events", []),
-            "state_write_receipts": raw.get("state_write_receipts", [])}
+    safe = manifest_source_material(raw)
     subject = vf.SubjectRef(kind="trace", snapshot_id=source.snapshot_id, episode_id=source.episode_id, trace_id=raw["trace_id"])
     inputs, evaluations, seen, admitted_records = {}, {}, set(), []
     views, safe_digest = {}, digest(safe)
@@ -482,8 +481,7 @@ async def manifest_retained_identity(task, request):
             or parent.subject.episode_id != sealed.episode_id):
         raise ValueError("retained_completion_contract_or_parent_mismatch")
     raw = json.loads(sealed.source_json)
-    safe = {"task_evidence": raw["task_evidence"], "tool_execution_events": raw.get("tool_execution_events", []),
-            "state_write_receipts": raw.get("state_write_receipts", [])}
+    safe = manifest_source_material(raw)
     if (binding_reason(safe, contract) is not None or digest(safe) != config["source_digest"]
             or selectors_digest(contract, check) != consumption["selectors_digest"]):
         raise ValueError("retained_completion_source_or_selector_mismatch")

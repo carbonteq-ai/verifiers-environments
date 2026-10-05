@@ -19,6 +19,21 @@ class AdmittedManifestInput:
         return json.loads(self.input_json)
 
 
+def manifest_source_material(raw):
+    """The source subset every manifest producer and credit planner reads.
+
+    Manifests read tool-server receipts. With tool interception (training), the
+    trace inventory also holds the harness's before/dispatch/after hook events
+    for the same invocations; they carry no receipt and are not executions.
+    Every builder of manifest material must use this one projection, or the
+    executor's source admission rejects the view.
+    """
+    return {"task_evidence": raw["task_evidence"],
+            "tool_execution_events": [event for event in raw.get("tool_execution_events", [])
+                                      if event.get("source") == "tool_server"],
+            "state_write_receipts": raw.get("state_write_receipts", [])}
+
+
 def admit_manifest_source(task, request, context):
     """Recheck the raw source before any cached evidence or result is admitted.
 
@@ -42,8 +57,7 @@ def admit_manifest_source(task, request, context):
             raise ValueError("manifest_source_admission_cache_wire_mismatch")
         return admitted
     raw = json.loads(sealed.source_json)
-    safe = {"task_evidence": raw["task_evidence"], "tool_execution_events": raw.get("tool_execution_events", []),
-            "state_write_receipts": raw.get("state_write_receipts", [])}
+    safe = manifest_source_material(raw)
     material = context.input(view.view_id)
     text = canonical_json(material)
     if hashlib.sha256(text.encode()).hexdigest() != view.input_digest:

@@ -67,7 +67,7 @@ from .manifest_retained_assessments import (
     plan_retained_credit,
     retained_requests,
 )
-from .manifest_source import admit_manifest_source
+from .manifest_source import admit_manifest_source, manifest_source_material
 from .manifest_summary_assessments import (
     SUMMARY_PRODUCER,
     SummaryBackend,
@@ -127,10 +127,7 @@ def _execution_subject(source, occurrence) -> vf.SubjectRef:
 
 
 def _source_material(source):
-    raw = json.loads(source.source_json)
-    return {"task_evidence": raw["task_evidence"],
-            "tool_execution_events": raw.get("tool_execution_events", []),
-            "state_write_receipts": raw.get("state_write_receipts", [])}
+    return manifest_source_material(json.loads(source.source_json))
 
 
 class ManifestAssessmentTask(AutomationBenchTask):

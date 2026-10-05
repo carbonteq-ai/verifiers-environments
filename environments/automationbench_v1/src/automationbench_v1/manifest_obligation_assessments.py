@@ -44,6 +44,7 @@ from .manifest_guard_assessments import (
     execution_subject,
     selectors_digest,
 )
+from .manifest_source import manifest_source_material
 
 OBLIGATION_PRODUCER = "automationbench.manifest_obligations"
 OBLIGATION_OUTPUT = "automationbench.manifest_obligation_result@1"
@@ -308,9 +309,7 @@ def plan_obligation_credit(source, batches, context, contract):
         raise ValueError("obligation_credit_source_mismatch")
     current = {(run.run_id, run.invocation_id, run.attempt_id) for run in context.current_assessment_runs}
     raw = json.loads(source.source_json)
-    safe = {"task_evidence": raw["task_evidence"],
-            "tool_execution_events": raw.get("tool_execution_events", []),
-            "state_write_receipts": raw.get("state_write_receipts", [])}
+    safe = manifest_source_material(raw)
     rules = {rule.check: rule for rule in contract.credit if rule.policy == "required_effect_once@1"}
     checks = {check.check_id: check for check in contract.checks if isinstance(check, ObligationCheck)}
     result, seen, channels, inputs, evaluations = [], set(), set(), {}, {}
@@ -491,8 +490,7 @@ async def manifest_obligation_identity(task, request, context=None):
             or parent.subject.snapshot_id != sealed.snapshot_id or parent.subject.episode_id != sealed.episode_id):
         raise ValueError("obligation_credit_contract_or_parent_mismatch")
     raw = json.loads(sealed.source_json)
-    safe = {"task_evidence": raw["task_evidence"], "tool_execution_events": raw.get("tool_execution_events", []),
-            "state_write_receipts": raw.get("state_write_receipts", [])}
+    safe = manifest_source_material(raw)
     material = {"source": safe, **capture_obligation_inputs(safe, contract)}
     populations, effects = restore_obligation_inputs(material, contract)
     evaluation, _, _ = _evaluate(material, contract, check, populations, effects)

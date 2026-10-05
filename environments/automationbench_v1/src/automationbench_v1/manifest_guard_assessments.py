@@ -37,6 +37,7 @@ from .contracts.sheet_reads import SheetReadSource, capture_sheet_reads
 from .contracts.slack_effects import SlackEffectSource, capture_slack_effects
 from .contracts.slack_reads import SlackReadSource, capture_slack_reads
 from .contracts.tables import Digest, TableEvidence, TableSource, capture_table
+from .manifest_source import manifest_source_material
 
 GUARD_PRODUCER = "automationbench.manifest_guards"
 GUARD_OUTPUT = "automationbench.manifest_guard_result@1"
@@ -617,11 +618,7 @@ def plan_guard_credit(source, batches, context, contract):
         (run.run_id, run.invocation_id, run.attempt_id) for run in context.current_assessment_runs
     }
     raw = json.loads(source.source_json)
-    safe = {
-        "task_evidence": raw["task_evidence"],
-        "tool_execution_events": raw.get("tool_execution_events", []),
-        "state_write_receipts": raw.get("state_write_receipts", []),
-    }
+    safe = manifest_source_material(raw)
     rules = {rule.check: rule for rule in contract.credit if rule.policy == "per_effect_negative@1"}
     checks = {check.check_id: check for check in contract.checks if isinstance(check, GuardCheck)}
     requests, firings, selectors = [], {}, {}

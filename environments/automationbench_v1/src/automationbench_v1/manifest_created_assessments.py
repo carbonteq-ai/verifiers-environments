@@ -27,7 +27,7 @@ from .contracts.loader import canonical_contract_digest, load_contract
 from .contracts.requests import RequestPopulationEvidence, RequestSource, capture_request_population
 from .contracts.tables import Digest
 from .manifest_guard_assessments import digest, execution_subject
-from .manifest_source import admit_manifest_source
+from .manifest_source import admit_manifest_source, manifest_source_material
 
 CREATED_PRODUCER = "automationbench.manifest_created_objects"
 CREATED_OUTPUT = "automationbench.manifest_created_result@1"
@@ -385,11 +385,7 @@ def validate_created_batches(source, batches, context, contract):
         (run.run_id, run.invocation_id, run.attempt_id) for run in context.current_assessment_runs
     }
     raw = json.loads(source.source_json)
-    safe = {
-        "task_evidence": raw["task_evidence"],
-        "tool_execution_events": raw.get("tool_execution_events", []),
-        "state_write_receipts": raw.get("state_write_receipts", []),
-    }
+    safe = manifest_source_material(raw)
     subject = vf.SubjectRef(
         kind="trace",
         snapshot_id=source.snapshot_id,
@@ -642,11 +638,7 @@ async def manifest_created_identity(task, request, context=None):
     ):
         raise ValueError("created_completion_contract_or_parent_mismatch")
     raw = json.loads(sealed.source_json)
-    safe = {
-        "task_evidence": raw["task_evidence"],
-        "tool_execution_events": raw.get("tool_execution_events", []),
-        "state_write_receipts": raw.get("state_write_receipts", []),
-    }
+    safe = manifest_source_material(raw)
     if digest(safe) != config.source_digest or binding_reason(safe, contract) is not None:
         raise ValueError("created_completion_source_or_authority_mismatch")
     material = {"source": safe, **capture_created_inputs(safe, contract)}

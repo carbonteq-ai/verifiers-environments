@@ -27,6 +27,7 @@ from .contracts.summary_policy import (
 )
 from .contracts.tables import Digest
 from .manifest_guard_assessments import digest
+from .manifest_source import manifest_source_material
 from .manifest_summary_actions import plan_summary_actions, reduce_summary_actions
 from .manifest_summary_assessments import (
     SUMMARY_ACTION_OUTPUT,
@@ -62,11 +63,7 @@ class PenaltyConfig(FrozenModel):
 
 def _safe(source):
     raw = json.loads(source.source_json)
-    return {
-        "task_evidence": raw["task_evidence"],
-        "tool_execution_events": raw.get("tool_execution_events", []),
-        "state_write_receipts": raw.get("state_write_receipts", []),
-    }
+    return manifest_source_material(raw)
 
 
 def _record(run, kind):
