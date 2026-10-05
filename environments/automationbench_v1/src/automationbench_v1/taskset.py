@@ -269,6 +269,15 @@ class AutomationBenchTask(
         tuple[type[vf.Toolset], ...], (AutomationBenchToolset,)
     )
 
+    def __new__(cls, data: Any = None, config: Any = None, *args: Any, **kwargs: Any):
+        # A task rebuilt from (data, config) as the base class becomes the class
+        # the taskset would have loaded for that row (see task_type_for).
+        if cls is AutomationBenchTask and data is not None and config is not None:
+            target = task_type_for(data.task_name, config)
+            if target is not cls:
+                return super().__new__(target)
+        return super().__new__(cls)
+
     @property
     def key(self) -> str:
         """Use the dataset task name as identity across fresh world instances.
@@ -503,6 +512,63 @@ class AutomationBenchConfig(vf.TasksetConfig):
         return self
 
 
+def task_type_for(task_name: str, config: AutomationBenchTaskConfig) -> type[AutomationBenchTask]:
+    """The concrete task class one dataset row runs as under one task config.
+
+    Verifiers' environment server rebuilds every request's task from its data and
+    config as the taskset's single task class, so the class choice must follow
+    from those two values (``AutomationBenchTask.__new__``) and not only from
+    ``load``. Otherwise manifest and reviewed assessments silently drop out of
+    worker-executed episodes.
+    """
+    task_type: type[AutomationBenchTask] = AutomationBenchTask
+    if config.reviewed_hr_assessments:
+        from .hr_assessments import ReviewedHrTask
+
+        task_type = ReviewedHrTask
+    if config.reviewed_simple_assessments:
+        from .simple_assessments import ReviewedSimpleTask
+        from .simple_evidence import SUPPORTED
+
+        if task_name in SUPPORTED:
+            task_type = ReviewedSimpleTask
+    if config.reviewed_suppression_assessments:
+        from .marketing_assessments import ReviewedSuppressionTask
+        from .marketing_evidence import TASK
+
+        if task_name == TASK:
+            task_type = ReviewedSuppressionTask
+    if config.reviewed_cash_flow_assessments:
+        from .finance_assessments import ReviewedCashFlowTask
+        from .finance_evidence import TASK as CASH_FLOW_TASK
+
+        if task_name == CASH_FLOW_TASK:
+            task_type = ReviewedCashFlowTask
+    if config.reviewed_renewal_assessments:
+        from .operations_assessments import RENEWAL_TASK, ReviewedRenewalTask
+
+        if task_name == RENEWAL_TASK:
+            task_type = ReviewedRenewalTask
+    if config.reviewed_record_update_assessments:
+        from .record_assessments import ReviewedRecordUpdateTask
+        from .simple_record_contracts import SUPPORTED as RECORD_UPDATE_TASKS
+
+        if task_name in RECORD_UPDATE_TASKS:
+            task_type = ReviewedRecordUpdateTask
+    if config.reviewed_access_assessments:
+        from .operations_assessments import ACCESS_TASK, ReviewedAccessTask
+
+        if task_name == ACCESS_TASK:
+            task_type = ReviewedAccessTask
+    if config.manifest_assessments:
+        from .contracts.loader import supported_tasks
+        from .manifest_assessments import ManifestAssessmentTask
+
+        if task_name in supported_tasks():
+            task_type = ManifestAssessmentTask
+    return task_type
+
+
 class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConfig]):  # pyright: ignore[reportInvalidTypeArguments]
     def load(self) -> list[AutomationBenchTask]:
         available = set(get_available_domains())
@@ -538,51 +604,7 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
                 zapier_tools = tuple(str(item) for item in info.get("zapier_tools", []))
                 if self.config.task.toolset == "limited_zapier":
                     zapier_tools = _with_spreadsheet_discovery(zapier_tools, prompt, initial_state)
-                task_type = AutomationBenchTask
-                if self.config.task.reviewed_hr_assessments:
-                    from .hr_assessments import ReviewedHrTask
-
-                    task_type = ReviewedHrTask
-                if self.config.task.reviewed_simple_assessments:
-                    from .simple_assessments import ReviewedSimpleTask
-                    from .simple_evidence import SUPPORTED
-
-                    if task_name in SUPPORTED:
-                        task_type = ReviewedSimpleTask
-                if self.config.task.reviewed_suppression_assessments:
-                    from .marketing_assessments import ReviewedSuppressionTask
-                    from .marketing_evidence import TASK
-
-                    if task_name == TASK:
-                        task_type = ReviewedSuppressionTask
-                if self.config.task.reviewed_cash_flow_assessments:
-                    from .finance_assessments import ReviewedCashFlowTask
-                    from .finance_evidence import TASK as CASH_FLOW_TASK
-
-                    if task_name == CASH_FLOW_TASK:
-                        task_type = ReviewedCashFlowTask
-                if self.config.task.reviewed_renewal_assessments:
-                    from .operations_assessments import RENEWAL_TASK, ReviewedRenewalTask
-
-                    if task_name == RENEWAL_TASK:
-                        task_type = ReviewedRenewalTask
-                if self.config.task.reviewed_record_update_assessments:
-                    from .record_assessments import ReviewedRecordUpdateTask
-                    from .simple_record_contracts import SUPPORTED as RECORD_UPDATE_TASKS
-
-                    if task_name in RECORD_UPDATE_TASKS:
-                        task_type = ReviewedRecordUpdateTask
-                if self.config.task.reviewed_access_assessments:
-                    from .operations_assessments import ACCESS_TASK, ReviewedAccessTask
-
-                    if task_name == ACCESS_TASK:
-                        task_type = ReviewedAccessTask
-                if self.config.task.manifest_assessments:
-                    from .contracts.loader import supported_tasks
-                    from .manifest_assessments import ManifestAssessmentTask
-
-                    if task_name in supported_tasks():
-                        task_type = ManifestAssessmentTask
+                task_type = task_type_for(task_name, self.config.task)
                 tasks.append(
                     task_type(
                         AutomationBenchData(

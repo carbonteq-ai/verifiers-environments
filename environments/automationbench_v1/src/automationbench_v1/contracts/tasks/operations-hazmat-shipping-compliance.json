@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "manifest_id": "operations-hazmat_shipping_compliance-components",
+  "revision": "luna_top20_manifest_authoring_20261004_v1",
+  "public_request": "Process outbound shipment compliance for hazardous materials. Check the shipment log (ss_shipments, ws_outbound) for all shipments classified as 'Hazardous'.\n\nImportant rules:\n- Only process shipments with Destination Type 'International' - domestic hazmat shipments use a different process and should be skipped.\n- Items with 'Reclassified' in the Notes column are no longer hazardous even if the Classification still says 'Hazardous' - skip these.\n- Check Declaration Status column - only send DocuSign for shipments where it is 'Missing'.\n\nFor each qualifying shipment, send a DocuSign hazmat declaration using the 'International Hazmat Declaration' template (NOT the 'Domestic Hazmat Declaration') to the shipper contact email, then send the envelope.\n\nEmail the compliance officer (compliance@company.example.com) with a list of all shipments needing declarations.\n\nPost a summary to #logistics with shipment IDs, destinations, and the total count of shipments requiring declarations. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "a82ddeeb80d94018960559546cf72521600a5d605880311fde463c9ee0d3ba88"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "canonical_sha256": "73f8cebbf178a9cab759adf9f7b3b64715605deeff129a6050a3ef4c6c0e2f3f"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack"
+      ],
+      "canonical_sha256": "ab0e9df6b70cf39e6154654973f0d8262402dc6c935de42ca297a024adbd00bf"
+    }
+  ],
+  "sources": {
+    "envelopes": {
+      "adapter": "service.record_writes@1",
+      "service": "docusign",
+      "collection": [
+        "envelopes"
+      ],
+      "kind": "create"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "shp-801": {
+      "adapter": "public.request@1",
+      "member_key": "shp-801",
+      "fields": {
+        "shipment": {
+          "value": "SHP-801",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets"
+            ]
+          ]
+        },
+        "shipper": {
+          "value": "h.weber@logistik-gmbh.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets"
+            ]
+          ]
+        }
+      }
+    },
+    "compliance-mail": {
+      "adapter": "public.request@1",
+      "member_key": "compliance-mail",
+      "fields": {
+        "recipient": {
+          "value": "compliance@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "logistics-post": {
+      "adapter": "public.request@1",
+      "member_key": "logistics-post",
+      "fields": {
+        "channel": {
+          "value": "CLOG",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "shipment-801-envelope-created",
+      "signal_id": "operations.hazmat.shipment_801_envelope",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "shp-801",
+      "source": "envelopes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "shp-801"
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "values_text"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "h.weber@logistik-gmbh.example.com"
+        },
+        "mode": "words"
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "compliance-email",
+      "signal_id": "operations.hazmat.compliance_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "compliance-mail",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "compliance-mail"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "recipient"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "to"
+          ],
+          "domain": "sequence"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "logistics-post",
+      "signal_id": "operations.hazmat.logistics_post",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "logistics-post",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "logistics-post"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "CLOG"
+        }
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

