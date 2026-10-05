@@ -26,6 +26,8 @@ Gaming. A random spot-check of 3 unreviewed full-coverage drafts found 11 of 14 
 
 Jira task data. The HelpScout triage task named Jira project SUP but declared no projects, so with strict project validation no agent could create the issues it requires. Like the earlier Gorgias FIN repair, it was fixed in the AutomationBench fork, which now declares SUP; the vendored copy is byte-identical. Old Luna episodes still carry the pre-repair starting state, so simulator runs seeded from those episodes cannot create Jira issues in these two tasks. Seed Jira alternatives from the current task data.
 
+Simple mix-v2 install (2026-10-06). Manifest step credit now counts record goals (`record.fields_equal@1`), credited to the write `select_credit` names. Every Simple draft and installed manifest was replayed on its Luna episode with the training step-credit reader (rl repo `scripts/qualification/automationbench_simple_replay.py`, evidence `docs/research/verifiers-assessment-qualification/reward-candidate/simple-manifest-replay-20261006.json`). Seventeen accepted drafts are installed as candidates for task mix `automationbench-manifest-luna-v2`; fourteen were rebound from the whole prompt to the user message (`prompt[1].content`), with request-field authority moved to the user message only where the message states the value. Independent qualification review remains separate.
+
 | Task | Expressed / in scope | Gaps | Status | Notes |
 |---|---|---:|---|---|
 | `finance.contract_billing` | 4 / 4 | 0 | qualified candidate | 1 known gaming |
