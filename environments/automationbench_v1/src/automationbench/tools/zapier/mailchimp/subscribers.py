@@ -4,7 +4,6 @@
 """Mailchimp subscriber and audience tools."""
 
 import json
-from datetime import datetime
 from typing import List, Literal, Optional
 
 from automationbench.schema.mailchimp import (
@@ -16,6 +15,7 @@ from automationbench.schema.mailchimp import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
+from automationbench import sim_runtime as _sim
 
 
 def mailchimp_add_subscriber(
@@ -73,7 +73,7 @@ def mailchimp_add_subscriber(
         if tags:
             existing.tags.update(tags)
         existing.vip = vip
-        existing.updated_at = datetime.now()
+        existing.updated_at = _sim.now()
         subscriber = existing
     else:
         # Create new subscriber
@@ -249,7 +249,7 @@ def mailchimp_send_campaign(
         )
 
     campaign.status = "sent"
-    campaign.send_time = datetime.now()
+    campaign.send_time = _sim.now()
 
     # Count subscribers in the audience
     subscribers = [
@@ -360,7 +360,7 @@ def mailchimp_add_tag_to_subscriber(
         )
 
     subscriber.tags.add(tag_name)
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -410,7 +410,7 @@ def mailchimp_remove_tag_from_subscriber(
         )
 
     subscriber.tags.discard(tag_name)
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -458,7 +458,7 @@ def mailchimp_archive_subscriber(
         )
 
     subscriber.status = "archived"
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -507,7 +507,7 @@ def mailchimp_add_subscriber_note(
         )
 
     subscriber.notes.append(note)
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps(
         {

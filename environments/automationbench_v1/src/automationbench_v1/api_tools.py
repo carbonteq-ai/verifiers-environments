@@ -9,6 +9,7 @@ from automationbench.tools.api import api_search as upstream_api_search
 from automationbench.tools.api import base64_encode as upstream_base64_encode
 
 from .capture import capture_action
+from .simulation import simulated_tool_call
 from .tools import AutomationBenchState
 from .world_codec import dump_world, load_world
 
@@ -43,16 +44,19 @@ class AutomationBenchApiToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchStat
     ) -> str:
         """Call a discovered endpoint against this rollout's simulated world."""
 
+        arguments = {"method": method, "url": url, "params": params, "body": body}
+
         def execute():
-            world = load_world(self.state.world)
-            result = upstream_api_fetch(world, method, url, params=params, body=body)
-            self.state.world = dump_world(world)
+            with simulated_tool_call(self.state, "api_fetch", arguments):
+                world = load_world(self.state.world)
+                result = upstream_api_fetch(world, method, url, params=params, body=body)
+                self.state.world = dump_world(world)
             return result
 
         return capture_action(
             self.state,
             "api_fetch",
-            {"method": method, "url": url, "params": params, "body": body},
+            arguments,
             execute,
         )
 

@@ -13,6 +13,7 @@ from automationbench.tools import ALL_TOOLS
 from automationbench.tools.zapier.meta import ToolRegistry
 
 from .capture import capture_action
+from .simulation import simulated_tool_call
 from .world_codec import dump_world, load_world
 
 
@@ -65,6 +66,11 @@ class AutomationBenchState(vf.State):
     # and action records travel once, as tool-server execution evidence.
     action_count: int = 0
     action_published: tuple[str, ...] = ()
+    # Deterministic simulation (see simulation.py): the world clock's base instant
+    # (ISO, UTC) and the number of calls that changed the world.
+    deterministic_world: bool = False
+    world_clock: str | None = None
+    world_revision: int = 0
 
 
 class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState]):
@@ -92,9 +98,10 @@ class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState])
         """Execute a tool found by ``search_tools`` against this rollout's world."""
 
         def execute():
-            world = load_world(self.state.world)
-            result = _registry().execute(tool_name, arguments, world=world)
-            self.state.world = dump_world(world)
+            with simulated_tool_call(self.state, tool_name, arguments):
+                world = load_world(self.state.world)
+                result = _registry().execute(tool_name, arguments, world=world)
+                self.state.world = dump_world(world)
             return result
 
         return capture_action(

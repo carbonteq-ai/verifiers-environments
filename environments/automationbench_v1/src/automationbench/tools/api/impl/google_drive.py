@@ -13,6 +13,7 @@ import re
 from typing import Any, Optional
 
 from automationbench.schema.world import WorldState
+from automationbench import sim_runtime as _sim
 
 
 # ---------------------------------------------------------------------------
@@ -272,9 +273,8 @@ def google_drive_files_copy(
     **kwargs,
 ) -> str:
     """Copy a file. Matches POST /drive/v3/files/{fileId}/copy."""
-    import uuid
 
-    new_id = f"gdrive_{uuid.uuid4().hex[:12]}"
+    new_id = f"gdrive_{_sim.uuid4().hex[:12]}"
     dest_name = name or f"Copy of {fileId}"
 
     params: dict[str, Any] = {
@@ -317,9 +317,8 @@ def google_drive_files_create(
     **kwargs,
 ) -> str:
     """Create a new file record. Matches POST /drive/v3/files."""
-    import uuid
 
-    new_id = f"gdrive_{uuid.uuid4().hex[:12]}"
+    new_id = f"gdrive_{_sim.uuid4().hex[:12]}"
     file_name = name or "Untitled"
 
     params: dict[str, Any] = {

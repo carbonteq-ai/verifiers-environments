@@ -9,7 +9,6 @@ them, forwarding parameters without modification.
 """
 
 import json
-from datetime import datetime
 from typing import List, Literal, Optional, cast
 
 from automationbench.schema.freshdesk import (
@@ -19,6 +18,7 @@ from automationbench.schema.freshdesk import (
     FreshdeskTicket,
 )
 from automationbench.schema.world import WorldState
+from automationbench import sim_runtime as _sim
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ def freshdesk_tickets_update(
         else:
             ticket.tags = list(tags)
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
     return json.dumps(_ticket_to_resource(ticket))
 
 
@@ -266,7 +266,7 @@ def freshdesk_ticket_notes_create(
 
     note = FreshdeskNote(body=body, private=private)
     ticket.notes.append(note)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(_note_to_resource(note))
 

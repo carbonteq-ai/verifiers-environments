@@ -9,9 +9,9 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import json
 from typing import Any, Dict, List
-from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from automationbench import sim_runtime as _sim
 
 
 class JiraIssueFields(BaseModel):
@@ -42,10 +42,10 @@ class JiraActionRecord(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(default_factory=lambda: f"jira_{uuid4().hex}")
+    id: str = Field(default_factory=lambda: f"jira_{_sim.uuid4().hex}")
     action_key: str
     params: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
 
     def to_result_dict(self) -> Dict[str, Any]:
         return {"id": self.id, **self.params}
@@ -163,9 +163,9 @@ class JiraState(BaseModel):
         priority = params.get("priority")
         if priority is not None and (not isinstance(priority, str) or not priority.strip()):
             raise ValueError("jira_priority_invalid")
-        identity = f"jira_issue_{uuid4().hex}"
+        identity = f"jira_issue_{_sim.uuid4().hex}"
         while any(item.get("id") == identity for item in self.issues):
-            identity = f"jira_issue_{uuid4().hex}"
+            identity = f"jira_issue_{_sim.uuid4().hex}"
         key = None
         if "key" in project:
             prefix = project["key"] + "-"

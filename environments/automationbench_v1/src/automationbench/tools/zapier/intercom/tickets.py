@@ -4,7 +4,6 @@
 """Intercom tools for tickets, conversations, and contacts."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
 from automationbench.schema.intercom import (
@@ -16,6 +15,7 @@ from automationbench.schema.intercom import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
+from automationbench import sim_runtime as _sim
 
 
 # ============================================================================
@@ -122,7 +122,7 @@ def intercom_update_ticket(
     if assignee_id:
         ticket.assignee_id = assignee_id
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -268,7 +268,7 @@ def intercom_reply_to_conversation(
         author_id=author_id,
     )
     conversation.conversation_parts.append(part)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -556,7 +556,7 @@ def intercom_add_note(
             author_id=admin_id,
         )
         conversation.conversation_parts.append(part)
-        conversation.updated_at = datetime.now()
+        conversation.updated_at = _sim.now()
         return json.dumps(
             {
                 "success": True,
@@ -644,7 +644,7 @@ def intercom_update_contact(
     if phone:
         contact.phone = phone
 
-    contact.updated_at = datetime.now()
+    contact.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -1379,7 +1379,7 @@ def intercom_update_lead(
     if phone:
         contact.phone = phone
 
-    contact.updated_at = datetime.now()
+    contact.updated_at = _sim.now()
 
     return json.dumps(
         {

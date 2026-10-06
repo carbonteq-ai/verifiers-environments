@@ -9,7 +9,6 @@ Invoked by the api_fetch routing layer.
 
 import json
 import re
-from datetime import datetime
 from decimal import Decimal
 
 from automationbench.schema.quickbooks import (
@@ -22,6 +21,7 @@ from automationbench.schema.quickbooks import (
     QBVendor,
 )
 from automationbench.schema.world import WorldState
+from automationbench import sim_runtime as _sim
 
 
 def _to_decimal(val) -> Decimal:
@@ -31,9 +31,8 @@ def _to_decimal(val) -> Decimal:
 
 
 def _qb_id() -> str:
-    import random
 
-    return str(random.randint(10000, 99999))
+    return str(_sim.rng().randint(10000, 99999))
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +226,7 @@ def quickbooks_invoice_create(world: WorldState, body: dict, **kwargs) -> str:
         doc_number=body.get("DocNumber", f"INV-{new_id}"),
         customer_id=cust_id,
         customer_name=cust_name,
-        txn_date=body.get("TxnDate", datetime.now().strftime("%Y-%m-%d")),
+        txn_date=body.get("TxnDate", _sim.now().strftime("%Y-%m-%d")),
         due_date=body.get("DueDate"),
         total_amt=total,
         balance=total,
@@ -351,7 +350,7 @@ def quickbooks_payment_create(world: WorldState, body: dict, **kwargs) -> str:
         customer_id=cust_id,
         customer_name=cust_name,
         total_amt=_to_decimal(body.get("TotalAmt", 0)),
-        txn_date=body.get("TxnDate", datetime.now().strftime("%Y-%m-%d")),
+        txn_date=body.get("TxnDate", _sim.now().strftime("%Y-%m-%d")),
         payment_number=body.get("PaymentRefNum"),
         note=body.get("PrivateNote"),
     )
@@ -404,7 +403,7 @@ def quickbooks_bill_create(world: WorldState, body: dict, **kwargs) -> str:
         doc_number=body.get("DocNumber", f"BILL-{new_id}"),
         vendor_id=vendor_id,
         vendor_name=vendor_name,
-        txn_date=body.get("TxnDate", datetime.now().strftime("%Y-%m-%d")),
+        txn_date=body.get("TxnDate", _sim.now().strftime("%Y-%m-%d")),
         due_date=body.get("DueDate"),
         total_amt=total,
         balance=total,
@@ -465,7 +464,7 @@ def quickbooks_bill_payment_create(world: WorldState, body: dict, **kwargs) -> s
         customer_id=vendor_id,
         customer_name=vendor_name,
         total_amt=total,
-        txn_date=body.get("TxnDate", datetime.now().strftime("%Y-%m-%d")),
+        txn_date=body.get("TxnDate", _sim.now().strftime("%Y-%m-%d")),
         payment_number=body.get("DocNumber"),
         invoice_id=linked_bill_id,
         note=body.get("PrivateNote"),
@@ -576,7 +575,7 @@ def quickbooks_refund_receipt_create(world: WorldState, body: dict, **kwargs) ->
         customer_id=cust_id,
         customer_name=cust_name,
         total_amt=total,
-        txn_date=body.get("TxnDate", datetime.now().strftime("%Y-%m-%d")),
+        txn_date=body.get("TxnDate", _sim.now().strftime("%Y-%m-%d")),
         payment_number=body.get("DocNumber"),
         note=body.get("PrivateNote"),
     )

@@ -55,6 +55,7 @@ from automationbench.schema.recruitee import RecruiteeState
 from automationbench.schema.quickbooks import QuickBooksState
 from automationbench.schema.xero import XeroState
 from automationbench.schema.wave import WaveState
+from automationbench import sim_runtime as _sim
 
 
 class WorldMeta(BaseModel):
@@ -63,7 +64,7 @@ class WorldMeta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = "0.1.0"
-    current_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    current_time: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
     no_same_sender_noise: bool = False
     # Services this task's world is "subscribed" to (seeded or asserted). When set,
     # api_fetch rejects calls to other services with a credentials error instead of

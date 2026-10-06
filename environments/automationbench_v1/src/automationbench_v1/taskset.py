@@ -22,6 +22,7 @@ from .limited_tools import (
     AutomationBenchLimitedToolsetConfig,
 )
 from .scoring import ScoreSnapshot, score_world
+from .simulation import simulated_setup, world_clock_base
 from .tool_mistakes import (
     EMPTY_RESULT,
     MISTAKES,
@@ -214,6 +215,10 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     world_time_context: bool = False
     # Host-side raw material for calibration; never exposed as a tool argument.
     capture_actions: bool = False
+    # Fixed world clock, identifiers and random choices per call (simulation.py), so
+    # equal actions on equal worlds give equal tool results. False keeps the wall
+    # clock and OS-random identifiers.
+    deterministic_world: bool = False
     # Offline development candidate; independent native findings, official score unchanged.
     reviewed_hr_assessments: bool = False
     reviewed_simple_assessments: bool = False
@@ -317,7 +322,14 @@ class AutomationBenchTask(
 
     async def setup(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         del runtime
-        world = WorldState.model_validate(self.data.initial_state)
+        deterministic = cast(AutomationBenchTaskConfig, self.config).deterministic_world
+        if deterministic:
+            clock = world_clock_base(self.data.initial_state)
+            with simulated_setup(self.data.initial_state, clock):
+                world = WorldState.model_validate(self.data.initial_state)
+            world.meta.current_time = clock
+        else:
+            world = WorldState.model_validate(self.data.initial_state)
         world.meta.allowed_services = _allowed_services(
             self.data.initial_state,
             self.data.assertions,
@@ -329,6 +341,9 @@ class AutomationBenchTask(
         state.assertions = self.data.assertions
         state.search_top_k = cast(AutomationBenchTaskConfig, self.config).search_top_k
         state.capture_actions = cast(AutomationBenchTaskConfig, self.config).capture_actions
+        state.deterministic_world = deterministic
+        state.world_clock = clock.isoformat() if deterministic else None
+        state.world_revision = 0
         if state.capture_actions:
             from .capture import snapshot_world
 

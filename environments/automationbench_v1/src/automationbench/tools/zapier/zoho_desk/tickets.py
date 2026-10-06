@@ -4,7 +4,6 @@
 """Zoho Desk tools for tickets and contacts."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
 from automationbench.schema.world import WorldState
@@ -14,6 +13,7 @@ from automationbench.schema.zoho_desk import (
     ZohoDeskTicket,
 )
 from automationbench.tools.zapier.types import register_metadata
+from automationbench import sim_runtime as _sim
 
 
 # ============================================================================
@@ -146,7 +146,7 @@ def zoho_desk_update_ticket(
     if tags:
         ticket.tags = [t.strip() for t in tags.split(",") if t.strip()]
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -233,7 +233,7 @@ def zoho_desk_add_comment(
         commenter_id=commenter_id,
     )
     ticket.comments.append(comment)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -618,7 +618,7 @@ def zoho_desk_send_reply(
         commenter_id=from_email,
     )
     ticket.comments.append(comment)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {

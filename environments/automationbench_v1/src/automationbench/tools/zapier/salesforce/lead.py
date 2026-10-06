@@ -15,6 +15,7 @@ from automationbench.schema.salesforce import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
+from automationbench import sim_runtime as _sim
 
 
 def salesforce_lead_create(
@@ -281,7 +282,7 @@ def salesforce_convert_lead_to_contact(
     Returns:
         JSON string with converted contact, opportunity, and lead info or error.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import timedelta, timezone
 
     # Verify lead exists and is not already converted
     lead_record = world.salesforce.get_lead_by_id(lead)
@@ -329,7 +330,7 @@ def salesforce_convert_lead_to_contact(
             id=generate_salesforce_id(),
             name=f"{lead_record.company} - New Business",
             stage_name="Qualification",
-            close_date=datetime.now() + timedelta(days=30),
+            close_date=_sim.now() + timedelta(days=30),
             account_id=account,
             lead_source=lead_record.lead_source,
         )
@@ -342,7 +343,7 @@ def salesforce_convert_lead_to_contact(
     lead_record.converted_contact_id = contact.id
     if opp_record:
         lead_record.converted_opportunity_id = opp_record.id
-    lead_record.last_modified_date = datetime.now(timezone.utc)
+    lead_record.last_modified_date = _sim.now(timezone.utc)
 
     result = {
         "success": True,

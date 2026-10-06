@@ -8,14 +8,14 @@ from typing import Literal, Optional
 from pydantic import Field, model_validator
 
 from automationbench.schema.linkedin.base import LinkedInRecord
+from automationbench import sim_runtime as _sim
 
 
 def generate_linkedin_job_id() -> str:
     """Construct a plausible LinkedIn job listing identifier."""
-    import random
     import string
 
-    return "".join(random.choices(string.digits, k=10))
+    return "".join(_sim.rng().choices(string.digits, k=10))
 
 
 class Job(LinkedInRecord):

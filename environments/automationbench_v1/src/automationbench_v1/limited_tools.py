@@ -16,6 +16,7 @@ from pydantic import ConfigDict, create_model
 from automationbench.tools import ALL_TOOLS
 
 from .capture import capture_action, capture_rejection
+from .simulation import simulated_tool_call
 from .tools import AutomationBenchState
 from .world_codec import dump_world, load_world
 
@@ -245,9 +246,10 @@ class AutomationBenchLimitedToolset(
         }
 
         def execute():
-            world = load_world(self.state.world)
-            result = func(*args, world=world, **cleaned)
-            self.state.world = dump_world(world)
+            with simulated_tool_call(self.state, tool_name, called):
+                world = load_world(self.state.world)
+                result = func(*args, world=world, **cleaned)
+                self.state.world = dump_world(world)
             return result
 
         return capture_action(self.state, tool_name, called, execute)

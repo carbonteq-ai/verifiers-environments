@@ -11,14 +11,14 @@ from automationbench.schema.chatgpt.base import (
     ChatGPTRecord,
     generate_unix_timestamp,
 )
+from automationbench import sim_runtime as _sim
 
 
 def generate_transcription_id() -> str:
     """Produce a unique transcription identifier."""
-    import random
     import string
 
-    return "tr_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "tr_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 class TranscriptionSegment(ChatGPTRecord):

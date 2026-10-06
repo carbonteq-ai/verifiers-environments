@@ -9,6 +9,7 @@ from typing import Literal, Optional
 from pydantic import Field
 
 from automationbench.schema.zoom.base import ZoomRecord, generate_zoom_uuid
+from automationbench import sim_runtime as _sim
 
 
 class Registrant(ZoomRecord):
@@ -54,7 +55,7 @@ class Registrant(ZoomRecord):
         description="Whether this registrant was auto-approved",
     )
     registered_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=_sim.now,
         description="Registration timestamp",
     )
     join_url: Optional[str] = Field(

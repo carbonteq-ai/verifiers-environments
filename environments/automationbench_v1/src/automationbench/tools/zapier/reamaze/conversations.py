@@ -4,7 +4,6 @@
 """Re:amaze tools for conversations and contacts."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
 from automationbench.schema.reamaze import (
@@ -14,6 +13,7 @@ from automationbench.schema.reamaze import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
+from automationbench import sim_runtime as _sim
 
 
 # ============================================================================
@@ -170,7 +170,7 @@ def reamaze_add_message(
         visibility=visibility,
     )
     conversation.messages.append(message)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -329,7 +329,7 @@ def reamaze_update_conversation(
     if assignee_email:
         conversation.assignee_email = assignee_email
 
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {

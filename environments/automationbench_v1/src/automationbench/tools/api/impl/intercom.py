@@ -9,7 +9,6 @@ these functions, forwarding parameters without modification.
 """
 
 import json
-from datetime import datetime
 from typing import Literal, Optional, cast
 
 from automationbench.schema.intercom import (
@@ -21,6 +20,7 @@ from automationbench.schema.intercom import (
     IntercomTicket,
 )
 from automationbench.schema.world import WorldState
+from automationbench import sim_runtime as _sim
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ def intercom_contact_update(
     if custom_attributes and isinstance(custom_attributes, dict):
         contact.custom_attributes.update({k: str(v) for k, v in custom_attributes.items()})
 
-    contact.updated_at = datetime.now()
+    contact.updated_at = _sim.now()
     return json.dumps(contact.to_display_dict())
 
 
@@ -411,7 +411,7 @@ def intercom_conversation_reply(
         author_id=author_id,
     )
     conversation.conversation_parts.append(part)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
     return json.dumps({"conversation_id": conversation_id, "part_id": part.id})
 
 
@@ -437,7 +437,7 @@ def intercom_conversation_note(
         author_id=admin_id,
     )
     conversation.conversation_parts.append(part)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
     return json.dumps({"conversation_id": conversation_id, "part_id": part.id})
 
 

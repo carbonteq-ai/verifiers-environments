@@ -9,7 +9,6 @@ without modification.
 """
 
 import json
-from datetime import datetime
 from typing import Literal, Optional, cast
 
 from automationbench.schema.world import WorldState
@@ -19,6 +18,7 @@ from automationbench.schema.zoho_desk import (
     ZohoDeskContact,
     ZohoDeskTicket,
 )
+from automationbench import sim_runtime as _sim
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ def zoho_desk_tickets_update(
     if team_id is not None:
         ticket.team_id = team_id
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(ticket.to_display_dict())
 
@@ -146,7 +146,7 @@ def zoho_desk_tickets_comment(
         commenter_id=commenterId,
     )
     ticket.comments.append(comment)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {

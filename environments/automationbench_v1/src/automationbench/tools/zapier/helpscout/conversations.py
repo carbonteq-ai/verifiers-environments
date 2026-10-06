@@ -4,7 +4,6 @@
 """HelpScout tools for conversations and customers."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
 from automationbench.schema.helpscout import (
@@ -14,6 +13,7 @@ from automationbench.schema.helpscout import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
+from automationbench import sim_runtime as _sim
 
 
 # ============================================================================
@@ -145,7 +145,7 @@ def helpscout_update_conversation(
     if mailbox_id:
         conversation.mailbox_id = mailbox_id
 
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -271,7 +271,7 @@ def helpscout_send_reply(
         author_email=author_email,
     )
     conversation.threads.append(thread)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -328,7 +328,7 @@ def helpscout_add_note(
         author_email=author_email,
     )
     conversation.threads.append(thread)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -692,7 +692,7 @@ def helpscout_update_customer(
     if job_title:
         customer.job_title = job_title
 
-    customer.updated_at = datetime.now()
+    customer.updated_at = _sim.now()
 
     return json.dumps(
         {

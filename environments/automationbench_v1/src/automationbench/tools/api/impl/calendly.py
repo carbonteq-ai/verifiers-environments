@@ -21,6 +21,7 @@ from automationbench.schema.calendly import (
     generate_calendly_uuid,
 )
 from automationbench.schema.world import WorldState
+from automationbench import sim_runtime as _sim
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ def _invitee_to_resource(invitee: Invitee) -> dict:
     if invitee.is_no_show:
         result["no_show"] = {
             "uri": generate_calendly_uri("no_shows"),
-            "created_at": invitee.no_show_marked_at or datetime.now().isoformat(),
+            "created_at": invitee.no_show_marked_at or _sim.now().isoformat(),
         }
     return result
 
@@ -267,7 +268,7 @@ def calendly_scheduled_event_cancel(
     if event.status == "canceled":
         return json.dumps({"error": {"code": 409, "message": "Event is already canceled"}})
 
-    now = datetime.now().isoformat()
+    now = _sim.now().isoformat()
     event.status = "canceled"
     event.cancel_reason = reason
     event.canceled_at = now
@@ -341,7 +342,7 @@ def calendly_invitee_no_show_create(
     if invitee_obj.is_no_show:
         return json.dumps({"error": {"code": 409, "message": "Invitee is already a no-show"}})
 
-    now = datetime.now().isoformat()
+    now = _sim.now().isoformat()
     invitee_obj.is_no_show = True
     invitee_obj.no_show_marked_at = now
 
@@ -532,7 +533,7 @@ def calendly_scheduling_link_create(
             start_time=start_time,
             end_time=end_time,
             host_ids=host_ids,
-            created_at=datetime.now().isoformat(),
+            created_at=_sim.now().isoformat(),
         )
         world.calendly.scheduled_events.append(event)
 
@@ -544,7 +545,7 @@ def calendly_scheduling_link_create(
             name=invitee_email.split("@")[0],
             email=invitee_email,
             status="active",
-            created_at=datetime.now().isoformat(),
+            created_at=_sim.now().isoformat(),
         )
         world.calendly.invitees.append(invitee)
 

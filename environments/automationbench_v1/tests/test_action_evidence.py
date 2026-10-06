@@ -33,15 +33,14 @@ def state(enabled=True):
 
 @pytest.mark.parametrize("mode", ["meta", "api", "limited"])
 def test_capture_preserves_tool_result_and_committed_world(mode, monkeypatch):
-    from automationbench.schema.salesforce import base
+    from automationbench import sim_runtime
 
-    class Clock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            instant = datetime(2026, 1, 1, tzinfo=UTC)
-            return instant if tz is not None else instant.replace(tzinfo=None)
+    def now(tz=None):
+        instant = datetime(2026, 1, 1, tzinfo=UTC)
+        return instant if tz is not None else instant.replace(tzinfo=None)
 
-    monkeypatch.setattr(base, "datetime", Clock)
+    # The simulator reads its clock through sim_runtime.
+    monkeypatch.setattr(sim_runtime, "now", now)
     initial = WorldState.model_validate(state(False).world).model_dump(mode="json")
     states = [
         AutomationBenchState(world=copy.deepcopy(initial), capture_actions=enabled)
