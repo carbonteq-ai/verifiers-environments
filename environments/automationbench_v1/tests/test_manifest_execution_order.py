@@ -99,7 +99,9 @@ def test_overlap_is_decided_only_for_two_ended_intervals():
     [
         {},  # no inventory
         {"tool_execution_events": "bad"},
-        {"tool_execution_events": [event(1, "r", "dispatch")]},  # sequence gap
+        {"tool_execution_events": [event(1, "r", "dispatch"), event(1, "r", "returned")]},  # repeated position
+        {"tool_execution_events": [event(2, "r", "dispatch"), event(1, "r", "returned")]},  # out of order
+        {"tool_execution_events": [{**event(0, "r", "dispatch"), "receipt_seq": None}]},  # no position
         events(("r", "returned"), ("a", "dispatch")),  # terminal without dispatch
         events(("r", "dispatch"), ("r", "dispatch"), ("r", "returned")),  # duplicate dispatch
         events(("r", "dispatch"), ("r", "returned"), ("r", "returned")),  # duplicate terminal
@@ -131,6 +133,12 @@ def test_receipt_identity_must_agree_and_unknown_invocations_stay_unknown():
     for seq, item in enumerate(mixed["tool_execution_events"]):
         item["receipt_seq"] = seq
     assert relation("returned_before_dispatch", mixed) is True
+    # Manifest material drops the harness events and keeps the native positions.
+    projected = {"tool_execution_events": [item for item in mixed["tool_execution_events"]
+                                           if item["source"] == "tool_server"]}
+    assert [item["receipt_seq"] for item in projected["tool_execution_events"]] == [0, 1, 3, 4]
+    assert relation("returned_before_dispatch", projected) is True
+    assert relation("returned_before_dispatch", projected, own="r", joined="a") is False
 
 
 def test_order_is_a_separate_optional_field_requiring_timing_any():

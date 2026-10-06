@@ -4,8 +4,12 @@ State revisions order *state*: a read whose revision precedes an action's
 proves the action ran on later state, not that the read's response had been
 returned before the action was dispatched, nor whether two calls ran
 concurrently. The native trace retains every tool-server lifecycle event in one
-receipt sequence (``receipt_seq`` equals the event's index; the native source
-is sealed and re-admitted before assessment). Each invocation has one
+receipt sequence (``receipt_seq`` is the event's index in the native trace; the
+native source is sealed and re-admitted before assessment). Manifest material
+keeps only the tool-server events of that sequence (``manifest_source_material``
+drops the harness's interception hooks), so the retained positions strictly
+increase but may skip harness positions; every tool-server event is retained,
+which admission checks against the sealed source. Each invocation has one
 ``dispatch`` event (``event_index`` 0) and, once it ends, one terminal event
 (``event_index`` 1: ``returned``, ``raised`` or ``interrupted``).
 
@@ -57,9 +61,12 @@ def capture_execution_order(source: Mapping) -> ExecutionOrder:
             raise TypeError("execution_order_events_missing")
         dispatch: dict[str, int] = {}
         terminal: dict[str, tuple[int, str]] = {}
-        for index, event in enumerate(events):
-            if not isinstance(event, Mapping) or event.get("receipt_seq") != index:
+        previous = -1
+        for event in events:
+            index = event.get("receipt_seq") if isinstance(event, Mapping) else None
+            if type(index) is not int or index <= previous:
                 raise ValueError("execution_order_sequence_invalid")
+            previous = index
             if event.get("source") != "tool_server":
                 continue
             receipt = json.loads(event["receipt_json"])
@@ -117,8 +124,8 @@ def execution_relation(
     if fact.invocation_id == other.invocation_id:
         return False  # one call neither precedes nor runs beside itself
     if relation == "returned_before_dispatch":
-        # The sequence is gap-free up to the cutoff and contains the evaluated
-        # dispatch, so a return not recorded before it did not happen before it
+        # Every tool-server event up to the cutoff is retained, including the
+        # evaluated dispatch, so a return not recorded before it did not happen before it
         # (a later or pending return, a raise or an interruption are all False).
         return (
             joined.terminal_seq is not None
