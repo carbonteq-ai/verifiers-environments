@@ -6,10 +6,10 @@
 import json
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.slack import Channel, Message, generate_slack_message_ts
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def slack_send_channel_message(

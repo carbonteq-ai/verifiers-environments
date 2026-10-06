@@ -6,6 +6,7 @@
 import json
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.salesforce import (
     CampaignMember,
     Contact,
@@ -15,7 +16,6 @@ from automationbench.schema.salesforce import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def salesforce_lead_create(

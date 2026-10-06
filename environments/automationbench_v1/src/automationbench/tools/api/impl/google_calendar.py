@@ -12,14 +12,13 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_calendar import (
     Calendar,
     CalendarEvent,
     generate_google_calendar_id,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Helpers

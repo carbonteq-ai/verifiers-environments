@@ -6,13 +6,12 @@
 import json
 from decimal import Decimal
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.wave import WaveCustomer, WaveInvoice, WaveProduct
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
 
 
 def _wave_id() -> str:
-
     return str(_sim.rng().randint(10000, 99999))
 
 

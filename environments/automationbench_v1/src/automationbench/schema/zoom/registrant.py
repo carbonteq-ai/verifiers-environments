@@ -8,8 +8,8 @@ from typing import Literal, Optional
 
 from pydantic import Field
 
-from automationbench.schema.zoom.base import ZoomRecord, generate_zoom_uuid
 from automationbench import sim_runtime as _sim
+from automationbench.schema.zoom.base import ZoomRecord, generate_zoom_uuid
 
 
 class Registrant(ZoomRecord):

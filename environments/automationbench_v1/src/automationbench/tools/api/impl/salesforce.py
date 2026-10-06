@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Any, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.salesforce import (
     Account,
     Attachment,
@@ -32,8 +33,6 @@ from automationbench.schema.salesforce import (
     generate_salesforce_id,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Maps

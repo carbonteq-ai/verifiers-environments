@@ -7,6 +7,8 @@ import json
 from decimal import Decimal
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
+from automationbench.schema.world import WorldState
 from automationbench.schema.xero import (
     XeroAccount,
     XeroBankTransaction,
@@ -14,9 +16,7 @@ from automationbench.schema.xero import (
     XeroCreditNote,
     XeroPayment,
 )
-from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 API = "XeroCLIAPI@2.20.1"
 
@@ -55,7 +55,6 @@ def xero_create_payment(
         reference=reference,
     )
     if not payment.date:
-
         payment.date = _sim.now().strftime("%Y-%m-%d")
 
     if inv:
@@ -193,7 +192,6 @@ def xero_create_bank_transaction(
         line_amount=Decimal(str(line_amount)) if line_amount else amt,
     )
     if not txn.date:
-
         txn.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.bank_transactions.append(txn)
@@ -243,7 +241,6 @@ def xero_create_bank_transfer(
         date=Date or "",
     )
     if not transfer.date:
-
         transfer.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.bank_transfers.append(transfer)
@@ -292,7 +289,6 @@ def xero_create_credit_note(
         remaining_credit=amt,
     )
     if not cn.date:
-
         cn.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.credit_notes.append(cn)

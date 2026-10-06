@@ -11,6 +11,7 @@ params without modification.
 import json
 from typing import Any, Dict, List, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.mailchimp import (
     MailchimpAudience,
     MailchimpCampaign,
@@ -19,8 +20,6 @@ from automationbench.schema.mailchimp import (
     generate_member_id,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Members (subscribers)

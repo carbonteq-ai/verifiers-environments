@@ -11,14 +11,13 @@ without modification.
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.reamaze import (
     ReamazeContact,
     ReamazeConversation,
     ReamazeMessage,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Conversations

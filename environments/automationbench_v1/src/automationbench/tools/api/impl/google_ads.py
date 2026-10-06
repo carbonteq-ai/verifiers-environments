@@ -13,10 +13,9 @@ import re
 from datetime import datetime
 from typing import Any, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_ads import OfflineConversion
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # GAQL Search (unified query endpoint)
@@ -366,7 +365,6 @@ def google_ads_offline_user_data_jobs_combined(
                     email = id_dict.get("hashedEmail", "")
                     if email:
                         customer_list.members.discard(email.lower())
-
 
     job_id = str(_sim.rng().randint(100000, 999999))
     return json.dumps({"resourceName": f"customers/{customerId}/offlineUserDataJobs/{job_id}"})

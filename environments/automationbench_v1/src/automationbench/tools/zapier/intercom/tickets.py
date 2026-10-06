@@ -6,6 +6,7 @@
 import json
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.intercom import (
     IntercomContact,
     IntercomConversation,
@@ -15,8 +16,6 @@ from automationbench.schema.intercom import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
-
 
 # ============================================================================
 # Ticket Tools

@@ -12,6 +12,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.docusign import (
     CarbonCopy,
     Envelope,
@@ -23,8 +24,6 @@ from automationbench.schema.docusign import (
     generate_docusign_id,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Resource serializers (Pydantic model -> API schema shape)

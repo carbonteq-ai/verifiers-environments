@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from automationbench import sim_runtime as _sim
 
 
@@ -34,7 +35,9 @@ class CanvaOwner(BaseModel):
 
     display_name: str = "User"
     team_id: Optional[str] = None
-    user_id: str = Field(default_factory=lambda: "U" + "".join(_sim.rng().choices(string.digits, k=10)))
+    user_id: str = Field(
+        default_factory=lambda: "U" + "".join(_sim.rng().choices(string.digits, k=10))
+    )
 
 
 class CanvaDesign(BaseModel):

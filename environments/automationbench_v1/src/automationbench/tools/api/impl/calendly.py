@@ -12,6 +12,7 @@ import json
 from datetime import datetime
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.calendly import (
     EventType,
     Invitee,
@@ -21,8 +22,6 @@ from automationbench.schema.calendly import (
     generate_calendly_uuid,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Resource converters (Pydantic model -> API schema shape)

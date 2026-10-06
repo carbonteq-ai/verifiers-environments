@@ -11,14 +11,13 @@ functions, forwarding parameters without modification.
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.gorgias import (
     GorgiasCustomer,
     GorgiasMessage,
     GorgiasTicket,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Tickets

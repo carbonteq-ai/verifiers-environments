@@ -6,10 +6,10 @@
 import json
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import Post, PostContent, generate_linkedin_post_id
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def linkedin_create_share(

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from automationbench.schema.salesforce.user import User
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from automationbench import sim_runtime as _sim
 
 

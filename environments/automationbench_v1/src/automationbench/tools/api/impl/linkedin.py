@@ -13,6 +13,7 @@ import string
 from datetime import timezone
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import (
     Invitation,
     Message,
@@ -21,8 +22,6 @@ from automationbench.schema.linkedin import (
     generate_linkedin_post_id,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Profiles

@@ -11,6 +11,7 @@ without modification.
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.world import WorldState
 from automationbench.schema.zoho_desk import (
     ZohoDeskAccount,
@@ -18,8 +19,6 @@ from automationbench.schema.zoho_desk import (
     ZohoDeskContact,
     ZohoDeskTicket,
 )
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Tickets

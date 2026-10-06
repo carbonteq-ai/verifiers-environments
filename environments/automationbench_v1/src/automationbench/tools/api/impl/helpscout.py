@@ -11,14 +11,13 @@ layer invokes these functions, forwarding parameters without modification.
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.helpscout import (
     HelpScoutConversation,
     HelpScoutCustomer,
     HelpScoutThread,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Mailboxes

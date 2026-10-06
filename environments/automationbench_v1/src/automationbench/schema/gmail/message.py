@@ -8,8 +8,8 @@ from typing import Optional, Union
 
 from pydantic import Field, field_validator, model_validator
 
-from automationbench.schema.gmail.base import GmailRecord, generate_gmail_id
 from automationbench import sim_runtime as _sim
+from automationbench.schema.gmail.base import GmailRecord, generate_gmail_id
 
 
 def _parse_date_to_ms(value: Union[int, str]) -> int:

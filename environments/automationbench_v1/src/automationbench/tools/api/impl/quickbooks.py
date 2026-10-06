@@ -11,6 +11,7 @@ import json
 import re
 from decimal import Decimal
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.quickbooks import (
     QBBill,
     QBCustomer,
@@ -21,7 +22,6 @@ from automationbench.schema.quickbooks import (
     QBVendor,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
 
 
 def _to_decimal(val) -> Decimal:
@@ -31,7 +31,6 @@ def _to_decimal(val) -> Decimal:
 
 
 def _qb_id() -> str:
-
     return str(_sim.rng().randint(10000, 99999))
 
 

@@ -7,10 +7,10 @@ import json
 from decimal import Decimal
 from typing import Optional
 
-from automationbench.schema.xero import XeroEmployee, XeroItem, XeroPurchaseOrder, XeroQuote
-from automationbench.schema.world import WorldState
-from automationbench.tools.zapier.types import register_metadata
 from automationbench import sim_runtime as _sim
+from automationbench.schema.world import WorldState
+from automationbench.schema.xero import XeroEmployee, XeroItem, XeroPurchaseOrder, XeroQuote
+from automationbench.tools.zapier.types import register_metadata
 
 API = "XeroCLIAPI@2.20.1"
 
@@ -265,7 +265,6 @@ def xero_create_purchase_order(
         reference=reference,
     )
     if not po.date:
-
         po.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.purchase_orders.append(po)
@@ -414,7 +413,6 @@ def xero_create_quote(
         terms=terms,
     )
     if not quote.date:
-
         quote.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.quotes.append(quote)

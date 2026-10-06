@@ -5,12 +5,13 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from datetime import datetime, timezone
-import json
 from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
+
 from automationbench import sim_runtime as _sim
 
 

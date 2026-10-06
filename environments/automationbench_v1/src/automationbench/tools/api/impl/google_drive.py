@@ -12,9 +12,8 @@ import json
 import re
 from typing import Any, Optional
 
-from automationbench.schema.world import WorldState
 from automationbench import sim_runtime as _sim
-
+from automationbench.schema.world import WorldState
 
 # ---------------------------------------------------------------------------
 # Helpers

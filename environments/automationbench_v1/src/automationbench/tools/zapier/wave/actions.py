@@ -8,6 +8,7 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.wave import (
     WaveCustomer,
     WaveInvoice,
@@ -17,7 +18,6 @@ from automationbench.schema.wave import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 API = "WaveCLIAPI@2.6.14"
 
@@ -215,7 +215,6 @@ def wave_create_invoice(
         items=[item],
     )
     if not inv.invoice_date:
-
         inv.invoice_date = _sim.now().strftime("%Y-%m-%d")
 
     world.wave.invoices.append(inv)
@@ -489,7 +488,6 @@ def wave_record_sale(
         external_id=externalId,
     )
     if not sale.sale_date:
-
         sale.sale_date = _sim.now().strftime("%Y-%m-%d")
 
     world.wave.sales.append(sale)

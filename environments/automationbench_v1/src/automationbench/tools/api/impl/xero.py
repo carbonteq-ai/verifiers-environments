@@ -6,6 +6,8 @@
 import json
 from decimal import Decimal
 
+from automationbench import sim_runtime as _sim
+from automationbench.schema.world import WorldState
 from automationbench.schema.xero import (
     XeroBill,
     XeroContact,
@@ -13,12 +15,9 @@ from automationbench.schema.xero import (
     XeroInvoice,
     XeroPayment,
 )
-from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
 
 
 def _xero_id() -> str:
-
     return f"{_sim.rng().randint(10000000, 99999999):08x}-{_sim.rng().randint(1000, 9999):04x}-{_sim.rng().randint(1000, 9999):04x}-{_sim.rng().randint(1000, 9999):04x}-{_sim.rng().randint(100000000000, 999999999999):012x}"
 
 

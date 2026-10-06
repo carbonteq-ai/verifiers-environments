@@ -11,6 +11,7 @@ layer, receiving parameters without modification.
 import json
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.slack import (
     Channel,
     Message,
@@ -18,8 +19,6 @@ from automationbench.schema.slack import (
     generate_slack_message_ts,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Conversations (channels)

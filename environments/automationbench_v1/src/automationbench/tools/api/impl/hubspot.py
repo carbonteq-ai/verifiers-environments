@@ -11,6 +11,7 @@ routing layer, receiving parameters without modification.
 import json
 from typing import Literal, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.hubspot import (
     HubSpotCompany,
     HubSpotContact,
@@ -19,8 +20,6 @@ from automationbench.schema.hubspot import (
     HubSpotTicket,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Contacts

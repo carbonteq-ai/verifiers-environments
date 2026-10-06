@@ -11,6 +11,7 @@ these functions, forwarding parameters without modification.
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.intercom import (
     IntercomCompany,
     IntercomContact,
@@ -20,8 +21,6 @@ from automationbench.schema.intercom import (
     IntercomTicket,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Contacts

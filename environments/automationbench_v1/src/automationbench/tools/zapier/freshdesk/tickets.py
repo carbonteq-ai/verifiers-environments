@@ -6,6 +6,7 @@
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.freshdesk import (
     FreshdeskCompany,
     FreshdeskContact,
@@ -14,8 +15,6 @@ from automationbench.schema.freshdesk import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
-
 
 # ============================================================================
 # Ticket Tools

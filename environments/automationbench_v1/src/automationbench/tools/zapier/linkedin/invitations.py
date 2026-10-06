@@ -4,13 +4,13 @@
 """LinkedIn invitation tools: send connection invites."""
 
 import json
-from typing import Optional
 import string
+from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import Invitation
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def _generate_invitation_id() -> str:

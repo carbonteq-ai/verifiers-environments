@@ -11,6 +11,7 @@ routing layer, receiving parameters without modification.
 import json
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.world import WorldState
 from automationbench.schema.zendesk import (
     ZendeskComment,
@@ -18,8 +19,6 @@ from automationbench.schema.zendesk import (
     ZendeskTicket,
     ZendeskUser,
 )
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Resource converters (Pydantic model -> API schema shape)

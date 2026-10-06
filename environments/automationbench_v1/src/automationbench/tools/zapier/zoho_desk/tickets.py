@@ -6,6 +6,7 @@
 import json
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.world import WorldState
 from automationbench.schema.zoho_desk import (
     ZohoDeskComment,
@@ -13,8 +14,6 @@ from automationbench.schema.zoho_desk import (
     ZohoDeskTicket,
 )
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
-
 
 # ============================================================================
 # Ticket Tools

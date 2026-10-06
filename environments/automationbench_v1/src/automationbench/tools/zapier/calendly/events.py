@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.calendly import (
     Invitee,
     QuestionAnswer,
@@ -16,7 +17,6 @@ from automationbench.schema.calendly import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def calendly_find_event(

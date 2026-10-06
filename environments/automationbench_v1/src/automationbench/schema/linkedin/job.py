@@ -7,8 +7,8 @@ from typing import Literal, Optional
 
 from pydantic import Field, model_validator
 
-from automationbench.schema.linkedin.base import LinkedInRecord
 from automationbench import sim_runtime as _sim
+from automationbench.schema.linkedin.base import LinkedInRecord
 
 
 def generate_linkedin_job_id() -> str:

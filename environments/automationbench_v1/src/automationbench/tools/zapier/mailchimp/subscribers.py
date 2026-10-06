@@ -6,6 +6,7 @@
 import json
 from typing import List, Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.mailchimp import (
     MailchimpAudience,
     MailchimpCampaign,
@@ -15,7 +16,6 @@ from automationbench.schema.mailchimp import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def mailchimp_add_subscriber(

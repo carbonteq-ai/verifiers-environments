@@ -8,8 +8,8 @@ from typing import Optional
 
 from pydantic import Field
 
-from automationbench.schema.linkedin.base import LinkedInRecord, generate_linkedin_urn
 from automationbench import sim_runtime as _sim
+from automationbench.schema.linkedin.base import LinkedInRecord, generate_linkedin_urn
 
 
 class Message(LinkedInRecord):

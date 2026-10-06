@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import List, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.hubspot import (
     HubSpotCompany,
     HubSpotContact,
@@ -16,7 +17,6 @@ from automationbench.schema.hubspot import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def hubspot_create_contact(

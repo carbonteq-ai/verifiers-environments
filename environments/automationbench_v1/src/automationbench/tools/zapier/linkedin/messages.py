@@ -7,10 +7,10 @@ import json
 from datetime import timezone
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import Message
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def _resolve_profile_id(

@@ -11,6 +11,7 @@ them, forwarding parameters without modification.
 import json
 from typing import List, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.freshdesk import (
     FreshdeskCompany,
     FreshdeskContact,
@@ -18,8 +19,6 @@ from automationbench.schema.freshdesk import (
     FreshdeskTicket,
 )
 from automationbench.schema.world import WorldState
-from automationbench import sim_runtime as _sim
-
 
 # ---------------------------------------------------------------------------
 # Resource converters (Pydantic model -> API schema shape)

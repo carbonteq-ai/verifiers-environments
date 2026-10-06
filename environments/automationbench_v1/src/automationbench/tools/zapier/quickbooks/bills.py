@@ -7,10 +7,10 @@ import json
 from decimal import Decimal
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.quickbooks import QBBill
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 API = "QuickBooksV3CLIAPI@3.4.1"
 
@@ -65,7 +65,6 @@ def quickbooks_create_bill(
         ap_account_name=ap_account,
     )
     if not bill.txn_date:
-
         bill.txn_date = _sim.now().strftime("%Y-%m-%d")
 
     world.quickbooks.bills.append(bill)

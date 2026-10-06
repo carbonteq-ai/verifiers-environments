@@ -7,10 +7,10 @@ import json
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_calendar import CalendarEvent, generate_google_calendar_id
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def google_calendar_quick_add_event(

@@ -7,10 +7,10 @@ import json
 from decimal import Decimal
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.quickbooks import QBEstimate, QBLineItem, QBSalesReceipt
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 API = "QuickBooksV3CLIAPI@3.4.1"
 
@@ -68,7 +68,6 @@ def quickbooks_create_estimate(
         **est_kwargs,
     )
     if not est.txn_date:
-
         est.txn_date = _sim.now().strftime("%Y-%m-%d")
 
     world.quickbooks.estimates.append(est)
@@ -203,7 +202,6 @@ def quickbooks_create_sales_receipt(
         **sr_kwargs,
     )
     if not sr.txn_date:
-
         sr.txn_date = _sim.now().strftime("%Y-%m-%d")
 
     world.quickbooks.sales_receipts.append(sr)
