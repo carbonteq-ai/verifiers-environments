@@ -135,10 +135,7 @@ def test_read_only_and_failures_deduplicate_world_without_committing_partial_eff
         tools.invoke("forbidden", x="original")
     sink_context.__exit__(None, None, None)
     assert envelopes[-1]["action"]["status"] == "rejected"
-    assert json.loads(envelopes[-1]["action"]["arguments_json"]) == {
-        "args": [],
-        "kwargs": {"x": "original"},
-    }
+    assert json.loads(envelopes[-1]["action"]["arguments_json"]) == {"x": "original"}
     assert (
         WorldState.model_validate(current.world).salesforce.contacts[0].phone != "partial-mutation"
     )
@@ -233,3 +230,27 @@ def test_candidate_native_buffer_retains_failed_action_snapshots(monkeypatch):
     assert json.loads(material["action"]["arguments_json"]) == {"record": "original"}
     for digest, encoded in material["snapshots"].items():
         assert hashlib.sha256(encoded.encode()).hexdigest() == digest
+
+
+def test_limited_keyword_call_is_captured_as_the_model_made_it_and_qualifies_as_a_record_write():
+    """The tool server fills omitted parameters with None; capture records the call itself."""
+    from types import SimpleNamespace
+
+    from automationbench_v1.contracts import evidence
+
+    current = state()
+    contact = WorldState.model_validate(current.world).salesforce.contacts[0]
+    tools = AutomationBenchLimitedToolset(
+        AutomationBenchLimitedToolsetConfig(allowed_tools=("salesforce_contact_update",))
+    )
+    tools._inert_state = current
+    sink_context = collect_local_evidence()
+    envelopes = sink_context.__enter__()
+    tools.invoke("salesforce_contact_update", id=contact.id, phone="+1 555 0100", first_name=None, email=None)
+    sink_context.__exit__(None, None, None)
+    action = envelopes[-1]["action"]
+    assert json.loads(action["arguments_json"]) == {"id": contact.id, "phone": "+1 555 0100"}
+    selector = SimpleNamespace(object_type="Contact", record_id=contact.id)
+    after = evidence.target_record(current.world, selector)
+    requested = evidence.qualified_requested_fields(SimpleNamespace(**action), selector, after)
+    assert requested is not None and "phone" in requested

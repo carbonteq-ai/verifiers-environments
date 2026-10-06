@@ -195,6 +195,21 @@ class AutomationBenchLimitedToolsetConfig(vf.ToolsetConfig):
     allowed_tools: tuple[str, ...]
 
 
+def _call_arguments(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+    """The call as the model made it, in the form the full toolsets capture.
+
+    Models call tools by keyword, and the tool server fills every parameter the
+    model left out with its ``None`` default. A keyword call is recorded as its
+    keyword arguments without those ``None`` defaults, which is also what the
+    dispatch receipt carries; manifest evidence reads this form. A positional
+    call keeps both parts.
+    """
+
+    if args:
+        return {"args": list(args), "kwargs": dict(kwargs)}
+    return {key: value for key, value in kwargs.items() if value is not None}
+
+
 class AutomationBenchLimitedToolset(
     vf.Toolset[AutomationBenchLimitedToolsetConfig, AutomationBenchState]
 ):
@@ -208,15 +223,16 @@ class AutomationBenchLimitedToolset(
     def invoke(self, tool_name: str, *args: Any, **kwargs: Any) -> Any:
         """Invoke one configured concrete tool and persist its world mutation."""
 
+        called = _call_arguments(args, kwargs)
         if tool_name not in self.config.allowed_tools:
             error = ValueError(f"tool {tool_name!r} is not enabled for this task")
-            capture_rejection(self.state, tool_name, {"args": args, "kwargs": kwargs}, error)
+            capture_rejection(self.state, tool_name, called, error)
             raise error
         try:
             func = _ZAPIER_TOOLS[tool_name]
         except KeyError as error:
             rejection = ValueError(f"unknown AutomationBench tool {tool_name!r}")
-            capture_rejection(self.state, tool_name, {"args": args, "kwargs": kwargs}, rejection)
+            capture_rejection(self.state, tool_name, called, rejection)
             raise rejection from error
         json_parameters = _json_string_parameters(func)
         for name in _optional_string_parameters(func):
@@ -234,7 +250,7 @@ class AutomationBenchLimitedToolset(
             self.state.world = dump_world(world)
             return result
 
-        return capture_action(self.state, tool_name, {"args": args, "kwargs": kwargs}, execute)
+        return capture_action(self.state, tool_name, called, execute)
 
     def _tool_wrapper(self, tool_name: str, func: Callable[..., Any]) -> Callable[..., Any]:
         signature = inspect.signature(func)
