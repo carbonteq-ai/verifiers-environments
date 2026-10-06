@@ -14,6 +14,13 @@ reasoning and its tool calls) additionally receives:
   harm violation issued by that turn, applied in turn order until the episode's
   ``manifest_harm_cap`` is reached.
 
+With ``manifest_goal_channel: group_relative`` neither is added to ``turn_reward``.
+Each turn instead reports one ``manifest_goal/<goal key>`` component per goal it
+first witnessed, valued ``manifest_goal_share / R``, and its capped
+``manifest_harm_debit``; goal keys (``obligation:<check>:<instance>`` or
+``record:<check>``) are equal across attempts at one task, so a trainer can weigh
+each goal by how many of a group's attempts reached it.
+
 Unknown or abstained findings contribute nothing. Tool invocations are mapped
 to turns by matching each tool-server dispatch, in order, to the next sampled
 tool call with the same name and arguments (transport retries map to the same
@@ -119,8 +126,8 @@ def _latest_payloads(trace: Any, kind: str) -> list[dict[str, Any]]:
     return payloads
 
 
-def _record_goals(trace: Any) -> tuple[list[str], int]:
-    """(credited write occurrences of passed record goals, decided record goal count).
+def _record_goals(trace: Any) -> tuple[list[tuple[str, str]], int]:
+    """((goal key, credited write occurrence) of passed record goals, decided record goal count).
 
     Record goals (``record.fields_equal@1``) are unconditional. Each is decided when its
     latest complete evaluation is valid; a passed goal is witnessed by the write that
@@ -151,7 +158,7 @@ def _record_goals(trace: Any) -> tuple[list[str], int]:
     combined = Evaluation(contract_digest=first.contract_digest, source_digest=first.source_digest,
                           results=results, evidence_json=first.evidence_json)
     required = sum(result.check_id in goals and result.status == "valid" for result in results)
-    occurrences = [selection.occurrence
+    occurrences = [(f"record:{check_id}", selection.occurrence)
                    for selection in select_credit(contract, combined)
                    for check_id in selection.check_ids if check_id in goals]
     return occurrences, required
@@ -161,6 +168,13 @@ def manifest_outcomes(trace: Any) -> tuple[list[str], int, list[tuple[str, str]]
     """(earliest goal witness occurrences, decided required goal count, harm (check, occurrence)).
 
     Required goals are obligation findings marked required and record goals."""
+
+    goals, required, harms = keyed_manifest_outcomes(trace)
+    return [occurrence for _, occurrence in goals], required, harms
+
+
+def keyed_manifest_outcomes(trace: Any) -> tuple[list[tuple[str, str]], int, list[tuple[str, str]]]:
+    """((goal key, earliest witness occurrence), decided required goal count, harm (check, occurrence))."""
 
     goal_occurrences, required = _record_goals(trace)
     for payload in _latest_payloads(trace, OBLIGATION_OUTPUT):
@@ -173,7 +187,8 @@ def manifest_outcomes(trace: Any) -> tuple[list[str], int, list[tuple[str, str]]
             witnesses = payload.get("witnesses") or []
             if witnesses:
                 earliest = min(witnesses, key=lambda item: (item.get("applied_revision", 0), item["occurrence"]))
-                goal_occurrences.append(earliest["occurrence"])
+                key = f"obligation:{payload.get('check_id')}:{payload.get('instance_key')}"
+                goal_occurrences.append((key, earliest["occurrence"]))
     harms = sorted({
         (payload["check_id"], payload["occurrence"])
         for payload in _latest_payloads(trace, GUARD_OUTPUT)
@@ -196,16 +211,20 @@ def apply_manifest_step_credit(
     assessments = evidence.get("assessments") or []
     goal_share = config.manifest_goal_share or 0.0
     harm_penalty = config.manifest_harm_penalty or 0.0
-    goal_occurrences, required, harms = manifest_outcomes(trace)
+    keyed_goals, required, harms = keyed_manifest_outcomes(trace)
+    goal_occurrences = [occurrence for _, occurrence in keyed_goals]
+    separate = config.manifest_goal_channel == "group_relative"
     mapping = invocation_turns(turns, events) if (goal_occurrences or harms) else {}
     mapped = mapping is not None
     goals_by_turn = [0] * len(assessments)
+    goal_keys_by_turn: list[list[str]] = [[] for _ in assessments]
     harms_by_turn = [0] * len(assessments)
     if mapped:
-        for occurrence in goal_occurrences:
+        for key, occurrence in keyed_goals:
             index = mapping.get(occurrence)
             if index is not None and index < len(assessments):
                 goals_by_turn[index] += 1
+                goal_keys_by_turn[index].append(key)
         for _, occurrence in harms:
             index = mapping.get(occurrence)
             if index is not None and index < len(assessments):
@@ -218,14 +237,16 @@ def apply_manifest_step_credit(
         remaining -= harm_debit
         previous = {c["name"]: c["value"] for c in assessment["components"]}
         # Rescoring re-derives manifest credit from the turn's base reward.
-        base_shift = previous.get("manifest_goal_credit", 0.0) - previous.get("manifest_harm_debit", 0.0)
+        base_shift = (0.0 if previous.get("manifest_separate") == 1.0
+                      else previous.get("manifest_goal_credit", 0.0) - previous.get("manifest_harm_debit", 0.0))
         components = []
         for component in assessment["components"]:
             if component["name"].startswith("manifest_"):
                 continue
             if component["name"] == TURN_REWARD:
                 base = component["value"] - base_shift
-                component = {**component, "value": base + goal_credit - harm_debit}
+                shift = 0.0 if separate else goal_credit - harm_debit
+                component = {**component, "value": base + shift}
             components.append(component)
         components += [
             {"name": "manifest_goals", "status": "valid", "value": float(goals_by_turn[index])},
@@ -234,8 +255,15 @@ def apply_manifest_step_credit(
             {"name": "manifest_harm_debit", "status": "valid", "value": harm_debit},
             {"name": "manifest_mapped", "status": "valid", "value": 1.0 if mapped else 0.0},
         ]
+        if separate:
+            components.append({"name": "manifest_separate", "status": "valid", "value": 1.0})
+        if separate and mapped and required:
+            weight = goal_share / required
+            for key in sorted(set(goal_keys_by_turn[index])):
+                components.append({"name": f"manifest_goal/{key}", "status": "valid",
+                                   "value": weight * goal_keys_by_turn[index].count(key)})
         updated.append({**assessment, "components": components})
     return {**evidence, "assessments": updated}
 
 
-__all__ = ["apply_manifest_step_credit", "invocation_turns", "manifest_outcomes"]
+__all__ = ["apply_manifest_step_credit", "invocation_turns", "keyed_manifest_outcomes", "manifest_outcomes"]

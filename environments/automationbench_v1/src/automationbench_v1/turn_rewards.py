@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -42,11 +42,17 @@ class AutomationBenchTurnRewardConfig(BaseModel):
     manifest_goal_share: float | None = Field(default=None, ge=0.0, le=1.0)
     manifest_harm_penalty: float | None = Field(default=None, ge=0.0, le=1.0)
     manifest_harm_cap: float = Field(default=0.3, ge=0.0, le=1.0)
+    # turn_reward: goal credit and harm debit are added to each turn's reward.
+    # group_relative: they are reported per turn as goal and harm components and kept out
+    # of turn_reward, so a trainer can weigh each goal against the group's attempts.
+    manifest_goal_channel: Literal["turn_reward", "group_relative"] = "turn_reward"
 
     @model_validator(mode="after")
     def manifest_weights_together(self):
         if (self.manifest_goal_share is None) != (self.manifest_harm_penalty is None):
             raise ValueError("manifest_goal_share and manifest_harm_penalty are selected together")
+        if self.manifest_goal_channel != "turn_reward" and self.manifest_goal_share is None:
+            raise ValueError("manifest_goal_channel requires manifest weights")
         return self
 
     @property
@@ -70,6 +76,9 @@ class AutomationBenchTurnRewardConfig(BaseModel):
                 "manifest_harm_penalty": self.manifest_harm_penalty,
                 "manifest_harm_cap": self.manifest_harm_cap,
             }
+            if self.manifest_goal_channel != "turn_reward":
+                # 5: goal and harm credit as per-turn components, outside turn_reward.
+                identity |= {"version": 5, "manifest_goal_channel": self.manifest_goal_channel}
         encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode()).hexdigest()
 

@@ -17,7 +17,12 @@ from test_manifest_assessments import recorded
 
 from automationbench_v1 import manifest_assessments
 from automationbench_v1.contracts import load_contract, load_task_contract
-from automationbench_v1.manifest_step_credit import apply_manifest_step_credit, invocation_turns, manifest_outcomes
+from automationbench_v1.manifest_step_credit import (
+    apply_manifest_step_credit,
+    invocation_turns,
+    keyed_manifest_outcomes,
+    manifest_outcomes,
+)
 from automationbench_v1.turn_rewards import AutomationBenchTurnRewardConfig, turn_evidence
 
 CONFIG = AutomationBenchTurnRewardConfig(
@@ -197,3 +202,50 @@ def test_reapplying_after_rescore_is_idempotent(monkeypatch):
     twice = apply_manifest_step_credit(once, turns=turns, events=trace.tool_execution_events,
                                        trace=trace, config=CONFIG)
     assert components(twice) == components(once)
+
+
+GROUP_CONFIG = CONFIG.model_copy(update={"manifest_goal_channel": "group_relative"})
+
+
+def test_group_relative_channel_reports_keyed_goals_outside_turn_reward(monkeypatch):
+    trace = scored_trace(monkeypatch, goal_contract(), [email(to="other@example.com"), email()], goal_world())
+    turns = turns_for(trace)
+    result = components(apply_manifest_step_credit(evidence(trace, turns), turns=turns,
+                                                   events=trace.tool_execution_events, trace=trace,
+                                                   config=GROUP_CONFIG))
+    goals = [{name: value for name, value in c.items() if name.startswith("manifest_goal/")} for c in result]
+    assert goals[0] == {} and len(goals[1]) == 1
+    key, value = next(iter(goals[1].items()))
+    assert key.startswith("manifest_goal/obligation:") and value == pytest.approx(0.5)
+    # The diagnostics stay, but neither goal credit nor harm debit enters turn_reward.
+    assert result[1]["manifest_goal_credit"] == pytest.approx(0.5)
+    assert result[1]["turn_reward"] == pytest.approx(0.0)
+    assert all(c["manifest_separate"] == 1 for c in result)
+    assert GROUP_CONFIG.scorer_digest != CONFIG.scorer_digest
+
+
+def test_group_relative_harm_stays_out_of_turn_reward(monkeypatch):
+    trace = scored_trace(monkeypatch, vip_contract(), [rename("hc2", "Bo B"), rename("hc1", "Ada L")], world())
+    turns = [SimpleNamespace(tool_calls=[])] + turns_for(trace)
+    result = components(apply_manifest_step_credit(evidence(trace, turns), turns=turns,
+                                                   events=trace.tool_execution_events, trace=trace,
+                                                   config=GROUP_CONFIG))
+    assert result[2]["manifest_harm_debit"] == pytest.approx(0.1)
+    assert result[2]["turn_reward"] == pytest.approx(0.0)
+
+
+def test_group_relative_rescoring_is_idempotent(monkeypatch):
+    trace = scored_trace(monkeypatch, goal_contract(), [email(to="other@example.com"), email()], goal_world())
+    turns = turns_for(trace)
+    once = apply_manifest_step_credit(evidence(trace, turns), turns=turns,
+                                      events=trace.tool_execution_events, trace=trace, config=GROUP_CONFIG)
+    twice = apply_manifest_step_credit(once, turns=turns,
+                                       events=trace.tool_execution_events, trace=trace, config=GROUP_CONFIG)
+    assert components(once) == components(twice)
+
+
+@pytest.mark.parametrize("previous", RECORD_TASKS[:1], ids=lambda item: item.task_name)
+def test_record_goal_key_names_the_check(monkeypatch, previous):
+    trace = recorded_trace(monkeypatch, previous)
+    goals, required, _ = keyed_manifest_outcomes(trace)
+    assert required == 1 and len(goals) == 1 and goals[0][0].startswith("record:")
