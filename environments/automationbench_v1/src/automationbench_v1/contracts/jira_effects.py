@@ -25,6 +25,7 @@ from ..notification_evidence import operation, result_payload
 from .base import FrozenModel, Identifier
 from .handler_scope import outside_service
 from .tables import Digest
+from .call_identity import same_call
 
 
 class JiraIssueSource(FrozenModel):
@@ -343,7 +344,7 @@ def _receipt_binding(source, item):
         if "arguments_json" in receipt:
             arguments = json.loads(receipt["arguments_json"])
             if (not isinstance(arguments, dict) or arguments.get("args") != []
-                    or _json(arguments.get("kwargs")) != action.arguments_json):
+                    or not same_call(action.tool_name, arguments.get("kwargs"), json.loads(action.arguments_json))):
                 raise ValueError("jira_native_arguments_mismatch")
     # Native write body_digest covers the whole tool state, not just world.
     # Its integrity belongs to native source admission; do not compare it to

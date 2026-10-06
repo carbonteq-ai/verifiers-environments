@@ -11,6 +11,7 @@ from ..notification_evidence import operation, result_payload
 from .effects import EffectEvidence, EffectFact
 from .handler_scope import outside_service
 from .service_hydration import public_service_matches
+from .call_identity import same_call
 
 
 def _digest(value):
@@ -57,7 +58,7 @@ def capture_native_record_reads(source, spec, *, service, project, writes=()):
             arguments = json.loads(receipt.get("arguments_json", "null"))
             if (receipt.get("tool_name") != action.tool_name or not isinstance(arguments, dict)
                     or set(arguments) != {"args", "kwargs"} or arguments["args"] != []
-                    or not _equal(arguments["kwargs"], json.loads(action.arguments_json))):
+                    or not same_call(action.tool_name, arguments["kwargs"], json.loads(action.arguments_json))):
                 raise ValueError(f"{service}_read_native_invocation_mismatch")
             if (action.status != "returned" or action.error_json is not None or action.result_json is None
                     or receipt.get("error_json") is not None or receipt.get("state_error_json") is not None

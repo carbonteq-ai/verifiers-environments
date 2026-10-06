@@ -39,6 +39,7 @@ from .base import FrozenModel, Identifier
 from .effects import EffectEvidence, EffectFact
 from .handler_scope import outside_service
 from .service_hydration import public_service_matches
+from .call_identity import same_call
 
 
 class SheetReadSource(FrozenModel):
@@ -286,7 +287,7 @@ def capture_sheet_reads(source: Mapping, spec: SheetReadSource) -> EffectEvidenc
             native_arguments = json.loads(receipt.get("arguments_json", "null"))
             if (receipt.get("tool_name") != action.tool_name or not isinstance(native_arguments, dict)
                     or set(native_arguments) != {"args", "kwargs"} or native_arguments["args"] != []
-                    or not _equal(native_arguments["kwargs"], json.loads(action.arguments_json))):
+                    or not same_call(action.tool_name, native_arguments["kwargs"], json.loads(action.arguments_json))):
                 raise ValueError("sheet_read_native_invocation_mismatch")
             if (action.status != "returned" or action.error_json is not None or action.result_json is None
                     or receipt.get("error_json") is not None or receipt.get("state_error_json") is not None

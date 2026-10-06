@@ -24,6 +24,7 @@ from ..notification_evidence import operation, result_payload
 from .base import FrozenModel, Identifier
 from .handler_scope import outside_service
 from .tables import Digest
+from .call_identity import same_call
 
 
 class HubSpotObjectSource(FrozenModel):
@@ -222,7 +223,7 @@ def _receipt_binding(source: Mapping, item) -> None:
         if "arguments_json" in receipt:
             arguments = json.loads(receipt["arguments_json"])
             if (not isinstance(arguments, dict) or arguments.get("args") != []
-                    or _json(arguments.get("kwargs")) != item.action.arguments_json):
+                    or not same_call(item.action.tool_name, arguments.get("kwargs"), json.loads(item.action.arguments_json))):
                 raise ValueError("hubspot_native_arguments_mismatch")
         if receipt.get("phase") == "returned" and "result_json" in receipt and receipt["result_json"] != item.action.result_json:
             raise ValueError("hubspot_native_result_mismatch")

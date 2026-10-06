@@ -27,6 +27,7 @@ from ..tools import AutomationBenchToolset
 from .authored_outputs import AuthoredOutputSource, capture_authored_outputs
 from .base import FrozenModel
 from .tables import Digest
+from .call_identity import same_call
 
 
 class InvocationEntry(FrozenModel):
@@ -126,7 +127,7 @@ def _entry(occurrence, receipts):
         ):
             raise ValueError("invocation_native_local_terminal_mismatch")
         args = _arguments(terminal.arguments_json)
-        if canonical_json(args) != canonical_json(json.loads(action.arguments_json)):
+        if not same_call(terminal.tool_name, args, json.loads(action.arguments_json)):
             raise ValueError("invocation_native_local_arguments_mismatch")
         name, inner = operation(action)
         values.update(
