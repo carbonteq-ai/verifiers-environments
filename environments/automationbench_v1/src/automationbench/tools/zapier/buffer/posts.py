@@ -7,10 +7,10 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.buffer import BufferChannel, BufferIdea, BufferPost
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-from automationbench import sim_runtime as _sim
 
 
 def buffer_get_posts(
