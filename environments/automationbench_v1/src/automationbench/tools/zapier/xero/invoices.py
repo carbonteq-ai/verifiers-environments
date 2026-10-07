@@ -7,8 +7,9 @@ import json
 from decimal import Decimal
 from typing import Optional
 
-from automationbench.schema.xero import XeroBill, XeroInvoice
+from automationbench import sim_runtime as _sim
 from automationbench.schema.world import WorldState
+from automationbench.schema.xero import XeroBill, XeroInvoice
 from automationbench.tools.zapier.types import register_metadata
 
 API = "XeroCLIAPI@2.20.1"
@@ -73,9 +74,7 @@ def xero_create_sales_invoice(
         url=url,
     )
     if not inv.date:
-        from datetime import datetime
-
-        inv.date = datetime.now().strftime("%Y-%m-%d")
+        inv.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.invoices.append(inv)
     return json.dumps(
@@ -267,9 +266,7 @@ def xero_create_bill(
         line_account_code=line_account_code,
     )
     if not bill.date:
-        from datetime import datetime
-
-        bill.date = datetime.now().strftime("%Y-%m-%d")
+        bill.date = _sim.now().strftime("%Y-%m-%d")
 
     world.xero.bills.append(bill)
     return json.dumps(

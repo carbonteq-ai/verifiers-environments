@@ -13,9 +13,9 @@ import re
 from datetime import datetime
 from typing import Any, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_ads import OfflineConversion
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # GAQL Search (unified query endpoint)
@@ -252,9 +252,8 @@ def google_ads_offline_user_data_jobs_create(
             user_list_resource = metadata_dict.get("userList", "")
 
     # Produce a job ID
-    import random
 
-    job_id = str(random.randint(100000, 999999))
+    job_id = str(_sim.rng().randint(100000, 999999))
     resource_name = f"customers/{customerId}/offlineUserDataJobs/{job_id}"
 
     # Persist job metadata in world state for subsequent operations
@@ -367,9 +366,7 @@ def google_ads_offline_user_data_jobs_combined(
                     if email:
                         customer_list.members.discard(email.lower())
 
-    import random
-
-    job_id = str(random.randint(100000, 999999))
+    job_id = str(_sim.rng().randint(100000, 999999))
     return json.dumps({"resourceName": f"customers/{customerId}/offlineUserDataJobs/{job_id}"})
 
 
@@ -506,7 +503,7 @@ def google_ads_conversions_upload(
             try:
                 conversion_time = datetime.fromisoformat(conv_dt.replace("Z", "+00:00"))
             except (ValueError, AttributeError):
-                conversion_time = datetime.now()
+                conversion_time = _sim.now()
 
             conversion = OfflineConversion(
                 account_id=mainAccountId,
@@ -534,7 +531,7 @@ def google_ads_conversions_upload(
     try:
         conversion_time = datetime.fromisoformat(time.replace("Z", "+00:00"))
     except ValueError:
-        conversion_time = datetime.now()
+        conversion_time = _sim.now()
 
     conversion = OfflineConversion(
         account_id=mainAccountId,

@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Iterable
+from datetime import datetime
+from pathlib import Path
 from typing import Any, ClassVar, Literal, cast
 
 import verifiers.v1 as vf
-from pydantic import Field
+from pydantic import Field, SerializerFunctionWrapHandler, model_serializer, model_validator
 
 from automationbench.domains import get_available_domains, get_domain_dataset
 from automationbench.rubric.registry import AssertionRegistry
@@ -20,6 +22,7 @@ from .limited_tools import (
     AutomationBenchLimitedToolsetConfig,
 )
 from .scoring import ScoreSnapshot, score_world
+from .simulation import simulated_setup, world_clock_base
 from .tool_mistakes import (
     EMPTY_RESULT,
     MISTAKES,
@@ -108,6 +111,40 @@ def _with_turn_budget(prompt: Any, turn_budget: int) -> Any:
     ]
 
 
+def _with_world_time(prompt: Any, declared_time: Any) -> Any:
+    """Expose only the explicit simulated clock, never a host-time fallback.
+
+    Preserve the declared timestamp and its precision. Legacy worlds sometimes
+    omit an offset; disclose that absence instead of assigning them a timezone.
+    This changes public task context and therefore the frozen task digest.
+    """
+    if not isinstance(declared_time, str) or "T" not in declared_time:
+        raise ValueError("world time context requires an explicit ISO datetime")
+    try:
+        instant = datetime.fromisoformat(declared_time)
+    except ValueError as exc:
+        raise ValueError("world time context requires an explicit ISO datetime") from exc
+    if not isinstance(prompt, list) or not prompt or not isinstance(prompt[0], dict):
+        raise ValueError("world time context requires a message-list prompt")
+    system = prompt[0]
+    content = system.get("content")
+    if system.get("role") != "system" or not isinstance(content, str):
+        raise ValueError("world time context requires an initial system message")
+    precision = (
+        "The timestamp's timezone is unspecified; do not infer one or treat it as a globally defined instant. "
+        if instant.utcoffset() is None
+        else ""
+    )
+    context = (
+        "\n\nSimulation context: For this task, the world time is "
+        f"{declared_time}. {precision}"
+        "Use this simulated clock for relative dates and deadlines; the host clock "
+        "does not define task time. This clock does not specify a business-day "
+        "calendar or holidays; use the task's available procedures for those rules."
+    )
+    return [{**system, "content": content + context}, *prompt[1:]]
+
+
 def _service_for_name(name: str) -> str | None:
     fields = sorted(
         (str(field) for field in WorldState.model_fields if field != "meta"),
@@ -136,6 +173,35 @@ class AutomationBenchData(vf.TaskData):
     initial_state: dict[str, Any]
     assertions: tuple[dict[str, Any], ...]
     zapier_tools: tuple[str, ...]
+    # Host-side declared facets. Empty values with not_reviewed status mean unknown.
+    workflow: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    guard_patterns: list[str] = Field(default_factory=list)
+    task_metadata_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    task_metadata_status: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def check_metadata_identity(self):
+        if self.task_metadata_digest is None and (
+            self.workflow or self.capabilities or self.guard_patterns or self.task_metadata_status
+        ):
+            raise ValueError("task classifications require a bound metadata digest")
+        return self
+
+    @model_serializer(mode="wrap")
+    def serialize_metadata(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = handler(self)
+        if self.task_metadata_digest is None:
+            # Preserve historical task content/hash when this opt-in is unused.
+            for name in (
+                "workflow",
+                "capabilities",
+                "guard_patterns",
+                "task_metadata_digest",
+                "task_metadata_status",
+            ):
+                data.pop(name, None)
+        return data
 
 
 class AutomationBenchTaskConfig(vf.TaskConfig):
@@ -145,10 +211,60 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     allowed_tools: tuple[str, ...] = ()
     # None keeps the upstream "~50 turns" system prompt.
     turn_budget: int | None = Field(default=None, gt=0)
+    # Explicit, versioned public context; False preserves upstream prompts.
+    world_time_context: bool = False
+    # Host-side raw material for calibration; never exposed as a tool argument.
+    capture_actions: bool = False
+    # Fixed world clock, identifiers and random choices per call (simulation.py), so
+    # equal actions on equal worlds give equal tool results. False keeps the wall
+    # clock and OS-random identifiers.
+    deterministic_world: bool = False
+    # Offline development candidate; independent native findings, official score unchanged.
+    reviewed_hr_assessments: bool = False
+    reviewed_simple_assessments: bool = False
+    reviewed_suppression_assessments: bool = False
+    reviewed_cash_flow_assessments: bool = False
+    reviewed_renewal_assessments: bool = False
+    reviewed_record_update_assessments: bool = False
+    reviewed_access_assessments: bool = False
+    manifest_assessments: bool = False
     # None records no per-turn rewards; SAMPO selects them explicitly.
     turn_rewards: AutomationBenchTurnRewardConfig | None = None
     # None adds no penalty; training selects one to discourage tool mistakes.
     mistake_penalty: AutomationBenchMistakePenaltyConfig | None = None
+
+
+def training_nodes(trace: Any) -> list[Any] | None:
+    """Nodes of the trajectory Posttrain trains, or None when it trains none.
+
+    A turn whose tool call did not parse cleanly is re-rendered for the next
+    request, so Verifiers keeps the exact sampled response as a leaf and starts
+    a new branch from a canonical, unsampled copy of it. Posttrain trains the
+    deepest branch with each unsampled assistant node replaced by its sampled
+    sibling; that trajectory must cover every sampled assistant turn.
+    """
+    branches = [branch for branch in trace.branches if branch.trainable]
+    if len(branches) == 1:
+        return list(branches[0].nodes)
+    if not branches:
+        return None
+    depth = max(len(branch.nodes) for branch in branches)
+    terminal = [branch for branch in branches if len(branch.nodes) == depth]
+    if len(terminal) != 1:
+        return None
+    sampled = [node for branch in branches for node in branch.nodes
+               if node.sampled and node.message.role == "assistant"]
+    resolved = []
+    for node in terminal[0].nodes:
+        if node.message.role != "assistant" or node.sampled:
+            resolved.append(node)
+            continue
+        siblings = {id(c): c for c in sampled if c.parent == node.parent and c is not node}
+        if len(siblings) > 1:
+            return None
+        resolved.extend(siblings.values() or [node])
+    covered = {id(node) for node in resolved if node.sampled}
+    return resolved if covered == {id(node) for node in sampled} else None
 
 
 class AutomationBenchTask(
@@ -157,6 +273,15 @@ class AutomationBenchTask(
     tools: ClassVar[tuple[type[vf.Toolset], ...]] = cast(
         tuple[type[vf.Toolset], ...], (AutomationBenchToolset,)
     )
+
+    def __new__(cls, data: Any = None, config: Any = None, *args: Any, **kwargs: Any):
+        # A task rebuilt from (data, config) as the base class becomes the class
+        # the taskset would have loaded for that row (see task_type_for).
+        if cls is AutomationBenchTask and data is not None and config is not None:
+            target = task_type_for(data.task_name, config)
+            if target is not cls:
+                return super().__new__(target)
+        return super().__new__(cls)
 
     @property
     def key(self) -> str:
@@ -197,7 +322,14 @@ class AutomationBenchTask(
 
     async def setup(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         del runtime
-        world = WorldState.model_validate(self.data.initial_state)
+        deterministic = cast(AutomationBenchTaskConfig, self.config).deterministic_world
+        if deterministic:
+            clock = world_clock_base(self.data.initial_state)
+            with simulated_setup(self.data.initial_state, clock):
+                world = WorldState.model_validate(self.data.initial_state)
+            world.meta.current_time = clock
+        else:
+            world = WorldState.model_validate(self.data.initial_state)
         world.meta.allowed_services = _allowed_services(
             self.data.initial_state,
             self.data.assertions,
@@ -208,6 +340,14 @@ class AutomationBenchTask(
         state.initial_state = self.data.initial_state
         state.assertions = self.data.assertions
         state.search_top_k = cast(AutomationBenchTaskConfig, self.config).search_top_k
+        state.capture_actions = cast(AutomationBenchTaskConfig, self.config).capture_actions
+        state.deterministic_world = deterministic
+        state.world_clock = clock.isoformat() if deterministic else None
+        state.world_revision = 0
+        if state.capture_actions:
+            from .capture import snapshot_world
+
+            snapshot_world(state)
 
     def _snapshot(self, trace: vf.Trace) -> ScoreSnapshot:
         state = cast(AutomationBenchState, trace.state)
@@ -233,6 +373,29 @@ class AutomationBenchTask(
 
     async def finalize(self, trace: vf.Trace, runtime: vf.Runtime) -> None:
         del runtime
+        state = cast(AutomationBenchState, trace.state)
+        if state.capture_actions:
+            # Action records and world bytes are retained once, as tool-server
+            # execution evidence; this summary indexes them without copying worlds.
+            from .capture import raw_action_envelopes
+
+            receipts = [
+                json.loads(event.receipt_json)
+                for event in trace.tool_execution_events
+                if event.source == "tool_server"
+            ]
+            trace.info["automationbench_capture"] = {
+                "schema_version": 2,
+                "initial_digest": state.action_initial_digest,
+                "snapshots": "tool_server_execution_evidence",
+                "events": [envelope["action"] for envelope in raw_action_envelopes(receipts)],
+                "coverage": {
+                    "scope": "retained tool-server execution evidence",
+                    "failed_mcp_retention": "unqualified",
+                    "concurrent_mcp_retention": "unqualified",
+                    "native_call_alignment": "unavailable",
+                },
+            }
         snapshot = self._snapshot(trace)
         trace.info["automationbench"] = {
             "domain": self.data.domain,
@@ -247,13 +410,26 @@ class AutomationBenchTask(
             record_progress(trace.info, trace.num_turns, lambda: snapshot.partial_credit)
             self._attach_turn_evidence(trace, turn_rewards)
 
+    async def score(self, trace: vf.Trace, runtime: vf.Runtime | None = None) -> None:
+        await super().score(trace, runtime)
+        config = cast(AutomationBenchTaskConfig, self.config).turn_rewards
+        if config is not None and config.manifest_enabled and TURN_EVIDENCE_KEY in trace.info:
+            from .manifest_step_credit import apply_manifest_step_credit
+
+            training = training_nodes(trace)
+            turns = [node.message for node in training or ()
+                     if node.sampled and node.message.role == "assistant"]
+            trace.info[TURN_EVIDENCE_KEY] = apply_manifest_step_credit(
+                trace.info[TURN_EVIDENCE_KEY], turns=turns, events=trace.tool_execution_events,
+                trace=trace, config=config,
+            )
+
     def _attach_turn_evidence(
         self, trace: vf.Trace, config: AutomationBenchTurnRewardConfig
     ) -> None:
-        branches = trace.branches
-        if len(branches) != 1:
-            return  # Posttrain trains one branch; compacted episodes carry no turn rewards
-        nodes = branches[0].nodes
+        nodes = training_nodes(trace)
+        if nodes is None:
+            return  # Posttrain trains one trajectory; other branch shapes carry no turn rewards
         turns = [
             node.message for node in nodes if node.sampled and node.message.role == "assistant"
         ]
@@ -278,6 +454,14 @@ class AutomationBenchTask(
     @vf.reward(weight=1.0)
     async def partial_credit(self, trace: vf.Trace) -> float:
         return self._snapshot(trace).partial_credit
+
+    def hooks(self, attr: str):
+        """Register the mistake penalty only when a penalty is selected, so tasks
+        scored without one keep exactly the official reward set."""
+        fns = super().hooks(attr)
+        if attr == "reward" and cast(AutomationBenchTaskConfig, self.config).mistake_penalty is None:
+            fns = [fn for fn in fns if fn.__name__ != "tool_mistake_penalty"]
+        return fns
 
     @vf.reward(weight=1.0)
     async def tool_mistake_penalty(self, trace: vf.Trace) -> float:
@@ -342,6 +526,71 @@ class AutomationBenchConfig(vf.TasksetConfig):
     domains: list[Domain] = Field(default_factory=lambda: ["simple"])
     task_names: list[str] = Field(default_factory=list)
     task: AutomationBenchTaskConfig = Field(default_factory=AutomationBenchTaskConfig)
+    task_metadata_path: Path | None = None
+    task_metadata_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def check_metadata_selection(self):
+        if (self.task_metadata_path is None) != (self.task_metadata_digest is None):
+            raise ValueError("task metadata requires both path and expected digest")
+        return self
+
+
+def task_type_for(task_name: str, config: AutomationBenchTaskConfig) -> type[AutomationBenchTask]:
+    """The concrete task class one dataset row runs as under one task config.
+
+    Verifiers' environment server rebuilds every request's task from its data and
+    config as the taskset's single task class, so the class choice must follow
+    from those two values (``AutomationBenchTask.__new__``) and not only from
+    ``load``. Otherwise manifest and reviewed assessments silently drop out of
+    worker-executed episodes.
+    """
+    task_type: type[AutomationBenchTask] = AutomationBenchTask
+    if config.reviewed_hr_assessments:
+        from .hr_assessments import ReviewedHrTask
+
+        task_type = ReviewedHrTask
+    if config.reviewed_simple_assessments:
+        from .simple_assessments import ReviewedSimpleTask
+        from .simple_evidence import SUPPORTED
+
+        if task_name in SUPPORTED:
+            task_type = ReviewedSimpleTask
+    if config.reviewed_suppression_assessments:
+        from .marketing_assessments import ReviewedSuppressionTask
+        from .marketing_evidence import TASK
+
+        if task_name == TASK:
+            task_type = ReviewedSuppressionTask
+    if config.reviewed_cash_flow_assessments:
+        from .finance_assessments import ReviewedCashFlowTask
+        from .finance_evidence import TASK as CASH_FLOW_TASK
+
+        if task_name == CASH_FLOW_TASK:
+            task_type = ReviewedCashFlowTask
+    if config.reviewed_renewal_assessments:
+        from .operations_assessments import RENEWAL_TASK, ReviewedRenewalTask
+
+        if task_name == RENEWAL_TASK:
+            task_type = ReviewedRenewalTask
+    if config.reviewed_record_update_assessments:
+        from .record_assessments import ReviewedRecordUpdateTask
+        from .simple_record_contracts import SUPPORTED as RECORD_UPDATE_TASKS
+
+        if task_name in RECORD_UPDATE_TASKS:
+            task_type = ReviewedRecordUpdateTask
+    if config.reviewed_access_assessments:
+        from .operations_assessments import ACCESS_TASK, ReviewedAccessTask
+
+        if task_name == ACCESS_TASK:
+            task_type = ReviewedAccessTask
+    if config.manifest_assessments:
+        from .contracts.loader import supported_tasks
+        from .manifest_assessments import ManifestAssessmentTask
+
+        if task_name in supported_tasks():
+            task_type = ManifestAssessmentTask
+    return task_type
 
 
 class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConfig]):  # pyright: ignore[reportInvalidTypeArguments]
@@ -359,6 +608,10 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
         for domain in self.config.domains:
             rows = cast(Iterable[dict[str, Any]], get_domain_dataset(domain))
             for raw in rows:
+                task_name = str(raw.get("task") or f"{domain}-{index}")
+                if requested and task_name not in requested:
+                    index += 1
+                    continue
                 info = raw.get("info", {})
                 if isinstance(info, str):
                     info = json.loads(info)
@@ -367,16 +620,17 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
                 if self.config.task.turn_budget is not None:
                     prompt = _with_turn_budget(prompt, self.config.task.turn_budget)
                 initial_state = _strip_none(info.get("initial_state", {}))
+                if self.config.task.world_time_context:
+                    prompt = _with_world_time(
+                        prompt, initial_state.get("meta", {}).get("current_time")
+                    )
                 assertions = tuple(_strip_none(item) for item in info.get("assertions", []))
                 zapier_tools = tuple(str(item) for item in info.get("zapier_tools", []))
                 if self.config.task.toolset == "limited_zapier":
                     zapier_tools = _with_spreadsheet_discovery(zapier_tools, prompt, initial_state)
-                task_name = str(raw.get("task") or f"{domain}-{index}")
-                if requested and task_name not in requested:
-                    index += 1
-                    continue
+                task_type = task_type_for(task_name, self.config.task)
                 tasks.append(
-                    AutomationBenchTask(
+                    task_type(
                         AutomationBenchData(
                             idx=index,
                             name=task_name,
@@ -395,6 +649,15 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
         missing = requested - found
         if missing:
             raise ValueError(f"unknown AutomationBench task_names: {', '.join(sorted(missing))}")
+        if self.config.task_metadata_path is not None:
+            from .task_metadata import attach_task_metadata, load_task_metadata
+
+            metadata = load_task_metadata(
+                self.config.task_metadata_path,
+                expected_digest=cast(str, self.config.task_metadata_digest),
+            )
+            for task in tasks:
+                task.data = attach_task_metadata(task.data, metadata)
         return tasks
 
 

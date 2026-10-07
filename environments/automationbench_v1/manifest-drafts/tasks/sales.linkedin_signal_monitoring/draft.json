@@ -1,0 +1,555 @@
+{
+  "schema_version": 1,
+  "manifest_id": "sales-linkedin-signal-monitoring-public",
+  "revision": "batch10_public_only_draft_v1",
+  "public_request": "Monitor LinkedIn for buying signals from target accounts, such as executive hires, company growth, funding announcements, or tech stack changes. For each signal detected, create a Salesforce task capturing the details, update the account priority to reflect the signal strength, and post an alert to #buying-signals. Include the names of affected entities in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "128d2ada3c6e3d85b9ae41dc6b0560781dc4be6f1d571b2c836d8d528166fe63"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "linkedin",
+        "companies"
+      ],
+      "canonical_sha256": "d7d38b38534996b641baff3060a19eaed18d577af45583e7042d39d60568cda2"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "linkedin",
+        "posts"
+      ],
+      "canonical_sha256": "8729da424a0416134687c61eb653403f47a87801d4c8316d7436cbaa0b513d7a"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "linkedin",
+        "profiles"
+      ],
+      "canonical_sha256": "0cf3278941859292d74d3b2811ba08619e9119ba105d84a81c1e697b7d40ddaa"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "salesforce",
+        "accounts"
+      ],
+      "canonical_sha256": "8b56dcd188af0c3db645c8af826c7fb1cc93bcdeff7381adff4ea4efd965e54e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "4abd256b773604d5b23e3c20c764dd2808cfc18b77c755725813494de6cbc4e7"
+    }
+  ],
+  "sources": {
+    "signal": {
+      "adapter": "public.request@1",
+      "member_key": "signalcorp-growth-funding",
+      "fields": {
+        "company": {
+          "value": "SignalCorp",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "companies",
+              0,
+              "name"
+            ]
+          ]
+        },
+        "linkedin_company_id": {
+          "value": "li_sig_001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "companies",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "account_id": {
+          "value": "001xx000003SG01",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "salesforce",
+              "accounts",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "employee_count": {
+          "value": 250,
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "companies",
+              0,
+              "employee_count"
+            ]
+          ]
+        },
+        "previous_employee_count": {
+          "value": 200,
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "companies",
+              0,
+              "previous_employee_count"
+            ]
+          ]
+        },
+        "employee_count_text": {
+          "value": "250",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "companies",
+              0,
+              "employee_count"
+            ]
+          ]
+        },
+        "previous_employee_count_text": {
+          "value": "200",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "companies",
+              0,
+              "previous_employee_count"
+            ]
+          ]
+        },
+        "post_id": {
+          "value": "post_funding",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "posts",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "post_text": {
+          "value": "Excited to announce our Series B funding!",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "linkedin",
+              "posts",
+              0,
+              "text"
+            ]
+          ]
+        },
+        "channel_id": {
+          "value": "C_SIG",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              0,
+              "id"
+            ]
+          ]
+        }
+      }
+    },
+    "task_creates": {
+      "adapter": "service.record_writes@1",
+      "service": "salesforce",
+      "collection": [
+        "tasks"
+      ],
+      "kind": "create"
+    },
+    "account_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "salesforce",
+      "collection": [
+        "accounts"
+      ],
+      "kind": "update"
+    },
+    "alerts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "signal-task-linked",
+      "signal_id": "sales.linkedin_signal_monitoring.task_for_detected_signal",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 128,
+      "population": "signal",
+      "source": "task_creates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "signalcorp-growth-funding"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "related_to_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "account_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "company"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "previous_employee_count_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "employee_count_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "post_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "signal-account-priority-updated",
+      "signal_id": "sales.linkedin_signal_monitoring.account_priority_updated",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 128,
+      "population": "signal",
+      "source": "account_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "signalcorp-growth-funding"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "account_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "effect",
+                  "record",
+                  "priority"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "Low"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "signal-alert-posted",
+      "signal_id": "sales.linkedin_signal_monitoring.alert_posted",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 128,
+      "population": "signal",
+      "source": "alerts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "signalcorp-growth-funding"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "company"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "previous_employee_count_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "employee_count_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "post_text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

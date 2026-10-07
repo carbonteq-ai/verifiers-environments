@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-intercom_conversation_quality",
+  "revision": "luna_batch04_partial_v1",
+  "public_request": "Audit the quality of our recent Intercom conversations. Review agent responses for helpfulness and completeness, tag conversations with quality ratings, add coaching notes where needed, log scores to our quality tracker (ss_quality), and post agent performance summary to #quality-review.\n\nToday is February 07, 2026.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "5ab110078a01f55635c5ab8d9d60e8021a3333d0cdebb932b9090ca11b2546a6"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "intercom",
+        "conversations"
+      ],
+      "canonical_sha256": "f20f6b69174fd97162675e6b571ea285e30327766f7abbea200d52b5874ec96d"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "worksheets"
+      ],
+      "canonical_sha256": "0955fced9eef48ba6e74c080964e43f3ee71149b5fe860d18e39f2d326eaa874"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "40456b4c16059f60625f266e432a534d4ac8365f63e64e5ff5df0535dde4abe7"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "request_anchor": {
+          "value": "support.intercom_conversation_quality",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "slack": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "conversations": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "intercom",
+        "conversations"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "state": [
+          "state"
+        ],
+        "title": [
+          "title"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "state"
+      ]
+    },
+    "updates": {
+      "adapter": "service.record_writes@1",
+      "service": "intercom",
+      "collection": [
+        "conversations"
+      ],
+      "kind": "update"
+    },
+    "scores": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_quality",
+      "worksheet_id": "ws_scores"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "summary-channel",
+      "signal_id": "support-intercom_conversation_quality.summary-channel",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "slack",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "C_QUAL"
+        }
+      }
+    },
+    {
+      "check_id": "log-reviewed-conversation",
+      "signal_id": "support-intercom_conversation_quality.log-reviewed-conversation",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "conversations",
+      "source": "scores",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "conv_q01",
+            "conv_q02",
+            "conv_q03",
+            "conv_q04",
+            "conv_q05",
+            "conv_q06",
+            "conv_q08",
+            "conv_q09"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Conversation ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "tag-reviewed-conversation",
+      "signal_id": "support-intercom_conversation_quality.tag-reviewed-conversation",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "conversations",
+      "source": "updates",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "conv_q01",
+            "conv_q02",
+            "conv_q03",
+            "conv_q04",
+            "conv_q05",
+            "conv_q06",
+            "conv_q08",
+            "conv_q09"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "tags"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "tags"
+              ]
+            },
+            "where": {
+              "op": "ne",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "item"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": ""
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

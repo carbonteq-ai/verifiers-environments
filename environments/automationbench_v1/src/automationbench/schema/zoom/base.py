@@ -3,10 +3,11 @@
 
 """Zoom schema base classes."""
 
-import uuid
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.zoom.meeting import Meeting
@@ -18,12 +19,12 @@ if TYPE_CHECKING:
 
 def generate_zoom_meeting_id() -> int:
     """Generate a Zoom-style meeting ID (numeric)."""
-    return int(uuid.uuid4().int % 10**10)
+    return int(_sim.uuid4().int % 10**10)
 
 
 def generate_zoom_uuid() -> str:
     """Generate a Zoom-style UUID."""
-    return str(uuid.uuid4())
+    return str(_sim.uuid4())
 
 
 class ZoomRecord(BaseModel):

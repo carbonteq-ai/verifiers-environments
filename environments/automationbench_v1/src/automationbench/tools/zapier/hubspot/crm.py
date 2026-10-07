@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import List, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.hubspot import (
     HubSpotCompany,
     HubSpotContact,
@@ -170,7 +171,7 @@ def hubspot_update_contact(
     if properties and isinstance(properties, dict):
         contact.properties.update(cast(dict[str, str], {k: str(v) for k, v in properties.items()}))
 
-    contact.updated_at = datetime.now()
+    contact.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -422,7 +423,7 @@ def hubspot_add_contact_to_deal(
 
     if contact_id not in deal.associated_contact_ids:
         deal.associated_contact_ids.append(contact_id)
-    deal.updated_at = datetime.now()
+    deal.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -725,7 +726,7 @@ def hubspot_update_ticket(
         except json.JSONDecodeError:
             pass
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -842,7 +843,7 @@ def hubspot_update_deal(
         except json.JSONDecodeError:
             pass
 
-    deal.updated_at = datetime.now()
+    deal.updated_at = _sim.now()
 
     return json.dumps(
         {

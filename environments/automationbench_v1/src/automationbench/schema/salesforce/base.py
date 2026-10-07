@@ -28,13 +28,14 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_salesforce_id() -> str:
     """Produce a Salesforce-compatible 18-character record identifier."""
-    import uuid
 
     # Take the first 18 hex characters from a UUID (matching Salesforce ID length)
-    return uuid.uuid4().hex[:18]
+    return _sim.uuid4().hex[:18]
 
 
 class SalesforceRecord(BaseModel):
@@ -46,8 +47,8 @@ class SalesforceRecord(BaseModel):
     id: str = Field(
         default_factory=generate_salesforce_id, description="Unique Salesforce record identifier"
     )
-    created_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_modified_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_date: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
+    last_modified_date: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
     owner_id: Optional[str] = Field(None, description="ID of the user who owns this record")
 
     def to_display_dict(self) -> dict:
@@ -111,7 +112,7 @@ class SalesforceState(BaseModel):
             if record.id == record_id:
                 updated_data = record.model_dump()
                 updated_data.update(updates)
-                updated_data["last_modified_date"] = datetime.now(timezone.utc)
+                updated_data["last_modified_date"] = _sim.now(timezone.utc)
                 # Reconstruct the record using the same model class
                 model_class = type(record)
                 records[i] = model_class(**updated_data)

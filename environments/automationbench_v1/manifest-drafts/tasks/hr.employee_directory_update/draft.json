@@ -1,0 +1,522 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-employee-directory-update",
+  "revision": "batch06_partial_v1",
+  "public_request": "Update the company employee directory with recent changes. Process new hires, terminations, and role changes. Post the updated directory summary to #hr-general. Use Google Sheets and Slack. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        0,
+        "content"
+      ],
+      "canonical_sha256": "05b9c856f069054dd8123937f11ae3f9df46bc1dc0842612053d80d0e87c3319"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "3995e171d8d14b3ac517ad36d6d45b968f7401a1de3a504f0c3c8bcd01624f61"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "26ee1e474dc7cefc7a69a8010f2cf2b614ebec0964dc06114836627bd4d9e531"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "worksheets"
+      ],
+      "canonical_sha256": "e40f18a47689b070da1bdea34334c309730665cd31c539d8d45b3e8499d6785d"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "9035389a0a483001417f8f47c49422bd6ff32a1faeabffbc6dc44b39ba76c040"
+    }
+  ],
+  "sources": {
+    "changes": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_dir",
+      "worksheet_id": "ws_changes",
+      "key_fields": [
+        "Email",
+        "Type"
+      ],
+      "required_fields": [
+        "Name",
+        "Department",
+        "Title"
+      ]
+    },
+    "active": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_dir",
+      "worksheet_id": "ws_active",
+      "key_fields": [
+        "Email"
+      ],
+      "required_fields": [
+        "Name",
+        "Department",
+        "Title"
+      ]
+    },
+    "directory_appends": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_dir",
+      "worksheet_id": "ws_active"
+    },
+    "directory_updates": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "ss_dir",
+      "worksheet_id": "ws_active"
+    },
+    "row_deletes": {
+      "adapter": "service.record_writes@1",
+      "service": "google_sheets",
+      "collection": [
+        "rows"
+      ],
+      "kind": "delete"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "updates": {
+      "adapter": "public.request@1",
+      "member_key": "directory-update-2026-03-15",
+      "fields": {
+        "topic": {
+          "value": "employee directory update",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "new-hire-added-to-active-directory",
+      "signal_id": "hr.directory.new_hire_row_added",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "changes",
+      "source": "directory_appends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Type"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "New Hire"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Email"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Department"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Department"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Title"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Title"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "title-change-applied-to-active-directory",
+      "signal_id": "hr.directory.title_change_applied",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "changes",
+      "source": "directory_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Type"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Title Change"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Email"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Department"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Department"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Title"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Title"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "terminated-employee-removed-from-active",
+      "signal_id": "hr.directory.termination_removed",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "changes",
+      "source": "row_deletes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Type"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Termination"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "spreadsheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ss_dir"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ws_active"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "before",
+                "cells",
+                "Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Email"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "directory-summary-slack",
+      "signal_id": "hr.directory.updated_summary_posted",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "updates",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "directory-update-2026-03-15"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_HROGEN"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "scope": "text",
+            "terms": [
+              {
+                "value": {
+                  "kind": "literal",
+                  "value": "Sarah Nakamura"
+                },
+                "mode": "words"
+              },
+              {
+                "value": {
+                  "kind": "literal",
+                  "value": "Greg Foster"
+                },
+                "mode": "words"
+              },
+              {
+                "value": {
+                  "kind": "literal",
+                  "value": "Alice Park"
+                },
+                "mode": "words"
+              },
+              {
+                "value": {
+                  "kind": "literal",
+                  "value": "Senior Software Engineer"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

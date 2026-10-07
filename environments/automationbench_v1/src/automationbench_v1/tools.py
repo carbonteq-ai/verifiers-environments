@@ -12,6 +12,8 @@ from pydantic import ConfigDict, Field, create_model
 from automationbench.tools import ALL_TOOLS
 from automationbench.tools.zapier.meta import ToolRegistry
 
+from .capture import capture_action
+from .simulation import simulated_tool_call
 from .world_codec import dump_world, load_world
 
 
@@ -58,6 +60,17 @@ class AutomationBenchState(vf.State):
     initial_state: dict[str, object] = Field(default_factory=dict)
     assertions: tuple[dict[str, object], ...] = ()
     search_top_k: int = 20
+    capture_actions: bool = False
+    action_initial_digest: str | None = None
+    # Capture keeps only bounded bookkeeping in the synced rollout state; world bytes
+    # and action records travel once, as tool-server execution evidence.
+    action_count: int = 0
+    action_published: tuple[str, ...] = ()
+    # Deterministic simulation (see simulation.py): the world clock's base instant
+    # (ISO, UTC) and the number of calls that changed the world.
+    deterministic_world: bool = False
+    world_clock: str | None = None
+    world_revision: int = 0
 
 
 class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState]):
@@ -65,21 +78,35 @@ class AutomationBenchToolset(vf.Toolset[vf.ToolsetConfig, AutomationBenchState])
 
     TOOL_PREFIX = None
 
+    def execution_capture_enabled(self) -> bool:
+        return self.state.capture_actions
+
     @vf.tool
     def search_tools(self, query: str, top_k: int = 5) -> str:
         """Find Zapier-style tools by service name, action, or description."""
 
         bounded = max(1, min(top_k, self.state.search_top_k))
-        return json.dumps(_registry().bm25(query, top_k=bounded), indent=2)
+        return capture_action(
+            self.state,
+            "search_tools",
+            {"query": query, "top_k": top_k},
+            lambda: json.dumps(_registry().bm25(query, top_k=bounded), indent=2),
+        )
 
     @vf.tool
     def execute_tool(self, tool_name: str, arguments: str) -> str:
         """Execute a tool found by ``search_tools`` against this rollout's world."""
 
-        world = load_world(self.state.world)
-        result = _registry().execute(tool_name, arguments, world=world)
-        self.state.world = dump_world(world)
-        return result
+        def execute():
+            with simulated_tool_call(self.state, tool_name, arguments):
+                world = load_world(self.state.world)
+                result = _registry().execute(tool_name, arguments, world=world)
+                self.state.world = dump_world(world)
+            return result
+
+        return capture_action(
+            self.state, "execute_tool", {"tool_name": tool_name, "arguments": arguments}, execute
+        )
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import json
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_calendar import CalendarEvent, generate_google_calendar_id
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -33,7 +34,7 @@ def google_calendar_quick_add_event(
     # For quick add, we parse a simple default time since we're simulating
     from datetime import timedelta
 
-    now = datetime.now()
+    now = _sim.now()
     start = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
     end = start + timedelta(hours=1)
 

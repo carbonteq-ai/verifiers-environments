@@ -3,25 +3,26 @@
 
 """Facebook Conversions API state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_fb_event_id() -> str:
     """Produce a Facebook-style event identifier incorporating a timestamp."""
-    timestamp = int(datetime.now().timestamp())
-    suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
+    timestamp = int(_sim.now().timestamp())
+    suffix = "".join(_sim.rng().choices(string.ascii_lowercase + string.digits, k=12))
     return f"evt_{timestamp}_{suffix}"
 
 
 def generate_fbtrace_id() -> str:
     """Produce a random Facebook trace identifier."""
     chars = string.ascii_uppercase + string.digits + "_"
-    return "".join(random.choices(chars, k=20))
+    return "".join(_sim.rng().choices(chars, k=20))
 
 
 class FacebookConversionEvent(BaseModel):
@@ -50,8 +51,8 @@ class FacebookConversionEvent(BaseModel):
     value: Optional[float] = None
     currency: str = "USD"
     status: Literal["success", "failed", "pending"] = "success"
-    event_time: datetime = Field(default_factory=datetime.now)
-    created_at: datetime = Field(default_factory=datetime.now)
+    event_time: datetime = Field(default_factory=_sim.now)
+    created_at: datetime = Field(default_factory=_sim.now)
     # Funnel-specific fields
     lifecycle_stage_name: Optional[str] = None
     lead_event_source: Optional[str] = None

@@ -3,17 +3,18 @@
 
 """Zoho Desk support state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_zoho_desk_id() -> str:
     """Generate a Zoho Desk-style object ID."""
-    return "".join(random.choices(string.digits, k=18))
+    return "".join(_sim.rng().choices(string.digits, k=18))
 
 
 class ZohoDeskComment(BaseModel):
@@ -26,7 +27,7 @@ class ZohoDeskComment(BaseModel):
     is_public: bool = True
     author: Optional[str] = None
     commenter_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
 
 class ZohoDeskTicket(BaseModel):
@@ -49,8 +50,8 @@ class ZohoDeskTicket(BaseModel):
     category: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     comments: List[ZohoDeskComment] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -97,8 +98,8 @@ class ZohoDeskContact(BaseModel):
     mobile: Optional[str] = None
     account_id: Optional[str] = None
     description: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -129,8 +130,8 @@ class ZohoDeskAccount(BaseModel):
     description: Optional[str] = None
     seats: Optional[int] = None
     domain: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -159,7 +160,7 @@ class ZohoDeskDepartment(BaseModel):
     id: str = Field(default_factory=generate_zoho_desk_id)
     name: str
     description: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""

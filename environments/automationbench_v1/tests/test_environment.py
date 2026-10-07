@@ -16,10 +16,61 @@ from automationbench_v1.taskset import (
     AutomationBenchConfig,
     AutomationBenchTaskConfig,
     AutomationBenchTaskset,
+    _with_world_time,
 )
 from automationbench_v1.tools import AutomationBenchState, AutomationBenchToolset
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("timestamp", ["2026-04-15T09:00:00Z", "2026-01-27T09:00:00", "2026-04-15T09:00:00+05:00"])
+def test_world_time_context_preserves_declared_clock_without_hidden_task_data(timestamp: str) -> None:
+    prompt = [{"role": "system", "content": "Workflow instructions"}, {"role": "user", "content": "Check recent hires"}]
+    result = _with_world_time(prompt, timestamp)
+    assert prompt[0]["content"] == "Workflow instructions"
+    assert result[1] == prompt[1]
+    assert timestamp in result[0]["content"]
+    assert "host clock does not define task time" in result[0]["content"]
+    assert ("timezone is unspecified" in result[0]["content"]) == (timestamp == "2026-01-27T09:00:00")
+
+
+@pytest.mark.parametrize("timestamp", [None, "", "2026-04-15", "invalid", "2026-99-15T09:00:00Z"])
+def test_world_time_context_rejects_missing_or_invalid_clock(timestamp: Any) -> None:
+    with pytest.raises(ValueError, match="explicit ISO datetime"):
+        _with_world_time([{"role": "system", "content": "Instructions"}], timestamp)
+
+
+def test_world_time_context_is_opt_in_and_bound_to_loaded_task() -> None:
+    config = AutomationBenchConfig(domains=["hr"], task_names=["hr.i9_verification_tracking"])
+    [original] = AutomationBenchTaskset(config).load()
+    [contextual] = AutomationBenchTaskset(config.model_copy(update={"task": AutomationBenchTaskConfig(world_time_context=True)})).load()
+    original_prompt = cast(Any, original.data.prompt)
+    contextual_prompt = cast(Any, contextual.data.prompt)
+    assert "Simulation context:" not in original_prompt[0].content
+    assert contextual.data.initial_state["meta"]["current_time"] in contextual_prompt[0].content
+    assert contextual_prompt[1].content == original_prompt[1].content
+    assert contextual.data.assertions == original.data.assertions
+
+
+def test_world_time_context_does_not_validate_unselected_tasks(monkeypatch: pytest.MonkeyPatch) -> None:
+    from automationbench_v1 import taskset
+
+    rows = [
+        {"task": "hr.untimed", "prompt": [], "info": {}},
+        {
+            "task": "hr.timed",
+            "prompt": [{"role": "system", "content": "Instructions"}, {"role": "user", "content": "Task"}],
+            "info": {"initial_state": {"meta": {"current_time": "2026-04-15T09:00:00Z"}}},
+        },
+    ]
+    monkeypatch.setattr(taskset, "get_domain_dataset", lambda domain: rows)
+    [selected] = AutomationBenchTaskset(
+        AutomationBenchConfig(domains=["hr"], task_names=["hr.timed"], task=AutomationBenchTaskConfig(world_time_context=True))
+    ).load()
+    assert selected.data.idx == 1
+    assert selected.key == "hr.timed"
+    with pytest.raises(ValueError, match="explicit ISO datetime"):
+        AutomationBenchTaskset(AutomationBenchConfig(domains=["hr"], task=AutomationBenchTaskConfig(world_time_context=True))).load()
 
 
 def test_distribution_metadata_supports_both_online_rl_python_capsules() -> None:
@@ -226,6 +277,31 @@ def test_task_setup_and_finalize_put_evaluation_detail_on_trace() -> None:
     assert trace.reward == 1.0
     assert trace.metrics["task_completed_correctly"] == 1.0
     assert trace.info["automationbench"]["assertions"][0]["passed"] is True
+
+
+def test_calibration_capture_is_opt_in_host_material_with_explicit_coverage() -> None:
+    task = AutomationBenchTaskset(
+        AutomationBenchConfig(task=AutomationBenchTaskConfig(capture_actions=True))
+    ).load()[0]
+    trace = vf.Trace(
+        agent=vf.AgentInfo(config=vf.AgentConfig()),
+        task=vf.TraceTask(type=type(task).__name__, data=task.data),
+        state=AutomationBenchState(),
+    )
+    asyncio.run(task.setup(trace, None))  # type: ignore[arg-type]
+    state = cast(AutomationBenchState, trace.state)
+    assert state.capture_actions
+    assert state.action_initial_digest is not None
+    # World bytes are published once as tool-server evidence, never kept in synced state.
+    assert state.action_published == () and state.action_count == 0
+    asyncio.run(task.finalize(trace, None))  # type: ignore[arg-type]
+    captured = trace.info["automationbench_capture"]
+    assert captured["events"] == []
+    assert captured["snapshots"] == "tool_server_execution_evidence"
+    assert captured["initial_digest"] == state.action_initial_digest
+    assert captured["coverage"]["native_call_alignment"] == "unavailable"
+    assert captured["coverage"]["failed_mcp_retention"] == "unqualified"
+    assert not AutomationBenchTaskConfig().capture_actions
 
 
 def test_limited_zapier_adds_spreadsheet_search_when_ids_are_undiscoverable() -> None:

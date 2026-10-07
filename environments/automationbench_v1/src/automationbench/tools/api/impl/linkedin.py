@@ -9,11 +9,11 @@ invokes these functions, forwarding parameters without modification.
 """
 
 import json
-import random
 import string
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import (
     Invitation,
     Message,
@@ -22,7 +22,6 @@ from automationbench.schema.linkedin import (
     generate_linkedin_post_id,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Profiles
@@ -350,7 +349,7 @@ def linkedin_ugc_posts_create(world: WorldState, **kwargs) -> str:
         text=comment_text,
         content=content,
         visibility=visibility,
-        created_at=datetime.now().isoformat(),
+        created_at=_sim.now().isoformat(),
     )
 
     world.linkedin.posts.append(post)
@@ -433,7 +432,7 @@ def linkedin_company_updates_create(world: WorldState, **kwargs) -> str:
         text=comment,
         content=content,
         visibility="PUBLIC",
-        created_at=datetime.now().isoformat(),
+        created_at=_sim.now().isoformat(),
     )
 
     world.linkedin.posts.append(post)
@@ -455,7 +454,7 @@ def linkedin_company_updates_create(world: WorldState, **kwargs) -> str:
 
 
 def _generate_invitation_id() -> str:
-    suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=24))
+    suffix = "".join(_sim.rng().choices(string.ascii_uppercase + string.digits, k=24))
     return f"inv_{suffix}"
 
 
@@ -498,7 +497,7 @@ def linkedin_invitations_create(world: WorldState, **kwargs) -> str:
             )
 
     invitation_id = _generate_invitation_id()
-    now = datetime.now().isoformat() + "Z"
+    now = _sim.now().isoformat() + "Z"
 
     invitation = Invitation(
         id=invitation_id,
@@ -613,7 +612,7 @@ def linkedin_messages_create(world: WorldState, **kwargs) -> str:
             sender_profile_id=sender_id,
             recipient_profile_id=resolved_id,
             text=text,
-            sent_at=datetime.now(timezone.utc).isoformat(),
+            sent_at=_sim.now(timezone.utc).isoformat(),
             subject=subject,
         )
         world.linkedin.messages.append(message)

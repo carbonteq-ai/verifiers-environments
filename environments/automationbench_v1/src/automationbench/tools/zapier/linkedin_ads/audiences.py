@@ -4,9 +4,9 @@
 """LinkedIn Ads audience tools: create, add/remove contacts."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin_ads import LinkedInAudience, generate_linkedin_ulid
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -92,7 +92,7 @@ def linkedin_ads_add_contact_to_audience(
     identifier = email or f"{first_name}_{last_name}_{generate_linkedin_ulid()[:8]}"
     if identifier:
         aud.members.add(identifier.lower())
-    aud.updated_at = datetime.now()
+    aud.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -148,7 +148,7 @@ def linkedin_ads_add_company_to_audience(
 
     identifier = company_id or company_name or generate_linkedin_ulid()[:8]
     aud.members.add(identifier.lower())
-    aud.updated_at = datetime.now()
+    aud.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -203,7 +203,7 @@ def linkedin_ads_remove_email_from_audience(
     was_present = email_lower in aud.members
     if was_present:
         aud.members.discard(email_lower)
-    aud.updated_at = datetime.now()
+    aud.updated_at = _sim.now()
 
     return json.dumps(
         {

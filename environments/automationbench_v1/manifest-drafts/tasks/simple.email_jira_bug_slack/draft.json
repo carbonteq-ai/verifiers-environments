@@ -1,0 +1,306 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-email_jira_bug_slack-public-component",
+  "revision": "batch13_public_v1",
+  "public_request": "A customer reported a bug via email. Read the email, create a Jira bug issue in the PLAT project, and notify the #engineering Slack channel about it.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "027da274099a56b3242063106743459b42e00bde1f546a9d411c1123d24df518"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "31137a2a571499a011ae91e42f022d0a2847ce46a2a265306c7f1024f527844e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack"
+      ],
+      "canonical_sha256": "24721dcad9cd1b9ffd5edeaed2967031c0bc28feaf9b182caf8a1f17076eb410"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "email_jira_bug_slack",
+      "fields": {
+        "message_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "thread_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "thread_id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "sender_email": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "from_"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "subject": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "subject"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "project": {
+          "value": "PLAT",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "channel_id": {
+          "value": "CENG001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              0
+            ]
+          ]
+        }
+      }
+    },
+    "reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "source-email-read",
+      "signal_id": "simple.email_jira_bug_slack.source_email_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "email_jira_bug_slack"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "message_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "message_id"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "engineering-channel-notified",
+      "signal_id": "simple.email_jira_bug_slack.channel_notified",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "email_jira_bug_slack"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_read",
+          "source": "reads",
+          "timing": "any",
+          "order": "returned_before_dispatch",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

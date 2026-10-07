@@ -1,0 +1,22 @@
+# support.reamaze_multilanguage Luna partial manifest review
+
+Luna official outcome: **official_partial**, score **0.952381**. The score is retained as recorded; it is not replaced by this draft's findings.
+
+Coverage: **2/4** expressible task obligations; 2 gaps, 1 out of scope. Status: **not_qualified**.
+
+Native replay: errors=0, rescore_equal=True, reload_equal=True, scalar_unchanged=True, episode_bytes_unchanged=True. Findings: language-agent-assignment=inapplicable:None, language-agent-assignment=inapplicable:None, language-agent-assignment=inapplicable:None, language-agent-assignment=valid:1.0, language-agent-assignment=valid:1.0, language-agent-assignment=valid:1.0, language-agent-assignment=valid:1.0, language-agent-assignment=valid:1.0, language-agent-assignment=inapplicable:None, language-agent-assignment=inapplicable:None, language-agent-assignment=inapplicable:None, language-agent-assignment=inapplicable:None, language-agent-assignment=inapplicable:None, language-route-tag=inapplicable:None, language-route-tag=inapplicable:None, language-route-tag=inapplicable:None, language-route-tag=valid:1.0, language-route-tag=valid:1.0, language-route-tag=valid:1.0, language-route-tag=valid:1.0, language-route-tag=valid:1.0, language-route-tag=valid:1.0, language-route-tag=inapplicable:None, language-route-tag=inapplicable:None, language-route-tag=inapplicable:None, language-route-tag=inapplicable:None, support.reamaze_multilanguage.assignee_email=inapplicable:None, support.reamaze_multilanguage.assignee_email=valid:1.0, support.reamaze_multilanguage.assignee_email.coverage=valid:1.0, support.reamaze_multilanguage.tags=inapplicable:None, support.reamaze_multilanguage.tags=valid:1.0, support.reamaze_multilanguage.tags.coverage=valid:1.0.
+
+Original Luna assertion misses (inspection aid only; not used to define checks): reamaze_conversation_has_message.
+
+The normalized public Sheets rows are bound without flattening or replacing their identities. I tested a source-derived lookup on the retained conversation checks: using the exact worksheet `TableSource` fails contract loading with `record_retained_requires_initial_lookup`; an all-rows `InitialCollectionSource` workaround loads, but deriving each assignee from the `lang-*` tag leaves all ten supported conversation findings abstained because the check cannot map the tag sequence to the scalar `Language Code` key. The linked simulator tests use real actions and are summarized below. The draft remains partial and `not_qualified`.
+
+Historical validation note: an initial inspection under the wrong installed Verifiers environment reported no retained events and incorrectly blocked simulator alternatives. Under `PYTHONPATH=/home/hammad/projects/verifiers-credit-candidate-20261003:src:tests`, raw and parsed Re:amaze traces both contain 34 execution events and 17 state-write receipts; the corrected native replay and simulator results are recorded here.
+
+
+Synthetic simulator alternatives used genuine local handlers over the exact retained `task.data.initial_state` and returned tool arguments. They are focused tests of the expressed checks, not new model responses or whole-task qualifications.
+
+- **correct** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
+- **harm** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[0.0, 1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
+- **missing_ack** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
+- **gaming** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
+- **duplicate** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.

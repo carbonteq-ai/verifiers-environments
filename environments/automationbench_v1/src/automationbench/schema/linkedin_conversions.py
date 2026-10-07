@@ -3,18 +3,19 @@
 
 """LinkedIn Conversions API state definitions for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_linkedin_conv_event_id() -> str:
     """Produce an identifier in the style used by LinkedIn conversion events."""
     chars = string.ascii_uppercase + string.digits
-    suffix = "".join(random.choices(chars, k=24))
+    suffix = "".join(_sim.rng().choices(chars, k=24))
     return f"conv_evt_{suffix}"
 
 
@@ -49,7 +50,7 @@ class LinkedInConversionAPIEvent(BaseModel):
     account: str
     conversion: str  # Name or ID of the conversion action
     conversion_type: str = "LEAD_GENERATION"
-    event_time: datetime = Field(default_factory=datetime.now)
+    event_time: datetime = Field(default_factory=_sim.now)
     status: Literal["success", "failed", "pending"] = "success"
     # Fields for identifying the converted user
     email: Optional[str] = None
@@ -67,7 +68,7 @@ class LinkedInConversionAPIEvent(BaseModel):
     currency_code: str = "USD"
     # Timing
     conversion_happened_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""

@@ -3,11 +3,12 @@
 
 """Base classes for Calendly schema."""
 
-import random
 import string
 from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.calendly.event import ScheduledEvent
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 
 def generate_calendly_uuid() -> str:
     """Generate a realistic Calendly UUID (16 uppercase alphanumeric)."""
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=16))
+    return "".join(_sim.rng().choices(string.ascii_uppercase + string.digits, k=16))
 
 
 def generate_calendly_uri(resource_type: str) -> str:

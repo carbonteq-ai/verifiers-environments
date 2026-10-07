@@ -3,23 +3,24 @@
 
 """Facebook Lead Ads state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_fb_ad_id() -> str:
     """Produce a Facebook-style numeric ad identifier."""
-    return "".join(random.choices(string.digits, k=15))
+    return "".join(_sim.rng().choices(string.digits, k=15))
 
 
 def generate_fb_report_id() -> str:
     """Produce a prefixed Facebook report identifier."""
     chars = string.ascii_uppercase + string.digits
-    return "rpt_" + "".join(random.choices(chars, k=24))
+    return "rpt_" + "".join(_sim.rng().choices(chars, k=24))
 
 
 class FacebookLeadAd(BaseModel):
@@ -44,7 +45,7 @@ class FacebookLeadAd(BaseModel):
         "APPLY_NOW", "DOWNLOAD", "GET_QUOTE", "LEARN_MORE", "SIGN_UP", "SUBSCRIBE"
     ] = "LEARN_MORE"
     platform: str = "fb"
-    created_time: datetime = Field(default_factory=datetime.now)
+    created_time: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""
@@ -78,7 +79,7 @@ class FacebookLead(BaseModel):
     email: str
     full_name: str
     phone: Optional[str] = None
-    created_time: datetime = Field(default_factory=datetime.now)
+    created_time: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""
@@ -111,7 +112,7 @@ class FacebookAdReport(BaseModel):
     average_cpc: str = "0.00"
     breakdowns: List[str] = Field(default_factory=list)
     fields: List[str] = Field(default_factory=list)
-    generated_at: datetime = Field(default_factory=datetime.now)
+    generated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""

@@ -1,0 +1,521 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-patent_monitoring-batch07-public-components",
+  "revision": "batch07-public-components-r1",
+  "public_request": "Review ss_patents/Filings for recent competitor filings relevant to product roadmap or competitor direction and send updates to product and legal.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "e7519353bb4d6788f9e222fc0c08844c931a15f39fc9f588d2ade008ac77400c"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "18964b04e2b50b61fd6b24773221356d5ae6fc3ed51206ca8c95c0d39c27d22e"
+    }
+  ],
+  "sources": {
+    "filings": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_patents",
+      "worksheet_id": "ws_filings",
+      "key_fields": [
+        "patent_title"
+      ],
+      "required_fields": [
+        "company",
+        "filing_date",
+        "notes",
+        "patent_title",
+        "relevance",
+        "technology_area"
+      ]
+    },
+    "emails": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_patents",
+      "worksheet_id": "ws_filings"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "patent-update",
+      "fields": {
+        "product_team": {
+          "value": "product-team@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "legal": {
+          "value": "legal@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "high": {
+          "value": "High",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "high-relevance-competitor-filing-reported",
+      "signal_id": "marketing.high_relevance_competitor_filing_reported",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "filings",
+      "source": "emails",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "relevance"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "High"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "not a direct competitor"
+              },
+              "mode": "words"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "withdrawn"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "company"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "patent_title"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "technology_area"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "join",
+                    "filings_sheet_read"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "matched"
+                }
+              }
+            ]
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "product-team@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "filings_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_patents"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_filings"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "high-relevance-competitor-filing-to-legal",
+      "signal_id": "marketing.high_relevance_competitor_filing_to_legal",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "filings",
+      "source": "emails",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "relevance"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "High"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "not a direct competitor"
+              },
+              "mode": "words"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "notes"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "withdrawn"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "company"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "patent_title"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "technology_area"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "join",
+                    "filings_sheet_read"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "matched"
+                }
+              }
+            ]
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "legal@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "filings_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_patents"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_filings"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

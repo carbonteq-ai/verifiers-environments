@@ -4,9 +4,9 @@
 """LinkedIn Ads conversion and report tools."""
 
 import json
-from datetime import datetime
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin_ads import LinkedInConversionEvent, LinkedInReport
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -88,7 +88,7 @@ def linkedin_ads_create_report(
     """
     report = LinkedInReport(
         account_id=account,
-        name=name or f"Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        name=name or f"Report_{_sim.now().strftime('%Y%m%d_%H%M%S')}",
         report_type=report_type,
     )
 

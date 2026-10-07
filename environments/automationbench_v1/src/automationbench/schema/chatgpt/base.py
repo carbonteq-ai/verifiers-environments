@@ -3,12 +3,12 @@
 
 """Shared base classes for the ChatGPT schema."""
 
-import random
 import string
-import time
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.chatgpt.assistant import Assistant
@@ -22,47 +22,47 @@ if TYPE_CHECKING:
 
 def generate_chatgpt_assistant_id() -> str:
     """Create a plausible OpenAI assistant identifier (asst_ prefix plus 24 alphanumeric chars)."""
-    return "asst_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "asst_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_thread_id() -> str:
     """Create a plausible OpenAI thread identifier (thread_ prefix plus 24 alphanumeric chars)."""
-    return "thread_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "thread_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_message_id() -> str:
     """Create a plausible OpenAI message identifier (msg_ prefix plus 24 alphanumeric chars)."""
-    return "msg_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "msg_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_run_id() -> str:
     """Create a plausible OpenAI run identifier (run_ prefix plus 24 alphanumeric chars)."""
-    return "run_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "run_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_file_id() -> str:
     """Create a plausible OpenAI file identifier (file- prefix plus 24 alphanumeric chars)."""
-    return "file-" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "file-" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_vector_store_id() -> str:
     """Create a plausible OpenAI vector store identifier (vs_ prefix plus 24 alphanumeric chars)."""
-    return "vs_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "vs_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_response_id() -> str:
     """Create a plausible OpenAI response identifier (resp_ prefix plus 24 alphanumeric chars)."""
-    return "resp_" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "resp_" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_chatgpt_image_id() -> str:
     """Create a plausible image generation identifier (img- prefix plus 24 alphanumeric chars)."""
-    return "img-" + "".join(random.choices(string.ascii_letters + string.digits, k=24))
+    return "img-" + "".join(_sim.rng().choices(string.ascii_letters + string.digits, k=24))
 
 
 def generate_unix_timestamp() -> int:
     """Return the current time as a Unix epoch integer."""
-    return int(time.time())
+    return int(_sim.time())
 
 
 class ChatGPTRecord(BaseModel):

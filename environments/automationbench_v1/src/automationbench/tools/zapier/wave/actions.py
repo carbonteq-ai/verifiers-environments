@@ -8,6 +8,7 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.wave import (
     WaveCustomer,
     WaveInvoice,
@@ -214,9 +215,7 @@ def wave_create_invoice(
         items=[item],
     )
     if not inv.invoice_date:
-        from datetime import datetime
-
-        inv.invoice_date = datetime.now().strftime("%Y-%m-%d")
+        inv.invoice_date = _sim.now().strftime("%Y-%m-%d")
 
     world.wave.invoices.append(inv)
     return json.dumps({"success": True, "invoice": inv.to_display_dict(), "id": inv.id})
@@ -489,9 +488,7 @@ def wave_record_sale(
         external_id=externalId,
     )
     if not sale.sale_date:
-        from datetime import datetime
-
-        sale.sale_date = datetime.now().strftime("%Y-%m-%d")
+        sale.sale_date = _sim.now().strftime("%Y-%m-%d")
 
     world.wave.sales.append(sale)
     return json.dumps({"success": True, "sale": sale.to_display_dict(), "id": sale.id})

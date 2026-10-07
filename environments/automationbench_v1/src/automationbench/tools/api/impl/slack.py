@@ -9,9 +9,9 @@ layer, receiving parameters without modification.
 """
 
 import json
-from datetime import datetime
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.slack import (
     Channel,
     Message,
@@ -19,7 +19,6 @@ from automationbench.schema.slack import (
     generate_slack_message_ts,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Conversations (channels)
@@ -409,7 +408,7 @@ def slack_chat_post_message(
         is_bot=True,
         bot_name=username or "Zapier",
         thread_ts=thread_ts,
-        created_at=datetime.now(),
+        created_at=_sim.now(),
     )
     world.slack.messages.append(msg)
 
@@ -484,7 +483,7 @@ def slack_chat_update(
                         break
 
     msg.text = effective_text
-    msg.edited_at = datetime.now()
+    msg.edited_at = _sim.now()
 
     return json.dumps(
         {"ok": True, "channel": resolved_channel, "ts": msg.ts, "text": effective_text}

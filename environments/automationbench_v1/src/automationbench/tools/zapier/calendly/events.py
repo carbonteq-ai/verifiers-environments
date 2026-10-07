@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.calendly import (
     Invitee,
     QuestionAnswer,
@@ -140,7 +141,7 @@ def calendly_book_meeting(
         location_kind=location_kind or et.location_kind,
         host_ids=[host_id] if host_id else ([et.owner_id] if et.owner_id else []),
         status="active",
-        created_at=datetime.now().isoformat(),
+        created_at=_sim.now().isoformat(),
     )
     world.calendly.scheduled_events.append(event)
 
@@ -172,7 +173,7 @@ def calendly_book_meeting(
         guests=guests,
         questions_and_answers=qa_list,
         status="active",
-        created_at=datetime.now().isoformat(),
+        created_at=_sim.now().isoformat(),
     )
     world.calendly.invitees.append(invitee)
 
@@ -223,7 +224,7 @@ def calendly_cancel_event(
     # Cancel the event
     event.status = "canceled"
     event.cancel_reason = reason
-    event.canceled_at = datetime.now().isoformat()
+    event.canceled_at = _sim.now().isoformat()
 
     # Cancel all invitees
     for invitee in world.calendly.get_invitees_for_event(event.id):
@@ -284,7 +285,7 @@ def calendly_mark_no_show(
         return json.dumps({"success": False, "error": "Invitee is already marked as no-show"})
 
     invitee.is_no_show = True
-    invitee.no_show_marked_at = datetime.now().isoformat()
+    invitee.no_show_marked_at = _sim.now().isoformat()
 
     return json.dumps(
         {
@@ -346,7 +347,7 @@ def calendly_cancel_scheduled_event(
     # Cancel the invitee's booking
     invitee.status = "canceled"
     invitee.cancel_reason = cancellation_reason
-    invitee.canceled_at = datetime.now().isoformat()
+    invitee.canceled_at = _sim.now().isoformat()
 
     # Find and potentially cancel the event if all invitees are canceled
     event = world.calendly.get_scheduled_event_by_id(invitee.event_id)

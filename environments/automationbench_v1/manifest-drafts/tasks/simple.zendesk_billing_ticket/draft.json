@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-zendesk_billing_ticket",
+  "revision": "batch22_v1",
+  "public_request": "A customer email arrived about an invoice issue. Please read the email and create a Zendesk support ticket for it.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "42039eadd901e6596ea3c3446c9d94dd37154a22ab8331256217c88d5dcd11b9"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "e9df01735399df7f14f304d2d213a392fe9cddf54ebcd2c0ce16b585df9c1aad"
+    }
+  ],
+  "sources": {
+    "inquiry": {
+      "adapter": "public.request@1",
+      "member_key": "zendesk_billing_ticket",
+      "fields": {
+        "message_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "thread_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "thread_id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "sender_email": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "from_"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "original_subject": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "subject"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        },
+        "email_body": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "body_plain"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages"
+            ]
+          ]
+        }
+      }
+    },
+    "reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "tickets_created": {
+      "adapter": "service.record_writes@1",
+      "service": "zendesk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "create"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "email-read-before-action",
+      "signal_id": "zendesk_billing_ticket.email_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "inquiry",
+      "source": "reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "zendesk_billing_ticket"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "body_plain"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "returned_fields"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "ticket-created-for-read-email",
+      "signal_id": "simple.zendesk_billing_ticket.ticket_for_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "inquiry",
+      "source": "tickets_created",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "zendesk_billing_ticket"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "original_subject"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim",
+            "value": {
+              "kind": "literal",
+              "value": "INV-2026-031"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_read",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

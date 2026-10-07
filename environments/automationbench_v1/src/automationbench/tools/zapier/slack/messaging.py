@@ -4,9 +4,9 @@
 """Slack messaging tools: send, edit, delete messages."""
 
 import json
-from datetime import datetime
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.slack import Channel, Message, generate_slack_message_ts
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -72,7 +72,7 @@ def slack_send_channel_message(
         is_bot=as_bot,
         bot_name=username or "Zapier" if as_bot else None,
         thread_ts=thread_ts,
-        created_at=datetime.now(),
+        created_at=_sim.now(),
     )
 
     world.slack.messages.append(msg)
@@ -159,7 +159,7 @@ def slack_send_direct_message(
         text=text,
         is_bot=as_bot,
         bot_name=username or "Zapier" if as_bot else None,
-        created_at=datetime.now(),
+        created_at=_sim.now(),
     )
 
     world.slack.messages.append(msg)
@@ -212,7 +212,7 @@ def slack_edit_message(
         return json.dumps({"success": False, "error": "Cannot edit a deleted message"})
 
     msg.text = text
-    msg.edited_at = datetime.now()
+    msg.edited_at = _sim.now()
 
     return json.dumps(
         {

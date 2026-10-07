@@ -20,9 +20,9 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .tool_mistakes import classify_tool_result, is_mistake
 
@@ -38,15 +38,56 @@ class AutomationBenchTurnRewardConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     tool_failure_penalty: float = Field(default=0.05, ge=0.0, le=1.0)
+    # Manifest step credit (manifest_step_credit.py); both None keeps version 2.
+    manifest_goal_share: float | None = Field(default=None, ge=0.0, le=1.0)
+    manifest_harm_penalty: float | None = Field(default=None, ge=0.0, le=1.0)
+    manifest_harm_cap: float = Field(default=0.3, ge=0.0, le=1.0)
+    # turn_reward: goal credit and harm debit are added to each turn's reward.
+    # group_relative: they are reported per turn as goal and harm components and kept out
+    # of turn_reward, so a trainer can weigh each goal against the group's attempts.
+    manifest_goal_channel: Literal["turn_reward", "group_relative"] = "turn_reward"
+    # Report, per turn, a state key (goals achieved so far, the world before the turn and the
+    # bucketed count of distinct successful reads) under turn evidence "turn_state_keys", so a
+    # trainer can compare turns from attempts that reached the same point by different routes.
+    anchor_state_keys: bool = False
+
+    @model_validator(mode="after")
+    def manifest_weights_together(self):
+        if (self.manifest_goal_share is None) != (self.manifest_harm_penalty is None):
+            raise ValueError("manifest_goal_share and manifest_harm_penalty are selected together")
+        if self.manifest_goal_channel != "turn_reward" and self.manifest_goal_share is None:
+            raise ValueError("manifest_goal_channel requires manifest weights")
+        if self.anchor_state_keys and self.manifest_goal_share is None:
+            raise ValueError("anchor_state_keys requires manifest weights")
+        return self
+
+    @property
+    def manifest_enabled(self) -> bool:
+        return self.manifest_goal_share is not None
 
     @property
     def scorer_digest(self) -> str:
-        identity = {
+        identity: dict[str, Any] = {
             "scorer": "automationbench-turn-progress",
             # 2: only mistakes are penalized; empty searches no longer are.
             "version": 2,
             "tool_failure_penalty": self.tool_failure_penalty,
         }
+        if self.manifest_enabled:
+            # 3: manifest goal credit and harm debit on the issuing step.
+            # 4: record goals count as required goals.
+            identity |= {
+                "version": 4,
+                "manifest_goal_share": self.manifest_goal_share,
+                "manifest_harm_penalty": self.manifest_harm_penalty,
+                "manifest_harm_cap": self.manifest_harm_cap,
+            }
+            if self.manifest_goal_channel != "turn_reward":
+                # 5: goal and harm credit as per-turn components, outside turn_reward.
+                identity |= {"version": 5, "manifest_goal_channel": self.manifest_goal_channel}
+            if self.anchor_state_keys:
+                # 6: per-turn state keys for anchor fallback.
+                identity |= {"version": 6, "anchor_state_keys": True}
         encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode()).hexdigest()
 

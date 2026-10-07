@@ -1,0 +1,9 @@
+# finance.dept_expense_rollup
+
+Status: **not qualified**. Expressed 2 checks, with 2 explicit gaps. Delivery and any listed exclusion guards do not verify task calculations, content, or other state changes.
+
+Luna replay: [{'check_id': 'recipient_0_delivered', 'candidate': ['public.request@1', '44bd55022d2e361bb3bb5dedd513ad4e59ecf11c7fc690d356da2d23f31af8c5', 'authored', 'finance.dept_expense_rollup-recipient-0'], 'status': 'valid', 'value': 1.0, 'reason': 'obligation_witnessed_required_effect'}, {'signal': 'finance_dept_expense_rollup.recipient_0', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_witnessed_required_effect'}, {'signal': 'finance_dept_expense_rollup.recipient_0.coverage', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_scope_closed'}, {'check_id': 'recipient_1_delivered', 'candidate': ['public.request@1', 'a631f015c0861c998d308560634310bbd6e5d7ef26ff7b48e142ab632e7ad0c2', 'authored', 'finance.dept_expense_rollup-recipient-1'], 'status': 'valid', 'value': 1.0, 'reason': 'obligation_witnessed_required_effect'}, {'signal': 'finance_dept_expense_rollup.recipient_1', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_witnessed_required_effect'}, {'signal': 'finance_dept_expense_rollup.recipient_1.coverage', 'status': 'valid', 'value': 1.0, 'reason': 'obligation_scope_closed'}]; errors=[]; rescore/reload=True/True; scalar/bytes unchanged=True/True.
+
+Simulator variants (correct, wrong route, missing ACK) were run through native scoring. Excluded-entity attack: None.
+
+Batch01 native-simulator audit (2026-10-05): real AutomationBench native-handler component variants are retained (genuine_simulator_correct, genuine_simulator_wrong_route_or_recipient, genuine_simulator_missing_ack, excluded_entity_attack). They are not whole-task qualification. Current draft SHA-256: `f044313b2131a3df128e54eddc3a175e349b6ca6836a1b715cab422e85824149`. See review.json for the underlying results and interpretation.

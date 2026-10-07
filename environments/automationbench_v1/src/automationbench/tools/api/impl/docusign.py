@@ -12,6 +12,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.docusign import (
     CarbonCopy,
     Envelope,
@@ -23,7 +24,6 @@ from automationbench.schema.docusign import (
     generate_docusign_id,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Resource serializers (Pydantic model -> API schema shape)
@@ -188,7 +188,7 @@ def docusign_envelopes_create(
         return json.dumps({"error": {"code": 404, "message": f"Template not found: {tmpl_id}"}})
 
     envelope_id = generate_docusign_id()
-    now = datetime.now(timezone.utc)
+    now = _sim.now(timezone.utc)
 
     docs = []
     if template:
@@ -393,7 +393,7 @@ def _signature_request_create(
         return json.dumps({"error": {"code": 404, "message": f"Template not found: {template_id}"}})
 
     envelope_id = generate_docusign_id()
-    now = datetime.now(timezone.utc)
+    now = _sim.now(timezone.utc)
 
     documents = [
         EnvelopeDocument(document_id=d.document_id, name=d.name, order=d.order)
@@ -555,7 +555,7 @@ def docusign_envelopes_update(
     if not envelope:
         return json.dumps({"error": {"code": 404, "message": f"Envelope not found: {envelopeId}"}})
 
-    now = datetime.now(timezone.utc)
+    now = _sim.now(timezone.utc)
 
     if status is None:
         # No status transition — only updating text fields
@@ -624,7 +624,7 @@ def docusign_envelopes_recipients_create(
     if not envelope:
         return json.dumps({"error": {"code": 404, "message": f"Envelope not found: {envelopeId}"}})
 
-    now = datetime.now(timezone.utc)
+    now = _sim.now(timezone.utc)
 
     if signers:
         for signer in signers:

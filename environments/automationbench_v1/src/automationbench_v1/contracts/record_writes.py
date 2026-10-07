@@ -1,0 +1,352 @@
+"""Acknowledged persisted record writes in any ID-keyed simulator collection.
+
+One adapter covers both simulator storage styles: typed collections such as
+``zoom.meetings`` or ``salesforce.tasks`` (lists of records with ``id``) and
+action-record services such as Airtable, Monday or Notion
+(``actions[<action_key>]`` lists of ``{id, action_key, params, created_at}``).
+
+Each acknowledged, serially qualified occurrence is diffed between its native
+BEFORE and AFTER snapshots for the declared collection, keyed by record ``id``.
+State is the authority, so writes through any tool (including ``api_fetch``)
+are observed; nothing is inferred from tool names or results. An occurrence
+whose static footprint excludes the service and leaves it unchanged is skipped.
+Scope closes only with a complete revision chain from 0, a matching
+acknowledgement inventory, public initial service state that reconciles with
+the first BEFORE snapshot, and a final service equal to the last AFTER.
+Creating then deleting a record inside one call leaves no persisted effect and
+is not reported.
+"""
+
+import hashlib
+import typing
+from collections import Counter
+from collections.abc import Mapping
+from typing import Any, Literal
+
+from pydantic import Field, model_validator
+
+from ..capture import canonical_json
+from ..effect_evidence import persisted_transitions
+from ..effect_index import EffectIndex
+from ..notification_evidence import operation
+from .base import FrozenModel, Identifier
+from .effects import EffectEvidence, EffectFact
+from .handler_scope import outside_service
+from .service_hydration import public_service_matches
+
+RecordKind = Literal["create", "update", "delete"]
+
+
+def _digest(value) -> str:
+    return hashlib.sha256(canonical_json(value).encode()).hexdigest()
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    return value
+
+
+def _list_model(annotation):
+    if typing.get_origin(annotation) in (list, typing.List):  # noqa: UP006
+        (item,) = typing.get_args(annotation) or (None,)
+        if isinstance(item, type) and hasattr(item, "model_fields"):
+            return item
+    return None
+
+
+def collection_shape(service: str, collection: tuple[str, ...], *, declared_identity: bool = False
+) -> Literal["list", "actions", "airtable_records"]:
+    """Validate a collection path against the installed simulator schema.
+
+    A list whose items have no ``id`` (Xero: ``contact_id``, ``invoice_id``...)
+    is accepted only with ``declared_identity`` (explicit ``identity_paths``).
+    """
+    from automationbench.schema.world import WorldState
+
+    if service not in WorldState.model_fields:
+        raise ValueError("record_writes_service_unknown")
+    model = WorldState.model_fields[service].annotation
+    fields = getattr(model, "model_fields", {})
+    if not collection or collection[0] not in fields:
+        raise ValueError("record_writes_collection_unknown")
+    if service == "airtable" and collection == ("bases", "tables", "records"):
+        if declared_identity:
+            raise ValueError("record_writes_airtable_identity_fixed")
+        return "airtable_records"
+    annotation = fields[collection[0]].annotation
+    item = _list_model(annotation)
+    if item is not None:
+        if len(collection) != 1 or "id" not in item.model_fields and not declared_identity:
+            raise ValueError("record_writes_collection_identity_unavailable")
+        return "list"
+    if typing.get_origin(annotation) in (dict, typing.Dict):  # noqa: UP006
+        _, value = typing.get_args(annotation)
+        item = _list_model(value)
+        keys = collection[1:]
+        if (collection[0] == "actions" and item is not None and "id" in item.model_fields
+                and keys and len(set(keys)) == len(keys)):
+            return "actions"
+    raise ValueError("record_writes_collection_unsupported")
+
+
+class RecordWriteSource(FrozenModel):
+    adapter: Literal["service.record_writes@1"] = "service.record_writes@1"
+    service: Identifier
+    # [<list field>], Airtable ["bases", "tables", "records"], or
+    # ["actions", <action_key>, ...]: several action keys form
+    # one inventory, so an equivalent write through a sibling action counts.
+    collection: tuple[Identifier, ...] = Field(min_length=1, max_length=9)
+    kind: RecordKind
+    # Composite identity for list collections whose ``id`` repeats across a
+    # parent (Mailchimp subscribers: [["list_id"], ["id"]]), or the single
+    # native key of a collection without ``id`` (Xero: [["contact_id"]]). The
+    # record id is then the canonical JSON list of these string fields,
+    # matching ``initial.records@1`` identities. Omitted when empty.
+    identity_paths: tuple[tuple[Identifier], ...] = Field(default=(), exclude_if=lambda value: not value)
+
+    @model_validator(mode="after")
+    def installed_collection(self):
+        shape = collection_shape(self.service, self.collection, declared_identity=bool(self.identity_paths))
+        if self.identity_paths:
+            from automationbench.schema.world import WorldState
+
+            fields = WorldState.model_fields[self.service].annotation.model_fields  # type: ignore[union-attr]
+            item = _list_model(fields[self.collection[0]].annotation)
+            # A single declared field is allowed only where the schema has no
+            # ``id`` (Xero ``contact_id``); composites need 2-4 fields.
+            least = 1 if item is not None and "id" not in item.model_fields else 2
+            if (shape != "list" or item is None or not least <= len(self.identity_paths) <= 4
+                    or len(set(self.identity_paths)) != len(self.identity_paths)
+                    or any(path[0] not in item.model_fields or item.model_fields[path[0]].annotation is not str
+                           for path in self.identity_paths)):
+                raise ValueError("record_writes_identity_paths_invalid")
+        return self
+
+
+def _collection(world, spec: RecordWriteSource):
+    service = world.get(spec.service)
+    if not isinstance(service, Mapping):
+        raise TypeError("record_writes_service_unavailable")
+    if spec.service == "airtable" and spec.collection == ("bases", "tables", "records"):
+        return _airtable_records(service)
+    value = service.get(spec.collection[0])
+    if len(spec.collection) > 1:
+        if not isinstance(value, Mapping):
+            raise TypeError("record_writes_actions_unavailable")
+        merged = []
+        for key in spec.collection[1:]:
+            items = value.get(key, [])
+            if not isinstance(items, (list, tuple)):
+                raise TypeError("record_writes_collection_unavailable")
+            merged.extend(items)
+        return merged
+    if not isinstance(value, (list, tuple)):
+        raise TypeError("record_writes_collection_unavailable")
+    return value
+
+
+def _airtable_records(service: Mapping) -> list[dict]:
+    """Flatten one fixed simulator layout; retain parent identity and actual fields.
+
+    No JSON query language is admitted. Duplicate parents are rejected even if
+    they happen to contain disjoint row IDs: the real handler may mutate multiple
+    matching parents. Parent display names are not row mutations or identities.
+    """
+    budget = 65_536
+
+    def children(parent, name):
+        nonlocal budget
+        value = parent.get(name)
+        if not isinstance(value, (list, tuple)):
+            raise TypeError("record_writes_airtable_collection_unavailable")
+        budget -= len(value)
+        if budget < 0:
+            raise ValueError("record_writes_airtable_inventory_budget_exceeded")
+        seen = set()
+        for item in value:
+            if not isinstance(item, Mapping) or type(item.get("id")) is not str or not item["id"]:
+                raise ValueError("record_writes_airtable_identity_unresolved")
+            if item["id"] in seen:
+                raise ValueError("record_writes_airtable_duplicate_identity")
+            seen.add(item["id"])
+        return value
+
+    flattened = []
+    for base in children(service, "bases"):
+        for table in children(base, "tables"):
+            for row in children(table, "records"):
+                if not isinstance(row.get("fields"), Mapping):
+                    raise TypeError("record_writes_airtable_fields_unavailable")
+                flattened.append({
+                    "id": canonical_json([base["id"], table["id"], row["id"]]),
+                    "base_id": base["id"], "table_id": table["id"],
+                    "record_id": row["id"], "fields": _plain(row["fields"]),
+                })
+    return flattened
+
+
+def _records(world, spec: RecordWriteSource) -> dict[str, tuple]:
+    records: dict[str, tuple] = {}
+    for record in _collection(world, spec):
+        if spec.identity_paths:
+            parts = [record.get(path[0]) if isinstance(record, Mapping) else None for path in spec.identity_paths]
+            if any(type(part) is not str or not part for part in parts):
+                raise ValueError("record_writes_identity_unresolved")
+            identity = canonical_json(parts)
+        else:
+            identity = record.get("id") if isinstance(record, Mapping) else None
+        if type(identity) not in {str, int} or identity == "":
+            raise ValueError("record_writes_identity_unresolved")
+        key = canonical_json(identity)
+        if key in records:
+            raise ValueError("record_writes_duplicate_identity")
+        records[key] = (identity, _plain(record))
+    return records
+
+
+def _values_text(record) -> str:
+    """Scalar leaf values, one per line, for content checks over agent-chosen fields."""
+    lines: list[str] = []
+
+    def walk(value):
+        if isinstance(value, Mapping):
+            for item in value.values():
+                walk(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                walk(item)
+        elif type(value) is str:
+            lines.append(value)
+        elif type(value) in {int, float}:
+            lines.append(str(value))
+
+    walk(record.get("params", record) if isinstance(record, Mapping) and "action_key" in record else record)
+    return "\n".join(lines)
+
+
+def _changes(before: dict, after: dict, kind: RecordKind):
+    if kind == "create":
+        return [(after[key][0], {"record": after[key][1], "values_text": _values_text(after[key][1])})
+                for key in after if key not in before]
+    if kind == "delete":
+        return [(before[key][0], {"before": before[key][1]}) for key in before if key not in after]
+    changed = []
+    for key, (identity, record) in after.items():
+        if key not in before:
+            continue
+        old = before[key][1]
+        if canonical_json(old) != canonical_json(record):
+            fields = sorted(
+                name for name in set(old) | set(record)
+                if canonical_json(old.get(name)) != canonical_json(record.get(name))
+            )
+            changed.append((identity, {"record": record, "before": old, "changed_fields": fields,
+                                       "added_items": _added_items(old, record),
+                                       "values_text": _values_text(record)}))
+    return changed
+
+
+def _added_items(before: dict, after: dict) -> dict:
+    """Per top-level list field (a list both before and after): the items present
+    after but not before, as a multiset in AFTER order (an appended message, a
+    new label). Fields that gained nothing map to an empty list."""
+    added = {}
+    for name, value in after.items():
+        old = before.get(name)
+        if not isinstance(value, list) or not isinstance(old, list):
+            continue
+        remaining = Counter(canonical_json(item) for item in old)
+        items = []
+        for item in value:
+            key = canonical_json(item)
+            if remaining[key]:
+                remaining[key] -= 1
+            else:
+                items.append(item)
+        added[name] = items
+    return added
+
+
+def capture_record_writes(source: Mapping, spec: RecordWriteSource) -> EffectEvidence:
+    """Keep qualified write witnesses even when wider inventory accounting fails."""
+    spec = RecordWriteSource.model_validate(spec.model_dump(mode="python", warnings=False))
+    source_id, selector_id = _digest(source), _digest(spec.model_dump(mode="json"))
+    facts: list[EffectFact] = []
+    reasons: list[str] = []
+
+    def result():
+        return EffectEvidence(source_id, selector_id, tuple(facts), not reasons,
+                              reasons[0] if reasons else "reconciled_record_write_inventory")
+
+    try:
+        if any(not isinstance(source.get(field), (list, tuple))
+               for field in ("tool_execution_events", "state_write_receipts")):
+            raise ValueError("record_writes_execution_inventory_missing")
+        index = EffectIndex(persisted_transitions(dict(source)))
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        reasons.append(str(error))
+        return result()
+    for occurrence in index.occurrences:
+        try:
+            if (occurrence.origin != "tool_server" or occurrence.action is None
+                    or occurrence.before_json is None or occurrence.after_json is None):
+                raise ValueError("record_writes_capture_unavailable")
+            before_world, after_world = index.world(occurrence.before_json), index.world(occurrence.after_json)
+            name, _ = operation(occurrence.action)
+            if outside_service(name, spec.service, before_world, after_world):
+                continue
+            before, after = _records(before_world, spec), _records(after_world, spec)
+            changes = _changes(before, after, spec.kind)
+            if canonical_json(sorted(before.items())) == canonical_json(sorted(after.items())):
+                continue
+            if (occurrence.evidence_status != "acknowledged"
+                    or EffectIndex((occurrence,)).serial_chain().status != "qualified"):
+                raise ValueError("record_writes_ack_or_revision_unavailable")
+            if occurrence.action.status != "returned" or occurrence.action.error_json is not None:
+                raise ValueError("record_writes_failed_call_changed_state")
+            for identity, params in changes:
+                facts.append(EffectFact(
+                    _digest([spec.service, *spec.collection, identity]), occurrence.invocation_id, "tool_server",
+                    spec.kind, canonical_json({**params, "record_id": identity, "operation": name}),
+                    "qualified", "acknowledged_persisted_record_write",
+                    occurrence.expected_revision, occurrence.applied_revision,
+                ))
+        except (ValueError, TypeError, KeyError, AttributeError) as error:
+            reasons.append(str(error))
+            facts.append(EffectFact(None, occurrence.invocation_id, "tool_server", spec.kind, None,
+                                    "unavailable", str(error), occurrence.expected_revision,
+                                    occurrence.applied_revision))
+    try:
+        task = source["task_evidence"]
+        initial, final = task["initial"], task["final"]
+        if task.get("complete") is not True:
+            raise ValueError("record_writes_task_finalization_unavailable")
+        if spec.service == "airtable" and spec.collection == ("bases", "tables", "records"):
+            _records(final, spec)
+        expected = {item.invocation_id for item in index.occurrences if item.origin == "tool_server"}
+        writes = source["state_write_receipts"]
+        if len(writes) != len(expected) or {item["write_id"] for item in writes} != expected:
+            raise ValueError("record_writes_ack_inventory_mismatch")
+        if not index.occurrences:
+            observed_final = final.get(spec.service) if isinstance(final, Mapping) else None
+            if not public_service_matches(initial, spec.service, observed_final):
+                raise ValueError("record_writes_unobserved_scope_change")
+        else:
+            chain = index.serial_chain()
+            if chain.status != "qualified" or chain.revision_interval is None or chain.revision_interval[0] != 0:
+                raise ValueError("record_writes_complete_revision_chain_unavailable")
+            first, last = chain.ordered[0], chain.ordered[-1]
+            if first.before_json is None or last.after_json is None:
+                raise ValueError("record_writes_boundary_capture_unavailable")
+            # The final service must be the last AFTER snapshot for the declared
+            # collection; unrelated generated fields elsewhere are not compared.
+            if (not public_service_matches(initial, spec.service, index.world(first.before_json).get(spec.service))
+                    or canonical_json(_plain(_collection(final, spec)))
+                    != canonical_json(_plain(_collection(index.world(last.after_json), spec)))):
+                raise ValueError("record_writes_initial_terminal_scope_mismatch")
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        reasons.append(str(error))
+    return result()

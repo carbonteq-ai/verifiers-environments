@@ -1,0 +1,11 @@
+# simple.gmail_meeting_confirm — batch16 review
+
+Checks exact recipient/subject, date and clock time plus their same-line occurrence. Confirmation meaning itself remains out of scope.
+
+**Source and outcome.** Original recorded reward: `[{'name': 'partial_credit', 'score': 1.0, 'weight': 1.0}]`; episode `e347f139e4134af9655792f332e3fd7704ff77f8f0634f369e2072e265896202` remains at SHA-256 `23309cd61e0f8439c2e6270e75285091230512577eec21e086d3f71140948bb5`. The full public prompt and initial snapshot match the retained episode and pack. Current draft SHA-256: `1a86268aeaaa072606aa97dbd1ed39b4723d8a23168c9b92a509de3f03983611`; public source-context SHA-256: `c456894acb00f85aa7ec88afbec343a93064bb44cbf20e676fa189e97cc4a6c0`. The retained native replay, serialized archive and reload/rescore preserve `partial_credit=1.0`; checks are outcome-only and no action credit or qualification is granted.
+
+**Declared coverage.** Expressed checks: `requested_subject_delivered`, `meeting_date_included`, `meeting_time_included`, `meeting_datetime_pair`, `wrong_recipient`. Coverage is partial where semantic or source-capture gaps are listed in `review.json`.
+
+**Validation.** Native schema admission passed. Retained episode score, candidate findings and reload/rescore were recorded at [`/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_meeting_confirm.json`](/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_meeting_confirm.json); archive SHA-256 `dd67ae55154e096b1bbf5ae8a44776283b38a2e7a7d36bc327660cd8f0546413`. Four genuine-handler controls (positive, omission, missing ACK and wrong entity) include actual reward maps, raw dispatch/return receipts, ACK materials and full task context under `/tmp/automationbench-luna-simple-batch16-20261005/controls`; scored wire episodes are separately saved under `/tmp/automationbench-luna-simple-batch16-20261005/controls/scored_archives` with per-archive SHA-256 values in `review.json`. All control/reload findings and reward maps matched; source inventory was stable (`59a23c931845d6021e6253315a79ff779ce8215f3635264546b3b6dcd4d425b9`).
+
+**Known limits.** No action credit, training eligibility or whole-task qualification. The message must confirm the request; whether its wording communicates confirmation/acceptance is a semantic language requirement.

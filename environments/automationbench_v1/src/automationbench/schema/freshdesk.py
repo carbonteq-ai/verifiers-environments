@@ -3,17 +3,18 @@
 
 """Freshdesk support state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_freshdesk_id() -> str:
     """Produce a Freshdesk-style numeric object identifier."""
-    return "".join(random.choices(string.digits, k=10))
+    return "".join(_sim.rng().choices(string.digits, k=10))
 
 
 class FreshdeskNote(BaseModel):
@@ -24,7 +25,7 @@ class FreshdeskNote(BaseModel):
     id: str = Field(default_factory=generate_freshdesk_id)
     body: str
     private: bool = True
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
 
 class FreshdeskTicket(BaseModel):
@@ -47,8 +48,8 @@ class FreshdeskTicket(BaseModel):
     tags: List[str] = Field(default_factory=list)
     notes: List[FreshdeskNote] = Field(default_factory=list)
     source: int = 2  # 1=Email, 2=Portal, 3=Phone, etc.
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""
@@ -96,8 +97,8 @@ class FreshdeskContact(BaseModel):
     job_title: Optional[str] = None
     description: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""
@@ -127,8 +128,8 @@ class FreshdeskCompany(BaseModel):
     domain: Optional[str] = None
     domains: List[str] = Field(default_factory=list)
     note: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""

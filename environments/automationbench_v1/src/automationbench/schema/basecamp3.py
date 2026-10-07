@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List
-from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from automationbench import sim_runtime as _sim
 
 
 class Basecamp3ActionRecord(BaseModel):
@@ -17,10 +18,10 @@ class Basecamp3ActionRecord(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(default_factory=lambda: f"basecamp3_{uuid4().hex}")
+    id: str = Field(default_factory=lambda: f"basecamp3_{_sim.uuid4().hex}")
     action_key: str
     params: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
 
     def to_result_dict(self) -> Dict[str, Any]:
         return {"id": self.id, **self.params}

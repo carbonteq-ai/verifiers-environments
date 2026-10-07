@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_ads import OfflineConversion, Report
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -46,7 +47,7 @@ def google_ads_send_offline_conversion(
     try:
         conversion_time = datetime.fromisoformat(time.replace("Z", "+00:00"))
     except ValueError:
-        conversion_time = datetime.now()
+        conversion_time = _sim.now()
 
     conversion = OfflineConversion(
         account_id=mainAccountId,
@@ -131,7 +132,7 @@ def google_ads_create_report(
     """
     report = Report(
         account_id=mainAccountId,
-        name=name or f"Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        name=name or f"Report_{_sim.now().strftime('%Y%m%d_%H%M%S')}",
         report_type=report_type,
         date_range=date_range,
     )

@@ -9,9 +9,9 @@ routing layer, receiving parameters without modification.
 """
 
 import json
-from datetime import datetime
 from typing import Literal, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.hubspot import (
     HubSpotCompany,
     HubSpotContact,
@@ -20,7 +20,6 @@ from automationbench.schema.hubspot import (
     HubSpotTicket,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Contacts
@@ -261,7 +260,7 @@ def hubspot_contact_update(world: WorldState, contact_id: str, body: dict, **kwa
         else:
             contact.properties[key] = str(value)
 
-    contact.updated_at = datetime.now()
+    contact.updated_at = _sim.now()
     return json.dumps(contact.to_display_dict())
 
 
@@ -444,7 +443,7 @@ def hubspot_deal_update(world: WorldState, deal_id: str, body: dict, **kwargs) -
         else:
             deal.properties[key] = str(value)
 
-    deal.updated_at = datetime.now()
+    deal.updated_at = _sim.now()
     return json.dumps(deal.to_display_dict())
 
 
@@ -456,7 +455,7 @@ def hubspot_deal_add_contact(world: WorldState, deal_id: str, contact_id: str, *
 
     if contact_id not in deal.associated_contact_ids:
         deal.associated_contact_ids.append(contact_id)
-    deal.updated_at = datetime.now()
+    deal.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -582,7 +581,7 @@ def hubspot_ticket_update(world: WorldState, ticket_id: str, body: dict, **kwarg
         else:
             ticket.properties[key] = str(value)
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
     return json.dumps(ticket.to_display_dict())
 
 

@@ -3,10 +3,11 @@
 
 """Base classes for the Google Calendar schema."""
 
-import uuid
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.google_calendar.calendar import Calendar
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
 
 def generate_google_calendar_id() -> str:
     """Produce a Google Calendar-style record identifier."""
-    return uuid.uuid4().hex
+    return _sim.uuid4().hex
 
 
 class GoogleCalendarRecord(BaseModel):

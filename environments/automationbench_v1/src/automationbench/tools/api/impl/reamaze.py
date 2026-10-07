@@ -9,16 +9,15 @@ without modification.
 """
 
 import json
-from datetime import datetime
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.reamaze import (
     ReamazeContact,
     ReamazeConversation,
     ReamazeMessage,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Conversations
@@ -217,7 +216,7 @@ def reamaze_conversations_update(
     # hold_until and data fields are acknowledged but not persisted on the model
     # (silently dropped per API contract)
 
-    convo.updated_at = datetime.now()
+    convo.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -269,7 +268,7 @@ def reamaze_conversations_add_message(
         author_name=author_name,
     )
     conversation.messages.append(message_obj)
-    conversation.updated_at = datetime.now()
+    conversation.updated_at = _sim.now()
 
     return json.dumps(
         {

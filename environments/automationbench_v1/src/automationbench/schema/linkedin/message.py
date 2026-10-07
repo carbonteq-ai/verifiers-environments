@@ -3,11 +3,12 @@
 
 """LinkedIn message schema model."""
 
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Optional
 
 from pydantic import Field
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin.base import LinkedInRecord, generate_linkedin_urn
 
 
@@ -18,7 +19,7 @@ class Message(LinkedInRecord):
     sender_profile_id: str
     recipient_profile_id: str
     text: str
-    sent_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    sent_at: str = Field(default_factory=lambda: _sim.now(timezone.utc).isoformat())
     subject: Optional[str] = None
 
     def to_display_dict(self) -> dict:

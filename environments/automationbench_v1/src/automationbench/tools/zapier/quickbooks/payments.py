@@ -8,15 +8,16 @@ import re
 from decimal import Decimal
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.quickbooks import QBPayment
 from automationbench.schema.world import WorldState
+from automationbench.tools.zapier.types import register_metadata
 from automationbench.tools.zapier.where_clause import (
     WhereClauseError,
     as_number,
     evaluate_where,
     parse_where,
 )
-from automationbench.tools.zapier.types import register_metadata
 
 API = "QuickBooksV3CLIAPI@3.4.1"
 
@@ -61,9 +62,7 @@ def quickbooks_create_payment(
         note=note,
     )
     if not payment.txn_date:
-        from datetime import datetime
-
-        payment.txn_date = datetime.now().strftime("%Y-%m-%d")
+        payment.txn_date = _sim.now().strftime("%Y-%m-%d")
 
     world.quickbooks.payments.append(payment)
     return json.dumps({"success": True, "payment": payment.to_display_dict(), "Id": payment.id})
@@ -162,9 +161,7 @@ def quickbooks_create_bill_payment(
         note=note,
     )
     if not payment.txn_date:
-        from datetime import datetime
-
-        payment.txn_date = datetime.now().strftime("%Y-%m-%d")
+        payment.txn_date = _sim.now().strftime("%Y-%m-%d")
 
     world.quickbooks.payments.append(payment)
     return json.dumps(

@@ -3,17 +3,18 @@
 
 """Re:amaze support platform state definitions used by AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_reamaze_id() -> str:
     """Produce a numeric ID string in the format used by Re:amaze objects."""
-    return "".join(random.choices(string.digits, k=10))
+    return "".join(_sim.rng().choices(string.digits, k=10))
 
 
 class ReamazeMessage(BaseModel):
@@ -27,7 +28,7 @@ class ReamazeMessage(BaseModel):
     author_email: Optional[str] = None
     author_name: Optional[str] = None
     visibility: Literal["regular", "internal"] = "regular"
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""
@@ -57,8 +58,8 @@ class ReamazeConversation(BaseModel):
     assignee_email: Optional[str] = None
     messages: List[ReamazeMessage] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""
@@ -90,8 +91,8 @@ class ReamazeContact(BaseModel):
     phone: Optional[str] = None
     notes: Optional[str] = None
     external_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""

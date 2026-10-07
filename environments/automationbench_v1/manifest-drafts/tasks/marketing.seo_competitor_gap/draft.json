@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-seo_competitor_gap-batch04-public-components",
+  "revision": "batch04_public_components_r1",
+  "public_request": "Look at our keyword rankings (ss_rankings / ws_data) and identify gaps in our competitive positioning. Queue up high-potential opportunities in ss_backlog / ws_queue and post to #seo-team. There may be relevant context from the team. Include the names of affected entities and the relevant amounts in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "4bfbebd802116bdb3c1d51b5d3be248a903b727a0d4e7a6d6c91a2ca2efe8672"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "52b65ca4e5585723b97c2344338589694b77c4e020391385383e7b7b7f5b6630"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "messages"
+      ],
+      "canonical_sha256": "ae47cf413b87bbf7b573e2be13506ecb8ef8d20dc84202016e822f8a14e3e935"
+    }
+  ],
+  "sources": {
+    "rankings": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_rankings",
+      "worksheet_id": "ws_data",
+      "key_fields": [
+        "keyword"
+      ],
+      "required_fields": [
+        "our_position",
+        "competitor_a_position",
+        "competitor_b_position",
+        "volume",
+        "notes"
+      ]
+    },
+    "queue": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_backlog",
+      "worksheet_id": "ws_queue"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "unranked-high-volume-opportunity-queued",
+      "signal_id": "marketing.unranked_high_volume_opportunity_queued",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "population": "rankings",
+      "source": "queue",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "keyword"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales pipeline management"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "keyword"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "keyword"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "volume"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "volume"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "opportunity-posted",
+      "signal_id": "marketing.opportunity_posted",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "population": "rankings",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "keyword"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales pipeline management"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ch_seo"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "keyword"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "volume"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount_reformatted",
+            "format": "decimal_string"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "stale-keyword-excluded",
+      "signal_id": "marketing.stale_keyword_excluded",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "match_cardinality": "per_candidate",
+      "population": "rankings",
+      "source": "queue",
+      "prohibited_when": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "request",
+            "notes"
+          ],
+          "domain": "string"
+        },
+        "value": {
+          "kind": "literal",
+          "value": "pending refresh"
+        },
+        "mode": "words"
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "keyword"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "keyword"
+          ],
+          "domain": "string"
+        }
+      }
+    }
+  ]
+}

@@ -4,9 +4,9 @@
 """LinkedIn post tools: create personal and company posts."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import Post, PostContent, generate_linkedin_post_id
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -57,7 +57,7 @@ def linkedin_create_share(
         text=comment,
         content=content,
         visibility=visibility__code,
-        created_at=datetime.now().isoformat(),
+        created_at=_sim.now().isoformat(),
     )
 
     world.linkedin.posts.append(post)
@@ -140,7 +140,7 @@ def linkedin_create_company_update(
         text=comment,
         content=content,
         visibility="anyone",  # Company posts are always public
-        created_at=datetime.now().isoformat(),
+        created_at=_sim.now().isoformat(),
     )
 
     world.linkedin.posts.append(post)

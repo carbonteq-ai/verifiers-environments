@@ -5,7 +5,7 @@
 
 from typing import Optional
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from automationbench.schema.linkedin.base import (
     LinkedInRecord,
@@ -22,7 +22,7 @@ class Company(LinkedInRecord):
     website: Optional[str] = None
     industry: Optional[str] = None
     company_size: Optional[str] = Field(
-        default=None, validation_alias="employee_count_range"
+        default=None, validation_alias=AliasChoices("company_size", "employee_count_range")
     )  # e.g., "1001-5000 employees"
     headquarters: Optional[str] = None
     founded_year: Optional[int] = None

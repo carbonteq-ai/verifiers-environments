@@ -1,0 +1,329 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple.gcal_partnership_call_from_email.components",
+  "revision": "simple15_20261005_public_r1",
+  "public_request": "Check my inbox for an email about scheduling a partnership call. Then create a calendar event based on the requested time and details.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "08e9c4ad49394ff0a44f53354d8683efc430ce9eb2b7b9caff7e146807950177"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "a83cee29ff7ef479f4e328b8864c82ffc220ca989de2a33054e1081990272410"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "requested_event",
+      "fields": {
+        "message_id": {
+          "value": "msg_4208",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "title": {
+          "value": "partnership call",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "start": {
+          "value": "2026-03-05T16:00:00Z",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "attendee_0": {
+          "value": "maria@cloudnova.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "attendee_sender": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "from_"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "from_"
+            ]
+          ]
+        }
+      }
+    },
+    "calendar_creates": {
+      "adapter": "service.record_writes@1",
+      "service": "google_calendar",
+      "collection": [
+        "events"
+      ],
+      "kind": "create"
+    },
+    "email_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "meeting_email_read",
+      "signal_id": "meeting_email_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "email_reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "requested_event"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "native_record_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "message_id"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "requested_meeting_event_after_email_read",
+      "signal_id": "requested_meeting_event_after_email_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "calendar_creates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "requested_event"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "iso_instant",
+                "path": [
+                  "effect",
+                  "record",
+                  "start__dateTime"
+                ]
+              }
+            },
+            "right": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "iso_instant",
+                "path": [
+                  "request",
+                  "start"
+                ]
+              }
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "attendee_0"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "attendees"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "meeting_email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "summary"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Partnership"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "summary"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Call"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "attendee_sender"
+              ]
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "attendees"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "meeting_email",
+          "source": "email_reads",
+          "timing": "before",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

@@ -4,10 +4,10 @@
 """QuickBooks invoice tools."""
 
 import json
-from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.quickbooks import QBInvoice, QBLineItem
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -64,7 +64,7 @@ def quickbooks_create_invoice(
     if qty and amount:
         line.unit_price = amount / qty
 
-    today = txn_date or datetime.now().strftime("%Y-%m-%d")
+    today = txn_date or _sim.now().strftime("%Y-%m-%d")
     kwargs = {}
     if number:
         kwargs["doc_number"] = number

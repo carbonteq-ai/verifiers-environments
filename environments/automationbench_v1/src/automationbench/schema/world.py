@@ -7,54 +7,55 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+from automationbench.schema.airtable import AirtableState
+from automationbench.schema.asana import AsanaState
+from automationbench.schema.bamboohr import BambooHRState
+from automationbench.schema.basecamp3 import Basecamp3State
 from automationbench.schema.buffer import BufferState
 from automationbench.schema.calendly import CalendlyState
 from automationbench.schema.canva import CanvaState
 from automationbench.schema.chatgpt import ChatGPTState
+from automationbench.schema.confluence import ConfluenceState
 from automationbench.schema.docusign import DocuSignState
 from automationbench.schema.facebook_conversions import FacebookConversionsState
 from automationbench.schema.facebook_lead_ads import FacebookLeadAdsState
 from automationbench.schema.facebook_pages import FacebookPagesState
+from automationbench.schema.freshdesk import FreshdeskState
 from automationbench.schema.gmail import GmailState
 from automationbench.schema.google_ads import GoogleAdsState
 from automationbench.schema.google_calendar import GoogleCalendarState
+from automationbench.schema.google_drive import GoogleDriveState
 from automationbench.schema.google_sheets import GoogleSheetsState
+from automationbench.schema.gorgias import GorgiasState
+from automationbench.schema.helpcrunch import HelpCrunchState
+from automationbench.schema.helpscout import HelpScoutState
+from automationbench.schema.hiver import HiverState
 from automationbench.schema.hubspot import HubSpotState
 from automationbench.schema.instagram import InstagramState
+from automationbench.schema.intercom import IntercomState
+from automationbench.schema.jira import JiraState
 from automationbench.schema.linkedin import LinkedInState
 from automationbench.schema.linkedin_ads import LinkedInAdsState
 from automationbench.schema.linkedin_conversions import LinkedInConversionsState
-from automationbench.schema.mailchimp import MailchimpState
-from automationbench.schema.salesforce import SalesforceState
-from automationbench.schema.slack import SlackState
-from automationbench.schema.twilio import TwilioState
-from automationbench.schema.twitter import TwitterState
-from automationbench.schema.zoom import ZoomState
-from automationbench.schema.airtable import AirtableState
-from automationbench.schema.asana import AsanaState
-from automationbench.schema.basecamp3 import Basecamp3State
-from automationbench.schema.confluence import ConfluenceState
-from automationbench.schema.google_drive import GoogleDriveState
-from automationbench.schema.jira import JiraState
 from automationbench.schema.linkedin_leadgen_forms import LinkedInLeadGenFormsState
+from automationbench.schema.mailchimp import MailchimpState
 from automationbench.schema.monday import MondayState
 from automationbench.schema.notion import NotionState
 from automationbench.schema.pipefy import PipefyState
-from automationbench.schema.trello import TrelloState
-from automationbench.schema.zendesk import ZendeskState
-from automationbench.schema.freshdesk import FreshdeskState
-from automationbench.schema.helpscout import HelpScoutState
-from automationbench.schema.gorgias import GorgiasState
-from automationbench.schema.intercom import IntercomState
-from automationbench.schema.reamaze import ReamazeState
-from automationbench.schema.zoho_desk import ZohoDeskState
-from automationbench.schema.hiver import HiverState
-from automationbench.schema.helpcrunch import HelpCrunchState
-from automationbench.schema.bamboohr import BambooHRState
-from automationbench.schema.recruitee import RecruiteeState
 from automationbench.schema.quickbooks import QuickBooksState
-from automationbench.schema.xero import XeroState
+from automationbench.schema.reamaze import ReamazeState
+from automationbench.schema.recruitee import RecruiteeState
+from automationbench.schema.salesforce import SalesforceState
+from automationbench.schema.slack import SlackState
+from automationbench.schema.trello import TrelloState
+from automationbench.schema.twilio import TwilioState
+from automationbench.schema.twitter import TwitterState
 from automationbench.schema.wave import WaveState
+from automationbench.schema.xero import XeroState
+from automationbench.schema.zendesk import ZendeskState
+from automationbench.schema.zoho_desk import ZohoDeskState
+from automationbench.schema.zoom import ZoomState
 
 
 class WorldMeta(BaseModel):
@@ -63,7 +64,7 @@ class WorldMeta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = "0.1.0"
-    current_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    current_time: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
     no_same_sender_noise: bool = False
     # Services this task's world is "subscribed" to (seeded or asserted). When set,
     # api_fetch rejects calls to other services with a credentials error instead of

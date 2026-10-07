@@ -1,0 +1,414 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-landing_page_conversion-batch07-public-components",
+  "revision": "batch07-public-components-r1",
+  "public_request": "Analyze ss_lp/ws_data using the last-month framework and send only to web-team@company.example.com.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "d6a54240d44f89c28d59eeffc5eec12d7359e42bdd5e8727434efd678440ca5e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "c652bc092f6afc4b00a0047de25e01aaa047a83e3d5c81e879569b1a18967ccc"
+    }
+  ],
+  "sources": {
+    "pages": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_lp",
+      "worksheet_id": "ws_data",
+      "key_fields": [
+        "url"
+      ],
+      "required_fields": [
+        "conversion_rate",
+        "conversions",
+        "notes",
+        "page_name",
+        "url",
+        "visits"
+      ]
+    },
+    "emails": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "policy": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "from": [
+          "from_"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "body": [
+          "body_plain"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "from",
+        "subject",
+        "body"
+      ],
+      "identity_paths": [
+        [
+          "id"
+        ]
+      ]
+    },
+    "policy_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_lp",
+      "worksheet_id": "ws_data"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "landing-page-framework",
+      "fields": {
+        "recipient": {
+          "value": "web-team@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "high_traffic_floor": {
+          "value": "2000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "cvr_threshold": {
+          "value": "3%",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "high-traffic-page-reported",
+      "signal_id": "marketing.high_traffic_landing_page_reported",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "population": "pages",
+      "source": "emails",
+      "required_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "lt",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "percent_points_string",
+                    "path": [
+                      "request",
+                      "conversion_rate"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 3
+                }
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "visits"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 2000
+                }
+              }
+            ]
+          },
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "notes"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "tracking pixel was broken"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "gt",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "visits"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 2000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "web-team@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "page_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "visits"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "decimal_string"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "conversions"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "decimal_string"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "page_sheet_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "last_report_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "page_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_lp"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_data"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "last_report_read",
+          "source": "policy_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_lp_hist"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

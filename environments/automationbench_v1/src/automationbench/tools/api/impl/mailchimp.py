@@ -9,9 +9,9 @@ params without modification.
 """
 
 import json
-from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.mailchimp import (
     MailchimpAudience,
     MailchimpCampaign,
@@ -20,7 +20,6 @@ from automationbench.schema.mailchimp import (
     generate_member_id,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Members (subscribers)
@@ -76,7 +75,7 @@ def mailchimp_members_create(
         if tag_names:
             existing.tags.update(tag_names)
         existing.vip = vip
-        existing.updated_at = datetime.now()
+        existing.updated_at = _sim.now()
         subscriber = existing
     else:
         subscriber = MailchimpSubscriber(
@@ -180,7 +179,7 @@ def mailchimp_members_update(
         subscriber.merge_fields.update(merge_fields)
     if vip is not None:
         subscriber.vip = vip
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps(subscriber.to_display_dict())
 
@@ -202,7 +201,7 @@ def mailchimp_members_delete(
         )
 
     subscriber.status = "archived"
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps({})
 
@@ -226,13 +225,13 @@ def mailchimp_members_tags(
             continue
         if status == "active":
             subscriber.tags.add(tag_name)
-            subscriber.updated_at = datetime.now()
+            subscriber.updated_at = _sim.now()
             results.append(
                 {"success": True, "email": subscriber_hash, "tag_name": tag_name, "added": True}
             )
         else:
             subscriber.tags.discard(tag_name)
-            subscriber.updated_at = datetime.now()
+            subscriber.updated_at = _sim.now()
             results.append(
                 {"success": True, "email": subscriber_hash, "tag_name": tag_name, "removed": True}
             )
@@ -259,7 +258,7 @@ def mailchimp_members_notes_create(
 
     note_id = len(subscriber.notes) + 1
     subscriber.notes.append(note)
-    subscriber.updated_at = datetime.now()
+    subscriber.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -345,7 +344,7 @@ def mailchimp_campaigns_send(world: WorldState, campaign_id: str, **kwargs) -> s
         )
 
     campaign.status = "sent"
-    campaign.send_time = datetime.now()
+    campaign.send_time = _sim.now()
 
     subscribers = [
         s

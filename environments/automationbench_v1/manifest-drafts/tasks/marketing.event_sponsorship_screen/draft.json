@@ -1,0 +1,950 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-event_sponsorship_screen-batch09-public-only",
+  "revision": "batch09-public-components-r1",
+  "public_request": "Screen Q1 sponsorships in ss_sponsor/ws_events, update each Status under final policy, and report approved spend to Finance.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "31502ddef0da661b51bfd17d3174e12cb0cfe00218025a0e0583d12496e2c758"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "cabdb9c105e19e8c255df03404b064a2844998c8c572ec96600a75973b4d7535"
+    }
+  ],
+  "sources": {
+    "events": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_sponsor",
+      "worksheet_id": "ws_events",
+      "key_fields": [
+        "Row_ID"
+      ],
+      "required_fields": [
+        "Audience_Fit",
+        "Cost",
+        "Event",
+        "Notes",
+        "Region",
+        "Row_ID",
+        "Status",
+        "Tier",
+        "linkedin_verified"
+      ]
+    },
+    "updates": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "ss_sponsor",
+      "worksheet_id": "ws_events"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_sponsor",
+      "worksheet_id": "ws_events"
+    },
+    "mail_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "public-task",
+      "fields": {
+        "tracking": {
+          "value": "SPON-558-Q1",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              4,
+              "body_plain"
+            ]
+          ]
+        },
+        "approval_cap": {
+          "value": "15000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              4,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "approve-only-policy-cleared-event",
+      "signal_id": "marketing.sponsor.approved_status",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "events",
+      "source": "updates",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "lte",
+                    "left": {
+                      "kind": "derived",
+                      "expression": {
+                        "kind": "input",
+                        "format": "decimal_string",
+                        "path": [
+                          "request",
+                          "Cost"
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "derived",
+                      "expression": {
+                        "kind": "input",
+                        "format": "decimal_string",
+                        "path": [
+                          "policy",
+                          "approval_cap"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Audience_Fit"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "High"
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Notes"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "pre-approved"
+                },
+                "mode": "words"
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "hold"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "pending review"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "partnership_hold"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "brand_conflict_hold"
+                  },
+                  "mode": "verbatim"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "blacklisted"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "compliance_check_required"
+                  },
+                  "mode": "verbatim"
+                }
+              ]
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "in",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Tier"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": [
+                      "Platinum",
+                      "Gold"
+                    ]
+                  }
+                },
+                {
+                  "op": "ne",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "linkedin_verified"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "True"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "row_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Row_ID"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Approved"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "pipeline_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "final_policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "pipeline_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_sponsor"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_events"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "final_policy_read",
+          "source": "mail_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_spon_policy_q1_final"
+            }
+          }
+        }
+      ],
+      "request_aliases": [
+        {
+          "alias": "policy",
+          "source": "request"
+        }
+      ]
+    },
+    {
+      "check_id": "hold-policy-events",
+      "signal_id": "marketing.sponsor.hold_status",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "events",
+      "source": "updates",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Notes"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "hold"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Notes"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "pending review"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Notes"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "compliance_check_required"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "row_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Row_ID"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Hold"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "pipeline_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "final_policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "pipeline_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_sponsor"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_events"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "final_policy_read",
+          "source": "mail_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_spon_policy_q1_final"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "reject-policy-events",
+      "signal_id": "marketing.sponsor.reject_status",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "events",
+      "source": "updates",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Notes"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "partnership_hold"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Notes"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "brand_conflict_hold"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Notes"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "blacklisted"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "in",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Tier"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": [
+                    "Platinum",
+                    "Gold"
+                  ]
+                }
+              },
+              {
+                "op": "ne",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "linkedin_verified"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "True"
+                }
+              }
+            ]
+          },
+          {
+            "op": "gt",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "Cost"
+                ]
+              }
+            },
+            "right": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "policy",
+                  "approval_cap"
+                ]
+              }
+            }
+          },
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Audience_Fit"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "High"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "row_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Row_ID"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Reject"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "pipeline_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "final_policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "pipeline_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_sponsor"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_events"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "final_policy_read",
+          "source": "mail_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_spon_policy_q1_final"
+            }
+          }
+        }
+      ],
+      "request_aliases": [
+        {
+          "alias": "policy",
+          "source": "request"
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

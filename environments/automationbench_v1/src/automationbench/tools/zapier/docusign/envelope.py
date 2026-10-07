@@ -4,7 +4,6 @@
 """DocuSign Envelope tools."""
 
 import json
-from datetime import datetime, timezone
 from typing import Optional
 
 from automationbench.schema.docusign import (
@@ -50,7 +49,7 @@ def docusign_create_signature_request(
         return json.dumps({"error": f"Template not found: {template_id}"})
 
     envelope_id = generate_docusign_id()
-    now = datetime.now(timezone.utc)
+    now = world.meta.current_time
 
     # Create documents from template
     documents = [
@@ -65,6 +64,8 @@ def docusign_create_signature_request(
     envelope = Envelope(
         id=envelope_id,
         envelope_id=envelope_id,
+        created_date_time=now,
+        last_modified_date_time=now,
         status="sent",
         email_subject=email_subject or template.email_subject or f"Please sign: {template.name}",
         email_blurb=email_blurb or template.email_blurb,
@@ -143,7 +144,7 @@ def docusign_create_envelope_from_template(
         return json.dumps({"error": f"Template not found: {template_id}"})
 
     envelope_id = generate_docusign_id()
-    now = datetime.now(timezone.utc)
+    now = world.meta.current_time
 
     documents = [
         EnvelopeDocument(
@@ -198,6 +199,8 @@ def docusign_create_envelope_from_template(
     envelope = Envelope(
         id=envelope_id,
         envelope_id=envelope_id,
+        created_date_time=now,
+        last_modified_date_time=now,
         status=status,
         email_subject=email_subject or template.email_subject or f"Please sign: {template.name}",
         email_blurb=email_blurb or template.email_blurb,
@@ -246,7 +249,7 @@ def docusign_void_envelope(
     if envelope.status in ("completed", "voided"):
         return json.dumps({"error": f"Cannot void envelope with status: {envelope.status}"})
 
-    now = datetime.now(timezone.utc)
+    now = world.meta.current_time
     envelope.status = "voided"
     envelope.voided_date_time = now
     envelope.voided_reason = voided_reason
@@ -432,7 +435,7 @@ def docusign_add_envelope_signer(
         role_name=role_name,
     )
     envelope.signers.append(signer)
-    envelope.last_modified_date_time = datetime.now(timezone.utc)
+    envelope.last_modified_date_time = world.meta.current_time
 
     return json.dumps({"success": True, "envelope": envelope.to_display_dict()})
 
@@ -479,7 +482,7 @@ def docusign_add_envelope_cc(
         routing_order=str(routing_order or next_order),
     )
     envelope.cc_recipients.append(cc)
-    envelope.last_modified_date_time = datetime.now(timezone.utc)
+    envelope.last_modified_date_time = world.meta.current_time
 
     return json.dumps({"success": True, "envelope": envelope.to_display_dict()})
 
@@ -538,7 +541,10 @@ def docusign_send_envelope(world: WorldState, envelope_id: str) -> str:
     if not envelope:
         return json.dumps({"success": False, "error": f"Envelope not found: {envelope_id}"})
     envelope.status = "sent"
-    envelope.sent_date_time = envelope.sent_date_time or datetime.now(timezone.utc)
+    now = world.meta.current_time
+    envelope.sent_date_time = envelope.sent_date_time or now
+    envelope.status_changed_date_time = now
+    envelope.last_modified_date_time = now
     return json.dumps({"success": True, "envelope": envelope.to_display_dict()})
 
 

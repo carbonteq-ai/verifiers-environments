@@ -1,0 +1,577 @@
+{
+  "schema_version": 1,
+  "manifest_id": "simple-customer_question_zendesk_reply",
+  "revision": "luna_batch12_public_v1",
+  "public_request": "A customer emailed with a question about our pricing tiers. Read the email, reply with a helpful response mentioning our Basic ($29/mo), Pro ($79/mo), and Enterprise (custom) plans, and create a Zendesk ticket to track the inquiry.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "27f89dcfe6d8dd0a73749fabd43c762fa3cf5657559cec8d0a4f1e0ea69035e8"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "6f204a7c0ec89707117ab909b40b4fea976614aee408f80c003bfc6b61b1d17e"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "pricing_inquiry",
+      "fields": {
+        "message_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0
+            ]
+          ]
+        },
+        "thread_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "thread_id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0
+            ]
+          ]
+        },
+        "customer_email": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "from_"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0
+            ]
+          ]
+        },
+        "subject": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "gmail",
+            "messages",
+            0,
+            "subject"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0
+            ]
+          ]
+        },
+        "customer_name": {
+          "value": "Jamie Park",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "basic_price": {
+          "value": "$29/mo",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "pro_price": {
+          "value": "$79/mo",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "tickets": {
+      "adapter": "final.created_records@1",
+      "service": "zendesk",
+      "collection": "tickets",
+      "references": {
+        "requester": {
+          "field": "requester_id",
+          "collection": "users"
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "read-pricing-question",
+      "signal_id": "simple.customer_question_zendesk_reply.pricing_email_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "reads",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "pricing_inquiry"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_plain"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "literal",
+                  "value": "body_html"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "returned_fields"
+                  ],
+                  "domain": "sequence"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "occurrence_bounds": {
+        "minimum": 1,
+        "maximum": 1
+      }
+    },
+    {
+      "check_id": "reply-with-prompted-pricing-facts",
+      "signal_id": "simple.customer_question_zendesk_reply.customer_pricing_reply",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "sends",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "pricing_inquiry"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "thread_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "thread_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "in",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "customer_email"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "to"
+                  ],
+                  "domain": "sequence"
+                }
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_plain"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "Basic"
+                },
+                "mode": "words",
+                "format": null,
+                "excluding": []
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_plain"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "basic_price"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim",
+                "format": null,
+                "excluding": []
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_plain"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "Pro"
+                },
+                "mode": "words",
+                "format": null,
+                "excluding": []
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_plain"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "pro_price"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim",
+                "format": null,
+                "excluding": []
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_plain"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "Enterprise"
+                },
+                "mode": "words",
+                "format": null,
+                "excluding": []
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_plain"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "custom"
+                },
+                "mode": "words",
+                "format": null,
+                "excluding": []
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_inquiry_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "occurrence_bounds": {
+        "minimum": 1,
+        "maximum": 1
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_inquiry_read",
+          "source": "reads",
+          "timing": "any",
+          "order": "returned_before_dispatch",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "message_id"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "body_plain"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "returned_fields"
+                      ],
+                      "domain": "sequence"
+                    }
+                  },
+                  {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "body_html"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "joined",
+                        "returned_fields"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "check_id": "create-ticket-for-email-customer",
+      "signal_id": "simple.customer_question_zendesk_reply.customer_inquiry_ticket",
+      "role": "goal",
+      "operator": "objects.created_and_retained@1",
+      "population": "request",
+      "source": "tickets",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "pricing_inquiry"
+        }
+      },
+      "retained_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "requester",
+                "email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "customer_email"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}

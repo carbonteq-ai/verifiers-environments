@@ -3,18 +3,19 @@
 
 """Buffer state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_buffer_id(prefix: str = "") -> str:
     """Produce a Buffer-style random identifier with an optional prefix."""
     chars = string.ascii_uppercase + string.digits
-    suffix = "".join(random.choices(chars, k=24))
+    suffix = "".join(_sim.rng().choices(chars, k=24))
     return f"{prefix}_{suffix}" if prefix else suffix
 
 
@@ -56,8 +57,8 @@ class BufferPost(BaseModel):
     needs_approval: bool = False
     due_at: Optional[int] = None
     tags: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
     # Engagement metrics
     impressions: int = 0
     likes: int = 0
@@ -117,8 +118,8 @@ class BufferIdea(BaseModel):
     archived: bool = False
     tags: List[str] = Field(default_factory=list)
     created_by: str = "user"
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""

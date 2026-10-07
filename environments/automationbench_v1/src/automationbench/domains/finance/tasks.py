@@ -9218,26 +9218,31 @@ def get_fin_payment_terms_tracking_task() -> dict:
                             "id": "qv_001",
                             "display_name": "Acme Supplies",
                             "email": "terms@acme.example.com",
+                            "terms": "Net 30",
                         },
                         {
                             "id": "qv_002",
                             "display_name": "CloudHost Pro",
                             "email": "billing@cloudhost.example.com",
+                            "terms": "Net 15",
                         },
                         {
                             "id": "qv_003",
                             "display_name": "Metro Supply",
                             "email": "ar@metro.example.com",
+                            "terms": "Net 30",
                         },
                         {
                             "id": "qv_004",
                             "display_name": "TechServe Solutions",
                             "email": "payments@techserve.example.com",
+                            "terms": "Net 30",
                         },
                         {
                             "id": "qv_005",
                             "display_name": "Pinnacle Logistics",
                             "email": "ap@pinnacle.example.com",
+                            "terms": "Net 30",
                         },
                     ]
                 },

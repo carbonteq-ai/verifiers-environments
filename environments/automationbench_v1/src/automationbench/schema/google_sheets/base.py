@@ -3,20 +3,21 @@
 
 """Shared base classes for the Google Sheets schema."""
 
-import uuid
 from typing import TYPE_CHECKING, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from automationbench import sim_runtime as _sim
+
 if TYPE_CHECKING:
+    from automationbench.schema.google_sheets.row import Row
     from automationbench.schema.google_sheets.spreadsheet import Spreadsheet
     from automationbench.schema.google_sheets.worksheet import Worksheet
-    from automationbench.schema.google_sheets.row import Row
 
 
 def generate_google_sheets_id() -> str:
     """Produce a Google Sheets-compatible identifier string."""
-    return str(uuid.uuid4()).replace("-", "")[:44]
+    return str(_sim.uuid4()).replace("-", "")[:44]
 
 
 class GoogleSheetsRecord(BaseModel):

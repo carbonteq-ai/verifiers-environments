@@ -4,17 +4,15 @@
 """Wave API tool implementations."""
 
 import json
-from datetime import datetime
 from decimal import Decimal
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.wave import WaveCustomer, WaveInvoice, WaveProduct
 from automationbench.schema.world import WorldState
 
 
 def _wave_id() -> str:
-    import random
-
-    return str(random.randint(10000, 99999))
+    return str(_sim.rng().randint(10000, 99999))
 
 
 def _to_decimal(val) -> Decimal:
@@ -124,7 +122,7 @@ def wave_invoice_create(world: WorldState, body: dict, **kw) -> str:
         customer_id=inp.get("customerId"),
         business_id=inp.get("businessId"),
         status=inp.get("status", "SAVED"),
-        invoice_date=inp.get("invoiceDate", datetime.now().strftime("%Y-%m-%d")),
+        invoice_date=inp.get("invoiceDate", _sim.now().strftime("%Y-%m-%d")),
         due_date=inp.get("dueDate"),
         invoice_total=total,
         invoice_amount_due=total,

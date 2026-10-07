@@ -3,11 +3,12 @@
 
 """Foundational base classes for the Slack schema."""
 
-import random
 import string
 from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.slack.channel import Channel
@@ -17,21 +18,20 @@ if TYPE_CHECKING:
 
 def generate_slack_channel_id() -> str:
     """Create a plausible Slack channel ID — the letter C followed by 10 uppercase alphanumeric characters."""
-    return "C" + "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    return "C" + "".join(_sim.rng().choices(string.ascii_uppercase + string.digits, k=10))
 
 
 def generate_slack_user_id() -> str:
     """Create a plausible Slack user ID — the letter U followed by 10 uppercase alphanumeric characters."""
-    return "U" + "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    return "U" + "".join(_sim.rng().choices(string.ascii_uppercase + string.digits, k=10))
 
 
 def generate_slack_message_ts() -> str:
     """Create a plausible Slack message timestamp string."""
     # Format: Unix timestamp with microseconds, e.g., "1405894322.002768"
-    import time
 
-    ts = time.time()
-    return f"{int(ts)}.{random.randint(100000, 999999):06d}"
+    ts = _sim.time()
+    return f"{int(ts)}.{_sim.rng().randint(100000, 999999):06d}"
 
 
 class SlackRecord(BaseModel):

@@ -3,17 +3,18 @@
 
 """Gorgias support platform state definitions for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_gorgias_id() -> str:
     """Produce a numeric identifier in the style used by Gorgias objects."""
-    return "".join(random.choices(string.digits, k=10))
+    return "".join(_sim.rng().choices(string.digits, k=10))
 
 
 class GorgiasMessage(BaseModel):
@@ -28,7 +29,7 @@ class GorgiasMessage(BaseModel):
     sender_type: Literal["customer", "agent"] = "customer"
     sender_email: Optional[str] = None
     sender_name: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""
@@ -76,8 +77,8 @@ class GorgiasTicket(BaseModel):
     messages: List[GorgiasMessage] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
     assignee_user_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""

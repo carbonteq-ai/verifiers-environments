@@ -4,11 +4,10 @@
 """LinkedIn invitation tools: send connection invites."""
 
 import json
-from datetime import datetime
-from typing import Optional
-import random
 import string
+from typing import Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.linkedin import Invitation
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -16,7 +15,7 @@ from automationbench.tools.zapier.types import register_metadata
 
 def _generate_invitation_id() -> str:
     """Generate a unique invitation ID."""
-    suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=24))
+    suffix = "".join(_sim.rng().choices(string.ascii_uppercase + string.digits, k=24))
     return f"inv_{suffix}"
 
 
@@ -75,7 +74,7 @@ def linkedin_send_invite(
 
     # Create the invitation
     invitation_id = _generate_invitation_id()
-    now = datetime.now().isoformat() + "Z"
+    now = _sim.now().isoformat() + "Z"
 
     invitation = Invitation(
         id=invitation_id,

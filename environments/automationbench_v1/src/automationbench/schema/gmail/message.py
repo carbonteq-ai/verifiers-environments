@@ -8,6 +8,7 @@ from typing import Optional, Union
 
 from pydantic import Field, field_validator, model_validator
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.gmail.base import GmailRecord, generate_gmail_id
 
 
@@ -85,11 +86,11 @@ class Message(GmailRecord):
 
     # Timestamps stored as milliseconds since epoch, matching the Gmail API convention
     date: int = Field(
-        default_factory=lambda: int(datetime.now(timezone.utc).timestamp() * 1000),
+        default_factory=lambda: int(_sim.now(timezone.utc).timestamp() * 1000),
         description="Timestamp of when the message was sent or received (ms since epoch)",
     )
     internal_date: int = Field(
-        default_factory=lambda: int(datetime.now(timezone.utc).timestamp() * 1000),
+        default_factory=lambda: int(_sim.now(timezone.utc).timestamp() * 1000),
         description="Internal Gmail timestamp for the message (ms since epoch)",
     )
 

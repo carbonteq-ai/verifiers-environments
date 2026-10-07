@@ -1,0 +1,662 @@
+"""Admit references from closed reward contracts and revalidated native evidence.
+
+Hashes establish integrity and exact binding, not scientific approval or artifact
+authenticity. Composition selects the accepted redesign and reviewed contracts.
+This module never accepts a caller's eligible/success/budget-confirmed boolean.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Literal, Protocol, Self, cast
+
+import verifiers.v1 as vf
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from verifiers.v1.assessment_source import capture_trace_source
+from verifiers.v1.episode_assessment import capture_episode_source
+
+from .budgets import SdkBudgetSummary, output_budget_eligibility, retain_sdk_budget
+from .collector import read_retained_artifacts, validate_episode
+from .frozen_verification import (
+    FrozenVerification,
+    FrozenVerifierBinding,
+    validate_frozen_verification,
+)
+from .inventory import FrozenTask, content_digest, load_inventory
+from .journal import AttemptEvent, AttemptJournal
+from .models import CalibrationManifest
+from .reward_revision import RedesignRevision, capture_redesign_revision
+from .sdk_runner import SIGNED_IN_ROUTE_IDENTITY
+
+
+class EligibilityRecord(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
+
+
+class RequiredRewardCheck(EligibilityRecord):
+    key: str = Field(min_length=1)
+    purpose: Literal["goal", "guard", "coverage"]
+    signal: vf.SignalDefinition
+    producer_id: str = Field(min_length=1)
+    producer_revision: str = Field(min_length=1)
+    rubric_revision: str = Field(min_length=1)
+    subject_kind: Literal["episode", "trace"]
+    operator: Literal["eq", "ge", "le"] = "eq"
+    expected_value: float
+
+
+class ReassessmentReplay(EligibilityRecord):
+    batch: vf.AssessmentBatch
+    credit_assignments: tuple[vf.CreditAssignment, ...] = ()
+
+
+class ReassessmentVerifier(Protocol):
+    """Trusted deterministic producer selected independently by composition.
+
+    Derive evidence, views, findings and credit from a detached original episode
+    and frozen task. Request fields supply invocation identity only. No model
+    calls or original mutations are permitted. Only producer-generated run,
+    invocation, attempt, assessment, contribution and gate identifiers are omitted
+    in semantic comparison. Native execution UUIDs and all subjects remain exact;
+    credit parent links resolve to exact assessment semantic content.
+    """
+
+    producer_id: str
+    producer_revision: str
+    rubric_revision: str
+    source_digest: str
+
+    def replay(
+        self,
+        *,
+        episode: vf.WireEpisode,
+        task: FrozenTask,
+        contract: TaskRewardContract,
+        request: vf.AssessmentRun,
+    ) -> ReassessmentReplay: ...
+
+
+def _assessment_semantics(record: vf.Assessment) -> dict:
+    return record.model_dump(mode="json", exclude={"assessment_id", "run_id"})
+
+
+def _batch_semantics(batch: vf.AssessmentBatch) -> dict:
+    body = batch.model_dump(mode="json")
+    for name in ("run_id", "invocation_id", "attempt_id"):
+        body["run"].pop(name)
+    body["assessments"] = [_assessment_semantics(record) for record in batch.assessments]
+    return body
+
+
+def _credit_semantics(assignment: vf.CreditAssignment) -> dict:
+    body = assignment.model_dump(mode="json")
+    parents = {
+        record.assessment_id: content_digest(_assessment_semantics(record))
+        for record in assignment.request.accepted
+    }
+    for name in ("invocation_id", "attempt_id"):
+        body["request"].pop(name)
+    body["request"]["accepted"] = [
+        _assessment_semantics(record) for record in assignment.request.accepted
+    ]
+    for contribution in body["contributions"]:
+        contribution.pop("contribution_id")
+        contribution["parent_assessment_ids"] = [
+            parents[key] for key in contribution["parent_assessment_ids"]
+        ]
+        for gate in contribution["gates"]:
+            gate.pop("gate_id")
+            gate["parent_assessment_ids"] = [parents[key] for key in gate["parent_assessment_ids"]]
+    return body
+
+
+class GuardSetDeclaration(EligibilityRecord):
+    """Reviewed policy inventory; not a reward or proof of universal safety."""
+
+    status: Literal["reviewed_closed", "unreviewed", "unresolved"]
+    check_keys: tuple[str, ...]
+    policy_source_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scope: Literal["task_specific", "task_and_public_environment"]
+    review_revision: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def verify(self) -> Self:
+        if any(not key for key in self.check_keys) or len(set(self.check_keys)) != len(
+            self.check_keys
+        ):
+            raise ValueError("guard inventory keys must be nonempty and unique")
+        return self
+
+
+class TaskRewardContract(EligibilityRecord):
+    """Reviewed closed obligations, never generated by copying a successful trace.
+
+    Whole-scope goal and coverage checks plus a reviewed guard set are required. Local
+    action findings can explain the results but cannot establish all-scope success
+    by their absence. Multiple deterministic/judge producers can supply checks.
+    """
+
+    schema_version: Literal[2] = 2
+    task_name: str = Field(min_length=1)
+    task_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    policy_source_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    admission_policy: Literal["accepted_redesign", "historical_full_and_redesign"] = (
+        "accepted_redesign"
+    )
+    guard_set: GuardSetDeclaration
+    checks: tuple[RequiredRewardCheck, ...] = Field(min_length=2)
+    digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def verify(self) -> Self:
+        if not {"goal", "coverage"} <= {item.purpose for item in self.checks}:
+            raise ValueError("reward contract requires independent goal and coverage checks")
+        if self.guard_set.status != "reviewed_closed":
+            raise ValueError("reward contract guard inventory is not reviewed closed")
+        if self.guard_set.policy_source_digest != self.policy_source_digest:
+            raise ValueError("guard inventory policy source differs from reward contract")
+        declared = set(self.guard_set.check_keys)
+        supplied = {item.key for item in self.checks if item.purpose == "guard"}
+        if declared != supplied:
+            raise ValueError("reward contract guard checks differ from reviewed inventory")
+        if len({item.key for item in self.checks}) != len(self.checks):
+            raise ValueError("duplicate reward contract key")
+        identities = [
+            (
+                item.signal.signal_id,
+                item.signal.revision,
+                item.producer_id,
+                item.producer_revision,
+                item.rubric_revision,
+                item.subject_kind,
+            )
+            for item in self.checks
+        ]
+        if len(set(identities)) != len(identities):
+            raise ValueError("ambiguous reward contract check")
+        if any(item.signal.semantics == "preference" for item in self.checks):
+            raise ValueError("eligibility requires explicit numeric success checks")
+        if self.digest != content_digest(self.model_dump(mode="json", exclude={"digest"})):
+            raise ValueError("task reward contract digest mismatch")
+        return self
+
+
+class EligibilityFile(EligibilityRecord):
+    name: Literal[
+        "inventory",
+        "manifest",
+        "journal",
+        "episode",
+        "assessments",
+        "revision",
+        "frozen_verification",
+    ]
+    path: str = Field(min_length=1)
+    digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    prefix_bytes: int | None = Field(default=None, gt=0, strict=True)
+
+    @model_validator(mode="after")
+    def verify(self) -> Self:
+        if not Path(self.path).is_absolute():
+            raise ValueError("eligibility source path must be absolute")
+        if self.prefix_bytes is not None and self.name != "journal":
+            raise ValueError("only journal evidence may bind an immutable prefix")
+        return self
+
+
+class QualifiedCheck(EligibilityRecord):
+    key: str
+    assessment_id: str
+    run_id: str
+    snapshot_id: str
+    value: float
+
+
+class TaskEligibilityProof(EligibilityRecord):
+    schema_version: Literal[1] = 1
+    model_id: Literal["gpt-6-luna"] = "gpt-6-luna"
+    original_output_budget: Literal[16384] = 16384
+    task_name: str
+    task_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    redesign_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    contract: TaskRewardContract
+    frozen_verification: FrozenVerification
+    files: tuple[EligibilityFile, ...]
+    original_attempt_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    original_manifest_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    original_episode_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    sdk_journal_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    budget_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reported_output_tokens: int = Field(ge=0, le=16384, strict=True)
+    checks: tuple[QualifiedCheck, ...]
+    digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def verify(self) -> Self:
+        if (self.task_name, self.task_digest) != (
+            self.contract.task_name,
+            self.contract.task_digest,
+        ):
+            raise ValueError("eligibility contract belongs to another task")
+        if len(self.files) != 7 or {item.name for item in self.files} != {
+            "inventory",
+            "manifest",
+            "journal",
+            "episode",
+            "assessments",
+            "revision",
+            "frozen_verification",
+        }:
+            raise ValueError("eligibility requires the exact source closure")
+        if len({item.key for item in self.checks}) != len(self.checks) or {
+            item.key for item in self.checks
+        } != {item.key for item in self.contract.checks}:
+            raise ValueError("eligibility does not account for every required check")
+        if self.digest != content_digest(self.model_dump(mode="json", exclude={"digest"})):
+            raise ValueError("eligibility proof digest mismatch")
+        return self
+
+
+class _ReadOnlyJournalReplay(AttemptJournal):
+    """Reuse journal transition checks without acquiring or writing a source lock."""
+
+    def __init__(self, manifest: CalibrationManifest, raw: bytes):
+        self.manifest = manifest
+        self.events = []
+        self.latest = {}
+        if not raw or not raw.endswith(b"\n"):
+            raise ValueError("eligibility journal prefix is absent or incomplete")
+        for line in raw.splitlines():
+            self._accept(AttemptEvent.model_validate_json(line))
+
+
+def _file(
+    name: Literal[
+        "inventory",
+        "manifest",
+        "journal",
+        "episode",
+        "assessments",
+        "revision",
+        "frozen_verification",
+    ],
+    path: Path,
+    *,
+    prefix_bytes: int | None = None,
+) -> EligibilityFile:
+    path = path.resolve()
+    raw = path.read_bytes()
+    if prefix_bytes is not None:
+        raw = raw[:prefix_bytes]
+    return EligibilityFile(
+        name=name, path=str(path), digest=hashlib.sha256(raw).hexdigest(), prefix_bytes=prefix_bytes
+    )
+
+
+def _read(reference: EligibilityFile) -> bytes:
+    raw = Path(reference.path).read_bytes()
+    if reference.prefix_bytes is not None:
+        if len(raw) < reference.prefix_bytes:
+            raise ValueError("eligibility journal prefix was removed")
+        raw = raw[: reference.prefix_bytes]
+    if hashlib.sha256(raw).hexdigest() != reference.digest:
+        raise ValueError(f"eligibility {reference.name} artifact changed")
+    return raw
+
+
+def _source_matches(batch: vf.AssessmentBatch, episode: vf.WireEpisode) -> None:
+    if not isinstance(batch.source, vf.SourceSnapshot):
+        raise ValueError("eligibility requires a full retained assessment source")  # noqa: TRY004 - permitted source union lacks proof
+    raw = json.loads(batch.source.source_json)
+    # task_evidence is a producer-owned transformation under the selected revision.
+    # Everything else must be exactly the native original, including raw receipts,
+    # artifact digests, node/call identities and episode ownership.
+    task_evidence = raw.get("task_evidence")
+    if "traces" in raw:
+        expected = capture_episode_source(
+            cast(vf.Episode, episode),
+            task_evidence=task_evidence,
+            finalization_state=episode.assessment_finalization_state or "not_run",
+        )
+    else:
+        trace = next((trace for trace in episode.traces if trace.id == raw.get("trace_id")), None)
+        if trace is None:
+            raise ValueError("assessment source is not an original episode child")
+        expected = capture_trace_source(cast(vf.Trace, trace), task_evidence=task_evidence)
+    if batch.source != expected:
+        raise ValueError("assessment source differs from the exact original native material")
+
+
+def _derive_proof(
+    files: tuple[EligibilityFile, ...],
+    contract: TaskRewardContract,
+    *,
+    current_redesign: RedesignRevision,
+    approved_bindings: dict[str, FrozenVerifierBinding],
+    reassessment_verifiers: dict[str, ReassessmentVerifier],
+) -> TaskEligibilityProof:
+    contract = TaskRewardContract.model_validate_json(contract.model_dump_json())
+    refs = {reference.name: reference for reference in files}
+    if len(refs) != 7:
+        raise ValueError("eligibility source closure is incomplete")
+    raw = {name: _read(reference) for name, reference in refs.items()}
+    revision = RedesignRevision.model_validate_json(raw["revision"])
+    accepted = RedesignRevision.model_validate_json(current_redesign.model_dump_json())
+    if revision != accepted:
+        raise ValueError("retained redesign differs from independently accepted revision")
+    configuration = json.loads(revision.configuration_json)
+    if (
+        not isinstance(configuration, dict)
+        or not isinstance(configuration.get("task_contracts"), dict)
+        or configuration["task_contracts"].get(contract.task_name) != contract.digest
+    ):
+        raise ValueError("task reward contract is not registered in the accepted redesign")
+    current = capture_redesign_revision(configuration, revision.native_source_digest)
+    if current != revision:
+        raise ValueError("redesign source, runtime or official scorer changed")
+    inventory = load_inventory(Path(refs["inventory"].path))
+    manifest = CalibrationManifest.model_validate_json(raw["manifest"])
+    manifest.validate_inventory(inventory)
+    if (
+        manifest.route_identity != SIGNED_IN_ROUTE_IDENTITY
+        or manifest.provider_model_id != "gpt-6-luna"
+        or manifest.limits.max_output_tokens != 16384
+    ):
+        raise ValueError("eligibility requires the original signed-in Luna 16384 budget")
+    frozen = next((task for task in inventory.tasks if task.task_name == contract.task_name), None)
+    if frozen is None or frozen.digest != contract.task_digest:
+        raise ValueError("eligibility task is absent or changed")
+    journal = _ReadOnlyJournalReplay(manifest, raw["journal"])
+    selected = [
+        event
+        for event in journal.latest.values()
+        if event.task_name == contract.task_name and event.episode_path == refs["episode"].path
+    ]
+    if len(selected) != 1:
+        raise ValueError("episode has no unique committed journal occurrence")
+    attempt = selected[0]
+    if (
+        attempt.status != "retained"
+        or attempt.kind not in {"initial", "confirmation"}
+        or attempt.retry_of is not None
+    ):
+        raise ValueError("rescue, retried or incomplete references cannot establish eligibility")
+    official = FrozenVerification.model_validate_json(raw["frozen_verification"])
+    if official.binding.digest not in configuration.get("frozen_verifiers", []):
+        raise ValueError("frozen official verifier is not registered in the accepted redesign")
+    approved = approved_bindings.get(official.binding.digest)
+    if approved is None or approved != official.binding:
+        raise ValueError("frozen verifier binding was not independently approved")
+    validate_frozen_verification(official, approved_binding=approved)
+    original_refs = {item.name: item for item in official.files}
+    for name in ("inventory", "manifest", "journal", "episode"):
+        current_ref = refs[name]
+        original_ref = original_refs[name]
+        if (current_ref.path, current_ref.digest, current_ref.prefix_bytes) != (
+            original_ref.path,
+            original_ref.digest,
+            original_ref.prefix_bytes,
+        ):
+            raise ValueError("frozen verification belongs to different original evidence")
+    if (
+        official.task_name,
+        official.task_digest,
+        official.attempt_id,
+        official.manifest_digest,
+    ) != (contract.task_name, contract.task_digest, attempt.attempt_id, manifest.digest):
+        raise ValueError("frozen verification belongs to another task or occurrence")
+    if contract.admission_policy == "historical_full_and_redesign" and (
+        official.official_strict_score != 1 or not official.all_declared_assertions_passed
+    ):
+        raise ValueError("explicit historical full-score admission policy did not pass")
+    episode, episode_digest = validate_episode(Path(refs["episode"].path), frozen, attempt)
+    if episode_digest != refs["episode"].digest or episode.assessment_finalization_state not in {
+        "completed",
+        "not_run",
+    }:
+        raise ValueError("original episode identity or finalization is unresolved")
+    trace = episode.traces[0]
+    artifacts = read_retained_artifacts(Path(refs["episode"].path).parent, trace)
+    trace.state.artifacts.update(artifacts)
+    sealed_sdk = artifacts.get("codex_sdk/events.json")
+    if sealed_sdk is None:
+        raise ValueError("sealed SDK journal is unavailable")
+    sdk = json.loads(sealed_sdk)
+    if sdk.get("provider_mode") != "signed_in" or sdk.get("output_budget") != 16384:
+        raise ValueError("SDK route or original output budget differs")
+    authenticated = [item for item in sdk.get("events", []) if item.get("kind") == "authenticated"]
+    if (
+        len(authenticated) != 1
+        or authenticated[0].get("account_type") != "chatgpt"
+        or authenticated[0].get("model") != "gpt-6-luna"
+    ):
+        raise ValueError("signed-in Luna model identity is unavailable")
+    info = {"codex_sdk": sdk}
+    retain_sdk_budget(info, 16384)
+    budget = SdkBudgetSummary.model_validate(info.get("automationbench_output_budget", {}))
+    accounting = budget.response_accounting
+    final = accounting is not None and accounting.status == "reconciled"
+    reasoning = (
+        accounting is not None
+        and final
+        and accounting.reasoning_inclusion == "reported_output_detail"
+    )
+    disposition, reason = output_budget_eligibility(
+        budget, final_usage_confirmed=final, reasoning_inclusion_confirmed=reasoning
+    )
+    if disposition != "within_budget":
+        raise ValueError(f"original Luna output budget is unqualified: {reason}")
+    document = json.loads(raw["assessments"])
+    if (
+        set(document)
+        != {
+            "schema_version",
+            "original_episode_digest",
+            "redesign_digest",
+            "contract_digest",
+            "selected_run_ids",
+            "batches",
+            "credit_assignments",
+        }
+        or document["schema_version"] != 1
+        or document["original_episode_digest"] != episode_digest
+        or document["redesign_digest"] != revision.digest
+        or document["contract_digest"] != contract.digest
+    ):
+        raise ValueError(
+            "reassessment does not bind the original episode and accepted reward contract"
+        )
+    batches = [vf.AssessmentBatch.model_validate(item) for item in document["batches"]]
+    by_run = {batch.run.run_id: batch for batch in batches}
+    selected_ids = document["selected_run_ids"]
+    if (
+        len(by_run) != len(batches)
+        or not selected_ids
+        or len(set(selected_ids)) != len(selected_ids)
+        or any(key not in by_run for key in selected_ids)
+    ):
+        raise ValueError("reassessment selected attempts are absent or ambiguous")
+    selected_batches = [by_run[key] for key in selected_ids]
+    retained_credit = tuple(
+        vf.CreditAssignment.model_validate(item) for item in document["credit_assignments"]
+    )
+    replayed_credit = []
+    for batch in selected_batches:
+        if batch.run.status != "complete" or batch.missing:
+            raise ValueError("reassessment coverage or finalization is incomplete")
+        _source_matches(batch, episode)
+        producer_key = (
+            f"{batch.run.producer_id}@{batch.run.producer_revision}/{batch.run.rubric_revision}"
+        )
+        verifier = reassessment_verifiers.get(producer_key)
+        approved_producers = configuration.get("assessment_verifiers", {})
+        if (
+            verifier is None
+            or not isinstance(approved_producers, dict)
+            or approved_producers.get(producer_key) != verifier.source_digest
+            or (verifier.producer_id, verifier.producer_revision, verifier.rubric_revision)
+            != (batch.run.producer_id, batch.run.producer_revision, batch.run.rubric_revision)
+        ):
+            raise ValueError("reassessment has no independently approved deterministic replay")
+        replay = verifier.replay(
+            episode=episode.model_copy(deep=True),
+            task=FrozenTask.model_validate_json(frozen.model_dump_json()),
+            contract=contract,
+            request=batch.run.model_copy(deep=True),
+        )
+        replay = ReassessmentReplay.model_validate_json(replay.model_dump_json())
+        if _batch_semantics(replay.batch) != _batch_semantics(batch):
+            raise ValueError(
+                "reassessment evidence, views or findings differ from deterministic replay"
+            )
+        replayed_credit.extend(replay.credit_assignments)
+    if [_credit_semantics(item) for item in replayed_credit] != [
+        _credit_semantics(item) for item in retained_credit
+    ]:
+        raise ValueError("reassessment credit rules or recipients differ from deterministic replay")
+    checks = []
+    for required in contract.checks:
+        matches = [
+            (batch, finding)
+            for batch in selected_batches
+            for finding in batch.assessments
+            if (batch.run.producer_id, batch.run.producer_revision, batch.run.rubric_revision)
+            == (required.producer_id, required.producer_revision, required.rubric_revision)
+            and finding.signal == required.signal
+            and finding.subject.kind == required.subject_kind
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"required {required.purpose} check is absent or ambiguous: {required.key}"
+            )
+        batch, finding = matches[0]
+        if finding.status != "valid" or finding.value is None:
+            raise ValueError(f"required {required.purpose} check is unavailable: {required.key}")
+        value = finding.value
+        passed = (
+            value == required.expected_value
+            if required.operator == "eq"
+            else value >= required.expected_value
+            if required.operator == "ge"
+            else value <= required.expected_value
+        )
+        if not passed:
+            raise ValueError(f"required {required.purpose} check did not pass: {required.key}")
+        checks.append(
+            QualifiedCheck(
+                key=required.key,
+                assessment_id=finding.assessment_id,
+                run_id=batch.run.run_id,
+                snapshot_id=batch.source.snapshot_id,
+                value=value,
+            )
+        )
+    output = budget.reported_counts.get("outputTokens")
+    assert type(output) is int
+    body = {
+        "schema_version": 1,
+        "model_id": "gpt-6-luna",
+        "original_output_budget": 16384,
+        "task_name": contract.task_name,
+        "task_digest": contract.task_digest,
+        "redesign_digest": revision.digest,
+        "contract": contract.model_dump(mode="json"),
+        "frozen_verification": official.model_dump(mode="json"),
+        "files": [item.model_dump(mode="json") for item in files],
+        "original_attempt_id": attempt.attempt_id,
+        "original_manifest_digest": manifest.digest,
+        "original_episode_digest": episode_digest,
+        "sdk_journal_digest": hashlib.sha256(sealed_sdk).hexdigest(),
+        "budget_digest": content_digest(budget.model_dump(mode="json")),
+        "reported_output_tokens": output,
+        "checks": [item.model_dump(mode="json") for item in checks],
+    }
+    return TaskEligibilityProof.model_validate({**body, "digest": content_digest(body)})
+
+
+def build_eligibility_proof(
+    *,
+    inventory_path: Path,
+    manifest_path: Path,
+    journal_path: Path,
+    episode_path: Path,
+    assessment_path: Path,
+    revision_path: Path,
+    frozen_verification_path: Path,
+    approved_binding: FrozenVerifierBinding,
+    current_redesign: RedesignRevision,
+    reassessment_verifiers: dict[str, ReassessmentVerifier],
+    contract: TaskRewardContract,
+) -> TaskEligibilityProof:
+    """Read one declared reference and derive every admission clause from evidence.
+
+    A terminal journal prefix binds the occurrence without making later append-only
+    work invalidate it. This is read-only: no source locks, rescoring or model calls.
+    """
+    episode_path = episode_path.resolve()
+    retained_revision = RedesignRevision.model_validate_json(revision_path.read_bytes())
+    if retained_revision != current_redesign:
+        raise ValueError("retained redesign differs from independently accepted revision")
+    verification = FrozenVerification.model_validate_json(frozen_verification_path.read_bytes())
+    if verification.binding != approved_binding:
+        raise ValueError("frozen verifier was not independently approved")
+    journal = journal_path.read_bytes()
+    consumed = 0
+    prefix_bytes = None
+    for line in journal.splitlines(keepends=True):
+        consumed += len(line)
+        event = AttemptEvent.model_validate_json(line)
+        if event.task_name == contract.task_name and event.episode_path == str(episode_path):
+            prefix_bytes = consumed
+            break
+    if prefix_bytes is None:
+        raise ValueError("episode has no committed journal terminal record")
+    references = (
+        _file("inventory", inventory_path),
+        _file("manifest", manifest_path),
+        _file("journal", journal_path, prefix_bytes=prefix_bytes),
+        _file("episode", episode_path),
+        _file("assessments", assessment_path),
+        _file("revision", revision_path),
+        _file("frozen_verification", frozen_verification_path),
+    )
+    return _derive_proof(
+        references,
+        contract,
+        current_redesign=current_redesign,
+        approved_bindings={approved_binding.digest: approved_binding},
+        reassessment_verifiers=reassessment_verifiers,
+    )
+
+
+def validate_eligibility_proof(
+    proof: TaskEligibilityProof,
+    *,
+    task_name: str,
+    task_digest: str,
+    redesign_digest: str,
+    current_redesign: RedesignRevision,
+    approved_bindings: dict[str, FrozenVerifierBinding],
+    reassessment_verifiers: dict[str, ReassessmentVerifier],
+) -> None:
+    """Re-read its exact source closure; a digest or official full score alone is insufficient."""
+    proof = TaskEligibilityProof.model_validate_json(proof.model_dump_json())
+    if (proof.task_name, proof.task_digest, proof.redesign_digest) != (
+        task_name,
+        task_digest,
+        redesign_digest,
+    ):
+        raise ValueError("eligibility belongs to another task or accepted redesign")
+    if current_redesign.digest != redesign_digest:
+        raise ValueError("independently accepted redesign differs from requested revision")
+    checked = _derive_proof(
+        proof.files,
+        proof.contract,
+        current_redesign=current_redesign,
+        approved_bindings=approved_bindings,
+        reassessment_verifiers=reassessment_verifiers,
+    )
+    if checked != proof:
+        raise ValueError("eligibility proof differs from current native source evidence")

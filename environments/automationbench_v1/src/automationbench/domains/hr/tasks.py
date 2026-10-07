@@ -5130,6 +5130,8 @@ def get_hr_docusign_offer_letters_task() -> dict:
                     "Send out the approved offer letters through DocuSign. Each candidate needs "
                     "the offer sent for signature with the correct terms. "
                     "Only send offers that have been fully approved. "
+                    "After an offer is successfully sent, set its tracker DocuSign Status "
+                    "to 'DocuSign Sent'; sending an offer does not mean it has been signed. "
                     "Use DocuSign and Google Sheets."
                 ),
             },
@@ -7433,6 +7435,8 @@ def get_hr_docusign_nda_collection_task() -> dict:
                     "Send NDAs to all new hires who haven't signed one yet. "
                     "Check the compliance tracker for who still needs an NDA. "
                     "Use DocuSign to send and update the tracker status. "
+                    "After an NDA is successfully sent, set its tracker NDA Status to "
+                    "'DocuSign Sent'; keep already signed employees marked 'Signed'. "
                     "Use DocuSign and Google Sheets."
                 ),
             },
@@ -15494,10 +15498,12 @@ def get_task_5107() -> dict:
                 "google_sheets_find_worksheet",
                 "google_sheets_get_spreadsheet_by_id",
                 "jira_create_issue",
+                "jira_project",
                 "slack_send_channel_message",
             ],
             "initial_state": {
                 "meta": {"schema_version": "0.1.0", "current_time": "2026-04-15T09:00:00Z"},
+                "jira": {"actions": {}, "projects": [{"id": "it", "key": "IT", "name": "IT Operations"}]},
                 "gmail": {
                     "messages": [
                         {

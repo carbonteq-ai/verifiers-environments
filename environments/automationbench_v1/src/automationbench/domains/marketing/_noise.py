@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+from datetime import datetime, timedelta
 
 from automationbench.domains._noise_util import is_reference_ws
 
@@ -1336,7 +1337,32 @@ def _inject_mailchimp(mc: dict, rng: random.Random) -> None:
     mc["subscribers"].extend(noise)
 
 
-def _inject_gmail(gm: dict, rng: random.Random) -> None:
+def _align_noise_dates(messages: list[dict], current_time: str) -> list[dict]:
+    """Move future background mail into the past without reversing its timeline.
+
+    One translation anchors the latest selected message one hour before the
+    explicit world clock. Primary records are never passed to this helper. A
+    naive clock supplies calendar coordinates, not an inferred UTC instant.
+    """
+    if not messages or not current_time:
+        return messages
+    current = datetime.fromisoformat(current_time)
+    dates = [datetime.fromisoformat(message["date"]) for message in messages]
+    if current.tzinfo is None:
+        dates = [date.replace(tzinfo=None) for date in dates]
+    else:
+        dates = [date.astimezone(current.tzinfo) for date in dates]
+    latest = max(dates)
+    if latest <= current:
+        return messages
+    shift = latest - current + timedelta(hours=1)
+    return [
+        {**message, "date": (date - shift).isoformat()}
+        for message, date in zip(messages, dates, strict=True)
+    ]
+
+
+def _inject_gmail(gm: dict, rng: random.Random, current_time: str = "") -> None:
     # Normalize legacy "emails" key to "messages" before injecting noise,
     # otherwise the Pydantic model_validator will silently drop "emails"
     # when both keys exist.
@@ -1344,7 +1370,7 @@ def _inject_gmail(gm: dict, rng: random.Random) -> None:
         gm["messages"] = gm.pop("emails")
     existing_ids = {m.get("id") for m in gm.get("messages", [])}
     noise = [m for m in _sample(_GMAIL, rng, 15) if m["id"] not in existing_ids]
-    gm.setdefault("messages", []).extend(noise)
+    gm.setdefault("messages", []).extend(_align_noise_dates(noise, current_time))
 
 
 def _inject_slack(sl: dict, rng: random.Random) -> None:
@@ -1462,7 +1488,7 @@ def apply_noise(tasks: list[dict]) -> list[dict]:
         if "mailchimp" in state:
             _inject_mailchimp(state["mailchimp"], rng)
         if "gmail" in state:
-            _inject_gmail(state["gmail"], rng)
+            _inject_gmail(state["gmail"], rng, str(state.get("meta", {}).get("current_time") or ""))
         if "slack" in state:
             _inject_slack(state["slack"], rng)
         if "google_sheets" in state:

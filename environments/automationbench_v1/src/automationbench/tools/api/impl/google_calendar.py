@@ -12,13 +12,13 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.google_calendar import (
     Calendar,
     CalendarEvent,
     generate_google_calendar_id,
 )
 from automationbench.schema.world import WorldState
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -195,7 +195,7 @@ def google_calendar_events_quick_add(
         return _calendar_not_found()
     calendarId = resolved_id
 
-    now = datetime.now()
+    now = _sim.now()
     start = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
     end = start + timedelta(hours=1)
 

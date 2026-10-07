@@ -1,0 +1,451 @@
+{
+  "schema_version": 1,
+  "manifest_id": "sales-sheets-reconciliation",
+  "revision": "batch04-20261005-r1",
+  "public_request": "Our sales tracking spreadsheet (ID: 'spreadsheet_sales_001', worksheet: 'ws_deals_001') needs reconciliation with Salesforce. Match each row to its opportunity, sync amounts and stages where Salesforce has more current data. Account for currency differences between accounts using the 'FX Rates' spreadsheet and don't touch closed or regressed deals.",
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "sales.sheets_reconciliation",
+      "fields": {
+        "deal_sheet_id": {
+          "value": "spreadsheet_sales_001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "spreadsheets",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "deal_worksheet_id": {
+          "value": "ws_deals_001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "worksheets",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "fx_sheet_id": {
+          "value": "spreadsheet_fx_001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "spreadsheets",
+              1,
+              "id"
+            ]
+          ]
+        },
+        "fx_worksheet_id": {
+          "value": "ws_fx_rates_001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "worksheets",
+              1,
+              "id"
+            ]
+          ]
+        },
+        "closed_sheet_row": {
+          "value": 5,
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows",
+              3,
+              "row_id"
+            ]
+          ]
+        },
+        "closed_sheet_name": {
+          "value": "Gamma Tech - Consulting",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows",
+              3,
+              "cells",
+              "opportunity_name"
+            ]
+          ]
+        },
+        "closed_sheet_amount": {
+          "value": "30000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows",
+              3,
+              "cells",
+              "amount"
+            ]
+          ]
+        },
+        "closed_sheet_stage": {
+          "value": "Proposal",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows",
+              3,
+              "cells",
+              "stage"
+            ]
+          ]
+        }
+      }
+    },
+    "deals_read": {
+      "adapter": "google_sheets.reads@1",
+      "spreadsheet_id": "spreadsheet_sales_001",
+      "worksheet_id": "ws_deals_001"
+    },
+    "fx_read": {
+      "adapter": "google_sheets.reads@1",
+      "spreadsheet_id": "spreadsheet_fx_001",
+      "worksheet_id": "ws_fx_rates_001"
+    },
+    "deals_writes": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "update",
+      "spreadsheet_id": "spreadsheet_sales_001",
+      "worksheet_id": "ws_deals_001"
+    },
+    "deal_rows": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "spreadsheet_sales_001",
+      "worksheet_id": "ws_deals_001",
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "opportunity_name",
+        "amount",
+        "stage"
+      ]
+    },
+    "gamma_opp": {
+      "adapter": "salesforce.record@1",
+      "object_type": "Opportunity",
+      "record_id": "006xx000004GAM1",
+      "baseline_requirements": [
+        {
+          "field": "name",
+          "value": "Gamma Tech - Consulting",
+          "comparison": "string"
+        }
+      ]
+    }
+  },
+  "checks": [
+    {
+      "check_id": "read-deal-tracker",
+      "signal_id": "sales.sheets_reconciliation.deals_sheet_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "deals_read",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales.sheets_reconciliation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "deal_worksheet_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "cell_values_returned"
+              ],
+              "domain": "boolean"
+            },
+            "right": {
+              "kind": "literal",
+              "value": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "read-fx-rates",
+      "signal_id": "sales.sheets_reconciliation.fx_rates_read",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "fx_read",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "sales.sheets_reconciliation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "worksheet_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "fx_worksheet_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "cell_values_returned"
+              ],
+              "domain": "boolean"
+            },
+            "right": {
+              "kind": "literal",
+              "value": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "closed-row-preserved",
+      "signal_id": "sales.sheets_reconciliation.closed_row_preserved",
+      "role": "goal",
+      "operator": "sheets.retained_when@1",
+      "population": "deal_rows",
+      "source": "deals_writes",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "candidate",
+            "identity",
+            3
+          ],
+          "domain": "number"
+        },
+        "right": {
+          "kind": "literal",
+          "value": 5
+        }
+      },
+      "retained_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "opportunity_name"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "opportunity_name"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "amount"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "amount"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "retained",
+                "stage"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "stage"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "closed-opportunity-stage-preserved",
+      "signal_id": "sales.sheets_reconciliation.closed_opportunity_stage_preserved",
+      "role": "goal",
+      "operator": "record.fields_equal@1",
+      "source": "gamma_opp",
+      "expected": [
+        {
+          "field": "stage_name",
+          "value": "Closed Lost",
+          "comparison": "string"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "50c0b78c19ff4fe5f9c6726ada2522329cf0f0337e6028f645910047c0c26dbb"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "9320018e1b9f0b493528795d4363b2b3a0bd09fac2b81bc7448114ab910aa63e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "spreadsheets"
+      ],
+      "canonical_sha256": "d879758d841f30ccd4c18c94c7b814c9e36ac08add3d4e32f43a0b7a964c7c19"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "worksheets"
+      ],
+      "canonical_sha256": "6346cb2683ac567e2ce04587c599cd1039b0d432a8d9d8f9045da100dfc1e891"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "salesforce",
+        "opportunities"
+      ],
+      "canonical_sha256": "516bf8ed453efa231651463056502d365a3efab61eb8377a39b332f73d94f5e3"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "salesforce",
+        "accounts"
+      ],
+      "canonical_sha256": "f5a8333db67b82f1cc7137f034b1138562a6b5163244c48903608404850af645"
+    }
+  ]
+}

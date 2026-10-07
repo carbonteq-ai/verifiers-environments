@@ -10,7 +10,11 @@ import pytest
 import verifiers.v1 as vf
 
 from automationbench_v1.episode_prompt import (
+    EPISODE_PROMPT_VERSION,
     EPISODE_RUBRICS,
+    GENERAL_EPISODE_JUDGE_SYSTEM_PROMPT,
+    MODEL_NATIVE_FRAME_REQUEST,
+    MODEL_NATIVE_VERDICT_REQUEST,
     EpisodeAssessmentFrame,
     EpisodeVerdict,
     EpisodeVocabularyProfile,
@@ -76,6 +80,38 @@ def _wire_payload(score: float = 0.75, evidence: list[int] | None = None) -> dic
 
 
 def _frame_payload() -> dict[str, Any]:
+    subdimensions = {
+        "problem_understanding_planning": [
+            "objective_coverage",
+            "constraint_recognition",
+            "plan_proportionality",
+        ],
+        "logical_correctness": [
+            "premise_grounding",
+            "inference_validity",
+            "executable_translation",
+            "failure_response",
+        ],
+        "verification_self_correction": [
+            "evidence_recognition",
+            "error_detection",
+            "corrective_action",
+            "outcome_confirmation",
+        ],
+        "progress_efficiency": ["useful_progress", "avoidable_detours", "terminal_recovery"],
+        "action_quality": [
+            "action_selection",
+            "argument_and_schema_validity",
+            "ordering_scope_authorization",
+            "result_handling",
+        ],
+        "answer_quality": [
+            "outcome_accuracy",
+            "evidence_support",
+            "requirement_coverage",
+            "limitation_disclosure",
+        ],
+    }
     return {
         "episode_understanding": "Determine whether the requested task was completed using observed evidence.",
         "success_conditions": ["The requested outcome is observed."],
@@ -93,6 +129,17 @@ def _frame_payload() -> dict[str, Any]:
         "open_discrepancies": [],
         "observed_defects": [],
         "perfection_blockers": {name: [] for name in EPISODE_RUBRICS},
+        "dimension_subchecks": {
+            dimension: [
+                {
+                    "subdimension": name,
+                    "finding": "No material defect is present in the supplied evidence.",
+                    "blocks_perfection": False,
+                }
+                for name in names
+            ]
+            for dimension, names in subdimensions.items()
+        },
         "dimension_language": {
             name: f"Evaluate {name} from the observed record." for name in EPISODE_RUBRICS
         },
@@ -108,6 +155,24 @@ def test_assessment_frame_drops_blank_optional_placeholders():
 
     assert frame.observed_state == []
     assert frame.claims_to_verify == ["A material claim remains."]
+
+
+def test_episode_prompt_preserves_defects_and_caps_unsupported_perfection():
+    assert EPISODE_PROMPT_VERSION == "general-agent-episode@16"
+    assert "cannot retroactively make the original action or path perfect" in (
+        GENERAL_EPISODE_JUDGE_SYSTEM_PROMPT
+    )
+    assert "the only material action was rejected or malformed" in (
+        GENERAL_EPISODE_JUDGE_SYSTEM_PROMPT
+    )
+    assert "answer_quality is at most 0.5" in GENERAL_EPISODE_JUDGE_SYSTEM_PROMPT
+    assert "Preserve every policy-caused malformed" in MODEL_NATIVE_FRAME_REQUEST
+    assert "dimension_subchecks" in MODEL_NATIVE_FRAME_REQUEST
+    assert "harness_observation_diagnostics" in MODEL_NATIVE_FRAME_REQUEST
+    assert "weakest material subcheck" in MODEL_NATIVE_VERDICT_REQUEST
+    assert "Apply the system prompt's defect-preserving ceilings mechanically" in (
+        MODEL_NATIVE_VERDICT_REQUEST
+    )
 
 
 def _vocabulary_profile() -> EpisodeVocabularyProfile:
@@ -164,7 +229,7 @@ def test_episode_judge_uses_one_episode_rubric_and_normalizes_wire_evidence(monk
     assert "turns list" not in system_prompt
     assert schema.__name__ == "WireEpisodeVerdict"
     attempt = trace.info["posttrain_episode_reward_attempts"][0]
-    assert attempt["assessment_request"]["contract"] == "general-agent-episode@13"
+    assert attempt["assessment_request"]["contract"] == "general-agent-episode@16"
     assert attempt["assessment_request"]["valid_message_ids"] == ["message-0", "message-1"]
     assert [entry["evidence_index"] for entry in attempt["assessment_request"]["trajectory"]] == [0, 1]
     assert "authoritative evidence_index" in system_prompt

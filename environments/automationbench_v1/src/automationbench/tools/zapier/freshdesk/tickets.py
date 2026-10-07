@@ -4,9 +4,9 @@
 """Freshdesk tools for tickets, contacts, and companies."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional, cast
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.freshdesk import (
     FreshdeskCompany,
     FreshdeskContact,
@@ -15,7 +15,6 @@ from automationbench.schema.freshdesk import (
 )
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
-
 
 # ============================================================================
 # Ticket Tools
@@ -153,7 +152,7 @@ def freshdesk_update_ticket(
     if tags:
         ticket.tags = [t.strip() for t in tags.split(",") if t.strip()]
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -307,7 +306,7 @@ def freshdesk_add_note_to_ticket(
 
     note = FreshdeskNote(body=body, private=private)
     ticket.notes.append(note)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {

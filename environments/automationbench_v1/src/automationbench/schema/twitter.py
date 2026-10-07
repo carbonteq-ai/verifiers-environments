@@ -3,23 +3,24 @@
 
 """Twitter/X state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_twitter_id() -> str:
     """Generate a Twitter-style numeric ID."""
-    return "".join(random.choices(string.digits, k=19))
+    return "".join(_sim.rng().choices(string.digits, k=19))
 
 
 def generate_twitter_ulid() -> str:
     """Generate a ULID-style ID for Twitter."""
     chars = string.ascii_uppercase + string.digits
-    return "".join(random.choices(chars, k=26))
+    return "".join(_sim.rng().choices(chars, k=26))
 
 
 class TwitterUser(BaseModel):
@@ -37,7 +38,7 @@ class TwitterUser(BaseModel):
     followers_count: int = 0
     following_count: int = 0
     tweet_count: int = 0
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -78,7 +79,7 @@ class Tweet(BaseModel):
     bookmark_count: int = 0
     impression_count: int = 0
     is_retweet: bool = False
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -121,7 +122,7 @@ class DirectMessage(BaseModel):
     text: str
     conversation_id: Optional[str] = None
     read: bool = False
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -145,7 +146,7 @@ class Like(BaseModel):
     id: str = Field(default_factory=lambda: f"like_{generate_twitter_ulid()}")
     user_id: str
     tweet_id: str
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -166,7 +167,7 @@ class Retweet(BaseModel):
     id: str = Field(default_factory=generate_twitter_id)
     user_id: str
     original_tweet_id: str
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -189,7 +190,7 @@ class Follow(BaseModel):
     following_id: str
     follower_username: str
     following_username: str
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""

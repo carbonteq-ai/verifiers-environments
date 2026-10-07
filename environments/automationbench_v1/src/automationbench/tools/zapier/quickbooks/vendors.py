@@ -26,6 +26,7 @@ def quickbooks_create_vendor(
     address__zip_code: Optional[str] = None,
     company__name: Optional[str] = None,
     vendor__1099: bool = False,
+    terms: Optional[str] = None,
 ) -> str:
     """
     Create a vendor in QuickBooks Online.
@@ -56,6 +57,7 @@ def quickbooks_create_vendor(
         website=website,
         vendor_1099=vendor__1099,
         billing_address=billing,
+        terms=terms or None,
     )
     world.quickbooks.vendors.append(vendor)
     return json.dumps({"success": True, "vendor": vendor.to_display_dict(), "Id": vendor.id})
@@ -75,12 +77,14 @@ def quickbooks_update_vendor(
     phone: Optional[str] = None,
     website: Optional[str] = None,
     active: Optional[bool] = None,
+    terms: Optional[str] = None,
 ) -> str:
     """
     Update a vendor in QuickBooks Online.
 
     Args:
         vendor_id: Vendor ID to update.
+        terms: Payment terms name (e.g. "Net 45").
 
     Returns:
         JSON string with updated vendor details.
@@ -98,6 +102,10 @@ def quickbooks_update_vendor(
         vendor.website = website
     if active is not None:
         vendor.active = active
+    if terms is not None:
+        if not isinstance(terms, str) or not terms.strip():
+            return json.dumps({"success": False, "error": "quickbooks_vendor_terms_invalid"})
+        vendor.terms = terms
     return json.dumps({"success": True, "vendor": vendor.to_display_dict(), "Id": vendor.id})
 
 

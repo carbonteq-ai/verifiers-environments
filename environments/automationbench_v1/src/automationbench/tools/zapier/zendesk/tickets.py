@@ -4,9 +4,9 @@
 """Zendesk tools for tickets, users, and organizations."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.world import WorldState
 from automationbench.schema.zendesk import (
     ZendeskComment,
@@ -15,7 +15,6 @@ from automationbench.schema.zendesk import (
     ZendeskUser,
 )
 from automationbench.tools.zapier.types import register_metadata
-
 
 # ============================================================================
 # Ticket Tools
@@ -177,7 +176,7 @@ def zendesk_update_ticket(
     if comment:
         ticket.comments.append(ZendeskComment(body=comment, public=comment_public))
 
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -372,7 +371,7 @@ def zendesk_add_comment_to_ticket(
 
     new_comment = ZendeskComment(body=comment, public=public)
     ticket.comments.append(new_comment)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -422,7 +421,7 @@ def zendesk_add_tags_to_ticket(
     for tag in new_tags:
         if tag not in ticket.tags:
             ticket.tags.append(tag)
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -470,7 +469,7 @@ def zendesk_remove_tags_from_ticket(
 
     tags_to_remove = [t.strip() for t in tags.split(",") if t.strip()]
     ticket.tags = [t for t in ticket.tags if t not in tags_to_remove]
-    ticket.updated_at = datetime.now()
+    ticket.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -637,7 +636,7 @@ def zendesk_update_user(
     if verified is not None:
         user.verified = verified
 
-    user.updated_at = datetime.now()
+    user.updated_at = _sim.now()
 
     return json.dumps(
         {
@@ -1058,7 +1057,7 @@ def zendesk_update_organization(
     if shared_comments is not None:
         org.shared_comments = shared_comments
 
-    org.updated_at = datetime.now()
+    org.updated_at = _sim.now()
 
     return json.dumps(
         {

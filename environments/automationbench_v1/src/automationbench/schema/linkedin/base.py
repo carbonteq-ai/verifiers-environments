@@ -3,11 +3,12 @@
 
 """Foundational classes for the LinkedIn schema."""
 
-import random
 import string
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from automationbench import sim_runtime as _sim
 
 if TYPE_CHECKING:
     from automationbench.schema.linkedin.company import Company
@@ -22,18 +23,18 @@ if TYPE_CHECKING:
 
 def generate_linkedin_urn(entity_type: str = "person") -> str:
     """Construct a plausible LinkedIn URN for the given entity type."""
-    entity_id = "".join(random.choices(string.digits, k=10))
+    entity_id = "".join(_sim.rng().choices(string.digits, k=10))
     return f"urn:li:{entity_type}:{entity_id}"
 
 
 def generate_linkedin_post_id() -> str:
     """Construct a plausible LinkedIn post or activity identifier."""
-    return "".join(random.choices(string.digits, k=19))
+    return "".join(_sim.rng().choices(string.digits, k=19))
 
 
 def generate_linkedin_company_id() -> str:
     """Construct a plausible LinkedIn company or organization identifier."""
-    return "".join(random.choices(string.digits, k=8))
+    return "".join(_sim.rng().choices(string.digits, k=8))
 
 
 class LinkedInRecord(BaseModel):

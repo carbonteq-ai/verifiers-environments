@@ -3,29 +3,30 @@
 
 """Google Ads state schema for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional, Set
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_google_ads_id() -> str:
     """Generate a Google Ads style numeric ID."""
-    return "".join(random.choices(string.digits, k=8))
+    return "".join(_sim.rng().choices(string.digits, k=8))
 
 
 def generate_operation_id() -> str:
     """Generate an operation ID."""
     chars = string.ascii_uppercase + string.digits
-    return f"op_{''.join(random.choices(chars, k=24))}"
+    return f"op_{''.join(_sim.rng().choices(chars, k=24))}"
 
 
 def generate_conversion_id() -> str:
     """Generate a conversion ID."""
     chars = string.ascii_uppercase + string.digits
-    return f"conv_{''.join(random.choices(chars, k=24))}"
+    return f"conv_{''.join(_sim.rng().choices(chars, k=24))}"
 
 
 class CustomerList(BaseModel):
@@ -46,7 +47,7 @@ class CustomerList(BaseModel):
     is_eligible_for_display: bool = True
     is_eligible_for_search: bool = True
     members: Set[str] = Field(default_factory=set)  # Set of member identifiers (emails, etc.)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -100,7 +101,7 @@ class Campaign(BaseModel):
     headline: Optional[str] = None
     description: Optional[str] = None
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -169,10 +170,10 @@ class OfflineConversion(BaseModel):
     phone: Optional[str] = None
     conversion_value: str = "0.01"
     conversion_currency_code: str = "USD"
-    conversion_time: datetime = Field(default_factory=datetime.now)
+    conversion_time: datetime = Field(default_factory=_sim.now)
     identifier_source: str = "gclid"
     status: str = "success"
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""
@@ -200,7 +201,7 @@ class Report(BaseModel):
     report_type: str = "CAMPAIGN_PERFORMANCE"
     date_range: str = "LAST_30_DAYS"
     status: str = "COMPLETED"
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Convert to display dictionary."""

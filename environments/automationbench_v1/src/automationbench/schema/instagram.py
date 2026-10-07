@@ -3,23 +3,24 @@
 
 """Instagram Business state definitions for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_instagram_media_id() -> str:
     """Produce a numeric identifier in the style used by Instagram media objects."""
-    return "18" + "".join(random.choices(string.digits, k=15))
+    return "18" + "".join(_sim.rng().choices(string.digits, k=15))
 
 
 def generate_instagram_shortcode() -> str:
     """Produce a URL shortcode in the style used by Instagram posts."""
     chars = string.ascii_letters + string.digits + "_-"
-    return "".join(random.choices(chars, k=11))
+    return "".join(_sim.rng().choices(chars, k=11))
 
 
 class InstagramMedia(BaseModel):
@@ -39,7 +40,7 @@ class InstagramMedia(BaseModel):
     status: Literal["published", "pending", "failed"] = "published"
     is_carousel: bool = False
     carousel_media_count: int = 1
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
     published_at: Optional[datetime] = None
 
     def model_post_init(self, __context) -> None:

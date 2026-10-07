@@ -3,17 +3,18 @@
 
 """HubSpot CRM state definitions for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_hubspot_id() -> str:
     """Produce a numeric identifier in the style used by HubSpot objects."""
-    return "".join(random.choices(string.digits, k=10))
+    return "".join(_sim.rng().choices(string.digits, k=10))
 
 
 class HubSpotOpenTicket(BaseModel):
@@ -41,8 +42,8 @@ class HubSpotContact(BaseModel):
     lifecyclestage: str = Field(default="lead", validation_alias="lifecycle_stage")
     lead_score: Optional[int] = None
     properties: Dict[str, str] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
     # UTM channel attribution fields
     utm_source: Optional[str] = None
     utm_campaign: Optional[str] = None
@@ -160,8 +161,8 @@ class HubSpotCompany(BaseModel):
     annual_revenue: Optional[float] = None
     employee_count: Optional[int] = None
     properties: Dict[str, str] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""
@@ -203,8 +204,8 @@ class HubSpotDeal(BaseModel):
     associated_company_ids: List[str] = Field(default_factory=list)
     description: Optional[str] = None
     properties: Dict[str, str] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
     days_in_stage: Optional[int] = None
 
     def to_display_dict(self) -> dict:
@@ -246,8 +247,8 @@ class HubSpotTicket(BaseModel):
     hubspot_owner_id: Optional[str] = None
     associated_contact_ids: List[str] = Field(default_factory=list)
     properties: Dict[str, str] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.now, alias="created")
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now, alias="created")
+    updated_at: datetime = Field(default_factory=_sim.now)
     company_name: Optional[str] = None
     company_phone: Optional[str] = None
     customer_email: Optional[str] = None
@@ -289,11 +290,11 @@ class HubSpotEngagement(BaseModel):
     id: str = Field(default_factory=generate_hubspot_id)
     engagement_type: Literal["NOTE", "EMAIL", "CALL", "MEETING", "TASK"]
     body: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=_sim.now)
     associated_contact_ids: List[str] = Field(default_factory=list)
     associated_company_ids: List[str] = Field(default_factory=list)
     associated_deal_ids: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
 
 class HubSpotState(BaseModel):

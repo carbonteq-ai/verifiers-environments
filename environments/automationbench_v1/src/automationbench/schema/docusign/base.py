@@ -15,12 +15,13 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_docusign_id() -> str:
     """Produce a UUID formatted like a DocuSign record identifier."""
-    import uuid
 
-    return str(uuid.uuid4())
+    return str(_sim.uuid4())
 
 
 class DocuSignRecord(BaseModel):
@@ -33,7 +34,7 @@ class DocuSignRecord(BaseModel):
         description="Unique identifier for this DocuSign record",
     )
     created_date_time: Optional[datetime] = None
-    last_modified_date_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_modified_date_time: datetime = Field(default_factory=lambda: _sim.now(timezone.utc))
 
     def to_display_dict(self) -> dict:
         """Produce a dictionary suitable for agent rendering. Subclasses should override this."""

