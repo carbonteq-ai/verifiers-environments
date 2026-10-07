@@ -46,6 +46,10 @@ class AutomationBenchTurnRewardConfig(BaseModel):
     # group_relative: they are reported per turn as goal and harm components and kept out
     # of turn_reward, so a trainer can weigh each goal against the group's attempts.
     manifest_goal_channel: Literal["turn_reward", "group_relative"] = "turn_reward"
+    # Report, per turn, a state key (goals achieved so far, the world before the turn and the
+    # bucketed count of distinct successful reads) under turn evidence "turn_state_keys", so a
+    # trainer can compare turns from attempts that reached the same point by different routes.
+    anchor_state_keys: bool = False
 
     @model_validator(mode="after")
     def manifest_weights_together(self):
@@ -53,6 +57,8 @@ class AutomationBenchTurnRewardConfig(BaseModel):
             raise ValueError("manifest_goal_share and manifest_harm_penalty are selected together")
         if self.manifest_goal_channel != "turn_reward" and self.manifest_goal_share is None:
             raise ValueError("manifest_goal_channel requires manifest weights")
+        if self.anchor_state_keys and self.manifest_goal_share is None:
+            raise ValueError("anchor_state_keys requires manifest weights")
         return self
 
     @property
@@ -79,6 +85,9 @@ class AutomationBenchTurnRewardConfig(BaseModel):
             if self.manifest_goal_channel != "turn_reward":
                 # 5: goal and harm credit as per-turn components, outside turn_reward.
                 identity |= {"version": 5, "manifest_goal_channel": self.manifest_goal_channel}
+            if self.anchor_state_keys:
+                # 6: per-turn state keys for anchor fallback.
+                identity |= {"version": 6, "anchor_state_keys": True}
         encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(encoded.encode()).hexdigest()
 

@@ -249,3 +249,39 @@ def test_record_goal_key_names_the_check(monkeypatch, previous):
     trace = recorded_trace(monkeypatch, previous)
     goals, required, _ = keyed_manifest_outcomes(trace)
     assert required == 1 and len(goals) == 1 and goals[0][0].startswith("record:")
+
+
+STATE_CONFIG = GROUP_CONFIG.model_copy(update={"anchor_state_keys": True})
+
+
+def test_turn_state_keys_follow_goals_and_world_changes(monkeypatch):
+    trace = scored_trace(monkeypatch, goal_contract(), [email(to="other@example.com"), email()], goal_world())
+    turns = turns_for(trace)
+    plain = apply_manifest_step_credit(evidence(trace, turns), turns=turns,
+                                       events=trace.tool_execution_events, trace=trace, config=GROUP_CONFIG)
+    assert "turn_state_keys" not in plain
+    keyed = apply_manifest_step_credit(evidence(trace, turns), turns=turns,
+                                       events=trace.tool_execution_events, trace=trace, config=STATE_CONFIG)
+    keys = keyed["turn_state_keys"]
+    turn_ids = [item["turn_id"] for item in keyed["assessments"]]
+    assert list(keys) == turn_ids and all(len(value) == 64 for value in keys.values())
+    # The first email changed the world, so the second turn stands somewhere else.
+    assert keys[turn_ids[0]] != keys[turn_ids[1]]
+    again = apply_manifest_step_credit(keyed, turns=turns, events=trace.tool_execution_events,
+                                       trace=trace, config=STATE_CONFIG)
+    assert again["turn_state_keys"] == keys
+    assert STATE_CONFIG.scorer_digest not in {GROUP_CONFIG.scorer_digest, CONFIG.scorer_digest}
+
+
+def test_failed_results_are_not_reads():
+    from automationbench_v1.manifest_step_credit import _failed
+
+    assert _failed({"status": "raised"})
+    assert _failed({"status": "returned", "result_json": json.dumps('{"success": false, "error": "x"}')})
+    assert _failed({"status": "returned", "result_json": json.dumps("Error executing tool: bad")})
+    assert not _failed({"status": "returned", "result_json": json.dumps('{"success": true, "rows": []}')})
+
+
+def test_anchor_state_keys_require_manifest_weights():
+    with pytest.raises(ValueError, match="anchor_state_keys"):
+        AutomationBenchTurnRewardConfig(anchor_state_keys=True)

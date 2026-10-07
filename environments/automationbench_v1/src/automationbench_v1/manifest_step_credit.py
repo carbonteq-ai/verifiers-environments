@@ -30,6 +30,7 @@ episode and every turn records ``manifest_mapped = 0``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -198,6 +199,78 @@ def keyed_manifest_outcomes(trace: Any) -> tuple[list[tuple[str, str]], int, lis
     return goal_occurrences, required, harms
 
 
+READ_BUCKETS = 3  # distinct successful reads are counted 0, 1, 2 and 3+
+
+
+def _actions_by_invocation(events: Sequence[Any]) -> dict[str, dict[str, Any]]:
+    """Captured raw actions (tool, arguments, world digests, status) keyed by invocation id."""
+
+    actions: dict[str, dict[str, Any]] = {}
+    for event in events:
+        data = event.model_dump(mode="json") if hasattr(event, "model_dump") else dict(event)
+        if data.get("source") != "tool_server" or data.get("phase") not in ("returned", "raised"):
+            continue
+        receipt = json.loads(data["receipt_json"])
+        for encoded in receipt.get("evidence_json") or ():
+            envelope = json.loads(encoded)
+            if isinstance(envelope, Mapping) and isinstance(envelope.get("action"), Mapping):
+                actions[data["invocation_id"]] = dict(envelope["action"])
+    return actions
+
+
+def _failed(action: Mapping[str, Any]) -> bool:
+    """Whether a captured action failed: raised, or returned an error result."""
+
+    if action.get("status") != "returned":
+        return True
+    try:
+        result = json.loads(action.get("result_json") or "null")
+        if isinstance(result, str):
+            text = result.strip()
+            if text.startswith(("Error", "error")):
+                return True
+            result = json.loads(text) if text.startswith("{") else result
+    except ValueError:
+        return False
+    return isinstance(result, Mapping) and result.get("success") is False
+
+
+def turn_state_keys(
+    turns: Sequence[Any],
+    events: Sequence[Any],
+    goal_keys_by_turn: Sequence[Sequence[str]],
+    turn_ids: Sequence[str],
+) -> dict[str, str] | None:
+    """Per turn: digest of (goals first achieved before it, world before it, bucketed reads).
+
+    The world is the after-digest of the last captured action of an earlier turn (the
+    initial world before any). A read is a distinct (tool, arguments) call that returned
+    without changing the world. None when a dispatch cannot be mapped to a turn or an
+    action was not captured."""
+
+    mapping = invocation_turns(turns, events)
+    actions = _actions_by_invocation(events)
+    if mapping is None or set(mapping) - set(actions):
+        return None
+    by_turn: dict[int, list[dict[str, Any]]] = {}
+    for invocation, index in mapping.items():
+        by_turn.setdefault(index, []).append(actions[invocation])
+    ordered = sorted(actions.values(), key=lambda action: action.get("occurrence_index", 0))
+    world = ordered[0]["before_digest"] if ordered else "initial"
+    goals: set[str] = set()
+    reads: set[tuple[str, str]] = set()
+    keys: dict[str, str] = {}
+    for index, turn_id in enumerate(turn_ids):
+        identity = [sorted(goals), world, min(len(reads), READ_BUCKETS)]
+        keys[turn_id] = hashlib.sha256(_canonical(identity).encode()).hexdigest()
+        for action in sorted(by_turn.get(index, ()), key=lambda item: item.get("occurrence_index", 0)):
+            world = action.get("after_digest") or world
+            if action.get("before_digest") == action.get("after_digest") and not _failed(action):
+                reads.add((str(action.get("tool_name")), _canonical(json.loads(action.get("arguments_json") or "{}"))))
+        goals.update(goal_keys_by_turn[index] if index < len(goal_keys_by_turn) else ())
+    return keys
+
+
 def apply_manifest_step_credit(
     evidence: dict[str, Any],
     *,
@@ -263,7 +336,19 @@ def apply_manifest_step_credit(
                 components.append({"name": f"manifest_goal/{key}", "status": "valid",
                                    "value": weight * goal_keys_by_turn[index].count(key)})
         updated.append({**assessment, "components": components})
-    return {**evidence, "assessments": updated}
+    result = {**evidence, "assessments": updated}
+    result.pop("turn_state_keys", None)
+    if config.anchor_state_keys:
+        state_keys = turn_state_keys(turns, events, goal_keys_by_turn, [item["turn_id"] for item in assessments])
+        if state_keys is not None:
+            result["turn_state_keys"] = state_keys
+    return result
 
 
-__all__ = ["apply_manifest_step_credit", "invocation_turns", "keyed_manifest_outcomes", "manifest_outcomes"]
+__all__ = [
+    "apply_manifest_step_credit",
+    "invocation_turns",
+    "keyed_manifest_outcomes",
+    "manifest_outcomes",
+    "turn_state_keys",
+]
