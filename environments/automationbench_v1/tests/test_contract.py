@@ -30,7 +30,7 @@ def test_distribution_metadata_is_standalone_and_pinned() -> None:
     assert not any(package["name"] == "carbonteq-automation-bench" for package in lock["package"])
     verifiers = next(package for package in lock["package"] if package["name"] == "verifiers")
     assert verifiers["source"]["git"].endswith(
-        "?rev=9d95aeb31965d6c945e2621259ac78f9d5e97c76#9d95aeb31965d6c945e2621259ac78f9d5e97c76"
+        "?rev=3cd9045ab23c11c6006202066244063aa012dc47#3cd9045ab23c11c6006202066244063aa012dc47"
     )
 
 
