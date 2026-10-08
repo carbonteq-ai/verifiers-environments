@@ -53,6 +53,37 @@ def test_invocations_map_to_turns_in_order_with_prefixed_names_and_retries():
     assert invocation_turns(turns, [dispatch("e9", 0, "gmail_send_email", {"to": "z"})]) is None
 
 
+def harness(execution, node_index):
+    return {"source": "harness", "execution_id": execution, "node_index": node_index, "phase": "dispatch"}
+
+
+def issued(invocation, seq, tool, kwargs, parent):
+    event = dispatch(invocation, seq, tool, kwargs)
+    receipt = json.loads(event["receipt_json"])
+    receipt["parent_execution_id"] = parent
+    event["receipt_json"] = json.dumps(receipt)
+    return event
+
+
+def test_invocations_map_to_the_turn_whose_node_issued_them():
+    # Turn 0's send was never dispatched; the identical send in turn 1 was. Matching by name
+    # and arguments puts the dispatch on turn 0; the issuing node puts it on turn 1.
+    send = ("gmail_send_email", {"to": "x"})
+    turns = [turn(send), turn(send), turn(("search_tools", {"q": "a"}))]
+    retry = issued("e1r", 1, "gmail_send_email", {"to": "x"}, "h1")
+    retry_receipt = json.loads(retry["receipt_json"])
+    retry_receipt["transport_attempt_index"] = 1
+    retry["receipt_json"] = json.dumps(retry_receipt)
+    events = [harness("h1", 3), issued("e1", 0, "gmail_send_email", {"to": "x"}, "h1"), retry,
+              harness("h2", 5), issued("e2", 2, "search_tools", {"q": "a"}, "h2")]
+    node_turns = {1: 0, 3: 1, 5: 2}
+    assert invocation_turns(turns, events) == {"e1": 0, "e1r": 0, "e2": 2}
+    assert invocation_turns(turns, events, node_turns) == {"e1": 1, "e1r": 1, "e2": 2}
+    # A dispatch without a parent link falls back to name-and-argument matching for the record.
+    unlinked = [*events, dispatch("e3", 3, "gmail_send_email", {"to": "y"})]
+    assert invocation_turns(turns, unlinked, node_turns) == invocation_turns(turns, unlinked)
+
+
 def scored_trace(monkeypatch, declared, calls, initial):
     monkeypatch.setattr(manifest_assessments, "load_task_contract", lambda _: declared)
     task, _, trace = native_fixture(run_operations(initial, calls))
@@ -285,3 +316,16 @@ def test_failed_results_are_not_reads():
 def test_anchor_state_keys_require_manifest_weights():
     with pytest.raises(ValueError, match="anchor_state_keys"):
         AutomationBenchTurnRewardConfig(anchor_state_keys=True)
+
+
+def test_node_turns_cover_sampled_turns_and_their_rerendered_copies():
+    from automationbench_v1.taskset import node_turns
+
+    def node(role, sampled, parent):
+        return SimpleNamespace(message=SimpleNamespace(role=role), sampled=sampled, parent=parent)
+
+    # 0 user; 1 sampled reply that did not parse; 2 its re-rendered copy; 3 tool; 4 sampled reply.
+    nodes = [node("user", False, None), node("assistant", True, 0), node("assistant", False, 0),
+             node("tool", False, 2), node("assistant", True, 3)]
+    trace = SimpleNamespace(nodes=nodes)
+    assert node_turns(trace, [nodes[1], nodes[4]]) == {1: 0, 2: 0, 4: 1}

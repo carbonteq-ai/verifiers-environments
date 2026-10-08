@@ -234,6 +234,24 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     mistake_penalty: AutomationBenchMistakePenaltyConfig | None = None
 
 
+def node_turns(trace: Any, turn_nodes: list[Any]) -> dict[int, int]:
+    """Trace node index -> training turn index for every assistant node that issued a turn's calls.
+
+    A re-rendered (unsampled) copy of a sampled turn shares its parent and maps to the same
+    turn, since the harness may record either node as the one whose tool calls it ran."""
+
+    positions = {id(node): index for index, node in enumerate(getattr(trace, "nodes", ()) or ())}
+    mapping: dict[int, int] = {}
+    for turn, node in enumerate(turn_nodes):
+        if id(node) in positions:
+            mapping[positions[id(node)]] = turn
+    turn_by_parent = {node.parent: turn for turn, node in enumerate(turn_nodes)}
+    for node in getattr(trace, "nodes", ()) or ():
+        if node.message.role == "assistant" and not node.sampled and node.parent in turn_by_parent:
+            mapping.setdefault(positions[id(node)], turn_by_parent[node.parent])
+    return mapping
+
+
 def training_nodes(trace: Any) -> list[Any] | None:
     """Nodes of the trajectory Posttrain trains, or None when it trains none.
 
@@ -417,11 +435,12 @@ class AutomationBenchTask(
             from .manifest_step_credit import apply_manifest_step_credit
 
             training = training_nodes(trace)
-            turns = [node.message for node in training or ()
-                     if node.sampled and node.message.role == "assistant"]
+            turn_nodes = [node for node in training or ()
+                          if node.sampled and node.message.role == "assistant"]
             trace.info[TURN_EVIDENCE_KEY] = apply_manifest_step_credit(
-                trace.info[TURN_EVIDENCE_KEY], turns=turns, events=trace.tool_execution_events,
-                trace=trace, config=config,
+                trace.info[TURN_EVIDENCE_KEY], turns=[node.message for node in turn_nodes],
+                events=trace.tool_execution_events, trace=trace, config=config,
+                node_turns=node_turns(trace, turn_nodes),
             )
 
     def _attach_turn_evidence(

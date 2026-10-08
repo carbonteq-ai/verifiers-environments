@@ -22,10 +22,12 @@ first witnessed, valued ``manifest_goal_share / R``, and its capped
 each goal by how many of a group's attempts reached it.
 
 Unknown or abstained findings contribute nothing. Tool invocations are mapped
-to turns by matching each tool-server dispatch, in order, to the next sampled
-tool call with the same name and arguments (transport retries map to the same
-call). If any dispatch cannot be matched, no manifest credit is applied to the
-episode and every turn records ``manifest_mapped = 0``.
+to the turn that issued them: each tool-server dispatch names its parent harness
+execution, whose event records the assistant node that made the call. Records
+without that link fall back to matching each dispatch, in order, to the next
+sampled tool call with the same name and arguments (transport retries map to the
+same call). If any dispatch cannot be mapped, no manifest credit is applied to
+the episode and every turn records ``manifest_mapped = 0``.
 """
 
 from __future__ import annotations
@@ -68,9 +70,47 @@ def _name(call: Any) -> str:
     return str(name or "")
 
 
-def invocation_turns(turns: Sequence[Any], events: Sequence[Any]) -> dict[str, int] | None:
-    """Map tool-server invocation ids to assistant turn indexes, or None if ambiguous."""
+def _event_data(event: Any) -> dict[str, Any]:
+    return event.model_dump(mode="json") if hasattr(event, "model_dump") else dict(event)
 
+
+def _issuing_turns(events: Sequence[Any], node_turns: Mapping[int, int]) -> dict[str, int] | None:
+    """Map invocations through the harness execution that issued them, or None if any is unlinked.
+
+    Each tool-server dispatch names its ``parent_execution_id``; the harness event of that
+    execution records the ``node_index`` of the assistant message whose tool call it ran."""
+
+    executions: dict[str, int] = {}
+    dispatches: list[tuple[str, str | None]] = []
+    for event in events:
+        data = _event_data(event)
+        if data.get("source") in {"harness", "interceptor"} and isinstance(data.get("node_index"), int):
+            executions.setdefault(str(data.get("execution_id")), data["node_index"])
+        elif data.get("source") == "tool_server" and data.get("phase") == "dispatch":
+            receipt = json.loads(data["receipt_json"])
+            dispatches.append((data["invocation_id"], receipt.get("parent_execution_id")))
+    mapping: dict[str, int] = {}
+    for invocation, parent in dispatches:
+        turn = node_turns.get(executions.get(str(parent), -1)) if parent is not None else None
+        if turn is None:
+            return None
+        mapping[invocation] = turn
+    return mapping
+
+
+def invocation_turns(
+    turns: Sequence[Any], events: Sequence[Any], node_turns: Mapping[int, int] | None = None
+) -> dict[str, int] | None:
+    """Map tool-server invocation ids to assistant turn indexes, or None if ambiguous.
+
+    With ``node_turns`` (trace node index -> turn index), every dispatch is mapped to the
+    turn that issued it through its harness execution. Records without that link fall back
+    to matching dispatches, in order, to sampled calls by tool name and arguments."""
+
+    if node_turns is not None:
+        issued = _issuing_turns(events, node_turns)
+        if issued is not None:
+            return issued
     calls = [
         (index, _name(call), _canonical(_arguments(call)))
         for index, message in enumerate(turns)
@@ -78,7 +118,7 @@ def invocation_turns(turns: Sequence[Any], events: Sequence[Any]) -> dict[str, i
     ]
     dispatches = []
     for event in events:
-        data = event.model_dump(mode="json") if hasattr(event, "model_dump") else dict(event)
+        data = _event_data(event)
         if data.get("source") != "tool_server" or data.get("phase") != "dispatch":
             continue
         receipt = json.loads(data["receipt_json"])
@@ -240,6 +280,7 @@ def turn_state_keys(
     events: Sequence[Any],
     goal_keys_by_turn: Sequence[Sequence[str]],
     turn_ids: Sequence[str],
+    node_turns: Mapping[int, int] | None = None,
 ) -> dict[str, str] | None:
     """Per turn: digest of (goals first achieved before it, world before it, bucketed reads).
 
@@ -248,7 +289,7 @@ def turn_state_keys(
     without changing the world. None when a dispatch cannot be mapped to a turn or an
     action was not captured."""
 
-    mapping = invocation_turns(turns, events)
+    mapping = invocation_turns(turns, events, node_turns)
     actions = _actions_by_invocation(events)
     if mapping is None or set(mapping) - set(actions):
         return None
@@ -278,6 +319,7 @@ def apply_manifest_step_credit(
     events: Sequence[Any],
     trace: Any,
     config: AutomationBenchTurnRewardConfig,
+    node_turns: Mapping[int, int] | None = None,
 ) -> dict[str, Any]:
     """Return turn evidence with manifest goal/harm components added to each turn."""
 
@@ -287,7 +329,7 @@ def apply_manifest_step_credit(
     keyed_goals, required, harms = keyed_manifest_outcomes(trace)
     goal_occurrences = [occurrence for _, occurrence in keyed_goals]
     separate = config.manifest_goal_channel == "group_relative"
-    mapping = invocation_turns(turns, events) if (goal_occurrences or harms) else {}
+    mapping = invocation_turns(turns, events, node_turns) if (goal_occurrences or harms) else {}
     mapped = mapping is not None
     goals_by_turn = [0] * len(assessments)
     goal_keys_by_turn: list[list[str]] = [[] for _ in assessments]
@@ -339,7 +381,9 @@ def apply_manifest_step_credit(
     result = {**evidence, "assessments": updated}
     result.pop("turn_state_keys", None)
     if config.anchor_state_keys:
-        state_keys = turn_state_keys(turns, events, goal_keys_by_turn, [item["turn_id"] for item in assessments])
+        state_keys = turn_state_keys(
+            turns, events, goal_keys_by_turn, [item["turn_id"] for item in assessments], node_turns
+        )
         if state_keys is not None:
             result["turn_state_keys"] = state_keys
     return result
