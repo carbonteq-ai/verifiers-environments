@@ -51,3 +51,16 @@ def test_missing_receipt_never_becomes_qualified_action_record():
     effects = asana_effects(EffectIndex(world_transitions(source)))
     assert effects[0].status == "qualified"
     assert effects[1].status == "unavailable"
+
+
+def test_create_task_arguments_compare_in_stored_names():
+    from automationbench_v1.asana_evidence import stored_arguments
+
+    # asana_create_task stores description as notes and due_on as dueDate; nulls are absent.
+    assert stored_arguments(
+        "create_task", {"name": "Provision Jordan", "description": "Laptop", "due_date": None, "due_on": "2026-02-01"}
+    ) == {"name": "Provision Jordan", "notes": "Laptop", "dueDate": "2026-02-01"}
+    # An explicit notes argument wins, as in the tool.
+    assert stored_arguments("create_task", {"notes": "N", "description": "D"}) == {"notes": "N"}
+    # Other operations keep their own argument names.
+    assert stored_arguments("add_task_to_section", {"description": "D"}) == {"description": "D"}
