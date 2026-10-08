@@ -35,6 +35,20 @@ def action_records(world: Mapping, key: str) -> tuple[Mapping, ...]:
     return tuple(records)
 
 
+# asana_create_task stores ``description`` as ``notes`` and ``due_on`` as ``dueDate``
+# (``notes or description``, ``dueDate or due_on``); compare invocations in the stored names.
+_ARGUMENT_ALIASES = {"create_task": {"description": "notes", "due_on": "dueDate"}}
+
+
+def stored_arguments(kind: str, arguments: Mapping[str, Any]) -> dict[str, Any]:
+    effective = {key: value for key, value in arguments.items() if value is not None and value != ""}
+    for alias, stored in _ARGUMENT_ALIASES.get(kind, {}).items():
+        if alias in effective:
+            value = effective.pop(alias)
+            effective.setdefault(stored, value)
+    return effective
+
+
 @dataclass(frozen=True)
 class AsanaEffect:
     invocation_id: str
@@ -91,9 +105,7 @@ def asana_effects(index: EffectIndex) -> tuple[AsanaEffect, ...]:
                 raise ValueError("asana_new_record_unresolved")
             record = matches[0]
             params = record["params"]
-            effective = {
-                key: value for key, value in args.items() if value is not None and value != ""
-            }
+            effective = stored_arguments(kind, args)
             if any(params.get(key) != value for key, value in effective.items()):
                 raise ValueError("asana_invocation_effect_disagreement")
             if any(returned.get(key) != value for key, value in params.items()):
