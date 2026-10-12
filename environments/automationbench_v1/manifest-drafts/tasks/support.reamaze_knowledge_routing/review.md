@@ -27,3 +27,13 @@ Known gaming (not closed):
 ## Revision 2026-10-12 (shard 2 eval validation, second pass)
 
 added effect goals routed-to-domain-expert-update and tagged-with-domain-update mirroring the retained checks. Replayed on the Luna episode with the step-credit reader. draft_sha256 in review.json predates this revision.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `8275f72a6912fdc573ad0c03bc5f1e764cbc7177954f0da991856bee679db9f3`.
+
+No edits in this review.
+
+Luna replay (step-credit reader): 22 of 31 decided required findings met; failing goal checks: kb-link-shared; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Unchanged. Luna routes and tags correctly but sent KB links with a wrong tool: kb-link-shared fails (real). Inert (not scored by the step-credit reader): routed-to-domain-expert, tagged-with-domain.

@@ -9,3 +9,9 @@ Checks a qualified read of the exact source message/thread, reply destination/th
 **Validation.** Native schema admission passed. Retained episode score, candidate findings and reload/rescore were recorded at [`/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_reply_complaint.json`](/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_reply_complaint.json); archive SHA-256 `9d089103bfd4685061957c7e91f324c9bf1c10ccf8329f4978fa03e9e62f092e`. Four genuine-handler controls (positive, omission, missing ACK and wrong entity) include actual reward maps, raw dispatch/return receipts, ACK materials and full task context under `/tmp/automationbench-luna-simple-batch16-20261005/controls`; scored wire episodes are separately saved under `/tmp/automationbench-luna-simple-batch16-20261005/controls/scored_archives` with per-archive SHA-256 values in `review.json`. All control/reload findings and reward maps matched; source inventory was stable (`59a23c931845d6021e6253315a79ff779ce8215f3635264546b3b6dcd4d425b9`).
 
 **Known limits.** No action credit, training eligibility or whole-task qualification. Apology, acknowledgment of the slow-load complaint, and explanation of the engineering cause are paraphrasable content/judgment. The numeric 15% and “next renewal” same-line association are checked; whether the email actually presents a goodwill offer is not proven.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-recipient. Goals re-derived from the prompt and task data. Luna replay: 5/5 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Added send-apology goal (prompt asks for an apology).

@@ -15,3 +15,14 @@ Three authentic-handler component scenarios (positive, candidate mismatch, and m
 - **expressed — goal:** create-hubspot-contact — Checks sender email, first/last name, company, job title and phone on actual contact-create evidence.
 
 No action-credit policy is declared. The public request, destination identity, retained-state limits and semantic report gaps are kept separate from the component findings.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `2fe0f6bd7861a5e201737974e441ee1a1c7e058d954cd2feeabcfc1f932af46b`.
+
+Edits in this review:
+- added harm guard: no duplicate creation of the same record
+
+Luna replay (step-credit reader): 2 of 2 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Luna full pass: every required goal met, no harm; empty run meets nothing.

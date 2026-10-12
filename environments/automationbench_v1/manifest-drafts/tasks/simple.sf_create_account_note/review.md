@@ -15,3 +15,9 @@
 ## Limits
 
 - No action or token credit is declared. Shared narration policies remain out of scope. Wrong-goal controls do not claim harm absent public prohibition.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are duplicate-note, note-on-wrong-parent. Goals re-derived from the prompt and task data. Luna replay: 1/1 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Dropped optional custom_type requirement (parent_id identifies the account); added note-on-wrong-parent harm guard.

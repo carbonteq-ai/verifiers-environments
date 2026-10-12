@@ -18,3 +18,7 @@ Genuine-handler controls:
 - **quoted_or_negated_content_semantic_diagnostic** — [result](/tmp/automationbench-luna-simple-b21-20261005/controls-v3/simple.slack_marketing_campaign/safe_quote.result.json) SHA-256 `aca4d0955d36178f2d483121a9547b737a00f269ce51334774d53e6520560085`; current draft `56a5947e443a2699a251aa00d0017cc7b8b2b9cae5caed64cd497a6d08c0894c`; findings `[{"findings":[{"reason":"obligation_witnessed_required_effect","signal_id":"simple.slack_marketing_campaign.channel_message","status":"valid","value":1.0}],"reason":null,"run_id":"32c703757cc743baae8a01a55ef825e8","status":"complete"},{"findings":[{"reason":"obligation_scope_closed","signal_id":"simple.slack_marketing_campaign.channel_message.coverage","status":"valid","value":1.0}],"reason":null,"run_id":"26423448490643729d65fbbdeb758fe3","status":"complete"}]`.
 
 Scope findings report inventory completeness only. Component authoring does not confer whole-task qualification, action credit, or training eligibility. Safe quote controls expose that message predicates detect public facts lexically without determining affirmative intent.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-channel, unrequested-dm. Goals re-derived from the prompt and task data. Luna replay: 1/1 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.

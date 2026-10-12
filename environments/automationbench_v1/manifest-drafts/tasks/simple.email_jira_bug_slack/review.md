@@ -20,3 +20,14 @@ No action-credit policy is declared. The public request, destination identity, r
 ## Revision 2026-10-12 (shard 2 eval validation)
 
 added effect goal jira-bug-issue-created (project PLAT, issue type Bug, after the email read). Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `17fd8b9559221b7b61ac3bdf06cffd979cfeb97e997871ef1cbebcace9587bbc`.
+
+Edits in this review:
+- added harm guard: no Slack post to a channel other than the requested one
+
+Luna replay (step-credit reader): 3 of 3 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Luna full pass: every required goal met, no harm; empty run meets nothing.

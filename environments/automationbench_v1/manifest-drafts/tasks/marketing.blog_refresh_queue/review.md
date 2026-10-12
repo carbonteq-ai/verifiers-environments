@@ -10,3 +10,4 @@
 - Current controls use native handlers for correct, allowed-alternative, harmful (evergreen and legal-hold rows), and missing-ACK cases. All four have zero assessment/credit errors and independent ordinary-scorer parity; both harmful rows trigger declared guards.
 - The retained episode still misses the required audit email; its count check only requires the count label, not the exact computed total. The summary is not proof that all original assertions passed.
 - Prior r1/r2 draft, replay, and control evidence is retained in `authoring_history` and the corresponding `_before_r*` scratch artifacts. No qualification is granted.
+- Shard-1 re-review: audit email now also must name each qualifying post's Title (prompt: include names of affected entities; official assertion requires 'Help Desk Buyer Guide' in the audit email).

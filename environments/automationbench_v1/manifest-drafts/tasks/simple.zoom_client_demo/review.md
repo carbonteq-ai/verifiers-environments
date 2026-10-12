@@ -9,3 +9,7 @@ Four genuine-handler controls ran with the full public prompt, initial state, or
 **Remaining gaps:** timezone_instant_interpretation: The check establishes civil date and wall-clock values only. The prompt does not say whether EST means a fixed UTC offset or the Eastern regional timezone with daylight-saving transitions; Zoom stores start_time and timezone separately. Bind a public timezone policy before claiming UTC/instant equivalence.
 
 No action credit, training eligibility or whole-task qualification is granted. The system-prompt conversation rules are recorded as out of scope for deterministic task checks.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-meeting-host. Goals re-derived from the prompt and task data. Luna replay: 3/3 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.

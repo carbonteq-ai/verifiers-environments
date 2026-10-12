@@ -22,3 +22,7 @@ H2 duplicate -> guard 1 on the second create; act-then-undo is closed by the fin
 Mechanism notes: Luna episode predates the persisted-issue Jira handler: its create_issue wrote only an action record, so the installed retained check scores the correct Luna run 0 (created_matching_fresh_object_absent). This is the installed, tested behaviour (tests/test_jira_accessibility_manifest.py::test_recorded_action_log_does_not_invent_retained_issue), not a draft error; it blocks qualification until a reference episode is re-recorded on the current handler.
 
 Both in-scope obligations are expressed and verified on the simulator, but the recorded Luna episode (old action-only Jira handler) scores O1 0 by design; needs a re-recorded reference.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are duplicate-audit-issue. Goals re-derived from the prompt and task data. Luna replay: 1/1 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.

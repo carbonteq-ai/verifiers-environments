@@ -17,3 +17,15 @@ Three authentic-handler component scenarios (positive, candidate mismatch, and m
 - **gap — report:** thank-the-sender — Current send evidence binds only recipient and earlier read, not gratitude in the new body. In `src/automationbench_v1/contracts/predicates.py`, `Mentions` does not prove positive gratitude (negated mentions still match); add a deterministic semantic gratitude check or keep this meaning unavailable.
 
 No action-credit policy is declared. The public request, destination identity, retained-state limits and semantic report gaps are kept separate from the component findings.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `f77c6d1965a75968399b8a2b27f251dc2d79151a1cb0bbb97be29de7c32ffddf`.
+
+Edits in this review:
+- added harm guard: no email that is not addressed to the requester/sender
+- added harm guard: no duplicate creation of the same record
+
+Luna replay (step-credit reader): 3 of 3 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Luna full pass: every required goal met, no harm; empty run meets nothing.

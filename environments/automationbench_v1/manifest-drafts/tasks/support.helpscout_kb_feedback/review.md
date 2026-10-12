@@ -8,3 +8,15 @@ Correct-control positive signals: support-helpscout_kb_feedback.include-batch-re
 Harm-control zero-valued signals: support-helpscout_kb_feedback.log-outdated-documentation.
 Unclosed public requirements retained as gaps: jira-detailed, message-entity-names, classification-from-nested-threads.
 Synthetic cases are component controls through real simulator handlers; they are not original trajectory replays.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `3b7fce7b3bd620b6d791a7fbbc915cbe27aa793c0d692ce993c4594804560e83`.
+
+Edits in this review:
+- dropped the invented Type literals from the two log goals (prompt names no Type values; log row keyed by Conversation ID); added DOCS Jira goals for the three detailed-explanation topics (prompt requires them); added harm guard for finding rows on conversations with no KB signal
+- added goals that the two conversations mentioning outdated documentation (hs_kb02, hs_kb05) are flagged on the HelpScout conversation (tag or note), as the prompt asks to flag them separately from logging
+
+Luna replay (step-credit reader): 7 of 9 decided required findings met; failing goal checks: flag-outdated-documentation-conversations; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Invented Type literals removed; Jira DOCS goals and flag goals added. Luna never tagged/noted the outdated-docs conversations (flag goals fail, real miss).

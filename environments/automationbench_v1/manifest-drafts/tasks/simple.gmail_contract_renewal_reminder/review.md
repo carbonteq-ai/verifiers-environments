@@ -9,3 +9,9 @@ Checks the exact subject and recipient, expiry date, 10% amount, deadline, porta
 **Validation.** Native schema admission passed. Retained episode score, candidate findings and reload/rescore were recorded at [`/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_contract_renewal_reminder.json`](/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_contract_renewal_reminder.json); archive SHA-256 `ffddf42b84758cb7a22e88cb7314329f80a837bdb68008b750ca8958c2c6a469`. Four genuine-handler controls (positive, omission, missing ACK and wrong entity) include actual reward maps, raw dispatch/return receipts, ACK materials and full task context under `/tmp/automationbench-luna-simple-batch16-20261005/controls`; scored wire episodes are separately saved under `/tmp/automationbench-luna-simple-batch16-20261005/controls/scored_archives` with per-archive SHA-256 values in `review.json`. All control/reload findings and reward maps matched; source inventory was stable (`59a23c931845d6021e6253315a79ff779ce8215f3635264546b3b6dcd4d425b9`).
 
 **Known limits.** No action credit, training eligibility or whole-task qualification. The reminder’s complete business sentence must preserve that the discount applies if Ben signs by March 15; a same-line amount/date pair does not prove the condition. Politeness, reminder clarity and any equivalent wording beyond exact date, amount, recipient, subject and portal URL require semantic review.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-recipient. Goals re-derived from the prompt and task data. Luna replay: 7/7 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Expiry and deadline dates matched as calendar dates (any spelling of March 31 2026 / March 15), not literal ordinal strings.

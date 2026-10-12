@@ -18,3 +18,9 @@ Genuine-handler controls:
 - **quoted_or_negated_content_semantic_diagnostic** — [result](/tmp/automationbench-luna-simple-b21-20261005/controls-v3/simple.slack_office_closure/safe_quote.result.json) SHA-256 `ef905cdd23c434198d4cc8930ade1ac5cbdb195ec8ba8ee0d1fc259c1b03d7c4`; current draft `202414698d389b7e3a5a6ce1baeff928a9075dcb12ec63d6a1d395deb05fde7d`; findings `[{"findings":[{"reason":"obligation_witnessed_required_effect","signal_id":"simple.slack_office_closure.channel_message","status":"valid","value":1.0}],"reason":null,"run_id":"f22c29924c2b46fb9b25043a46fb2c2f","status":"complete"},{"findings":[{"reason":"obligation_scope_closed","signal_id":"simple.slack_office_closure.channel_message.coverage","status":"valid","value":1.0}],"reason":null,"run_id":"9968d4c4e4294ba0a49cad350727a4d7","status":"complete"}]`.
 
 Scope findings report inventory completeness only. Component authoring does not confer whole-task qualification, action credit, or training eligibility. Safe quote controls expose that message predicates detect public facts lexically without determining affirmative intent.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-channel, unrequested-dm. Goals re-derived from the prompt and task data. Luna replay: 1/1 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: February 27 matched as a calendar date (any spelling).

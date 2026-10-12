@@ -20,3 +20,14 @@ Native/control module fingerprints stayed unchanged during the final run (`ad19a
 ## Revision 2026-10-12 (shard 2 eval validation)
 
 rebound from the whole-prompt binding to the user message (prompt[1].content). Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `9fac76d8a9de81dbd6e654cccbeef77ac335387550e19a6993bb500fb95daecc`.
+
+Edits in this review:
+- added harm guard: no duplicate creation of the same record
+
+Luna replay (step-credit reader): 1 of 1 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Luna full pass: every required goal met, no harm; empty run meets nothing.

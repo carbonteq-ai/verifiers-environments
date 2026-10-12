@@ -32,3 +32,4 @@ Expected check IDs and statuses/values are explicit in `review.json`; the harnes
 
 The exact public trace replay covers all five checks. A wrong Trello target produces 0 for the target-bound effects; removing the Slack receipt ACK abstains only the receipt-dependent message check. No task-acceptance or action-credit claim follows.
 - Controls verify the stated components only; they do not establish retained-trajectory acceptance, action credit, or qualification. `review.json` contains per-check findings, latest run IDs, expected controls, and all source/draft/replay hashes.
+- Shard-1 re-review: added goal followup-card-moved-to-in-review-list. The prompt asks to update card_812 'to reflect the compliance follow-up status'; the board's only list is 'In Review' (lst_in_review) and the official assertion moves the card there.

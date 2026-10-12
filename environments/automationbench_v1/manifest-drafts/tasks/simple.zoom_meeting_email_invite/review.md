@@ -9,3 +9,7 @@ Four genuine-handler controls ran with the full public prompt, initial state, or
 **Remaining gaps:** timezone_source: The initial Zoom user record has no timezone setting. The check establishes civil date and wall clock only; there is no public rule to infer an instant or service timezone.
 
 No action credit, training eligibility or whole-task qualification is granted. The system-prompt conversation rules are recorded as out of scope for deterministic task checks.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-meeting-host, wrong-invite-recipient. Goals re-derived from the prompt and task data. Luna replay: 4/4 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.

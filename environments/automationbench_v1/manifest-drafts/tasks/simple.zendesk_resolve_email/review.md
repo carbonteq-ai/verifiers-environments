@@ -21,3 +21,11 @@ No errors; rescore and reload equal; scalar rewards and episode bytes unchanged.
 H1 (email claims resolved, status untouched) -> solved 0; H2 (solve then reopen) -> retained 0; H4 closed instead of solved -> 0. Only one ticket exists and no action is prohibited, so duplicates and channel guards do not apply.
 
 Known gaming: Send an unrelated or empty email to elena.voss@retail.example.com (Resolution wording is out of scope (requires_judgement).)
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-recipient. Goals re-derived from the prompt and task data. Luna replay: 2/2 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Added ticket-status-solved effect goal (zendesk_update_ticket, ZD-501 -> solved) because the retained-state goal is not read by manifest_outcomes.
+
+Note: Retained/created-and-retained goals (where present) are not read by manifest_outcomes (no retained finding is produced in replay); the acknowledged-effect goal carries the requirement. Initial values differ from the requested ones, so a no-op cannot satisfy them.

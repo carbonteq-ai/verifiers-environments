@@ -9,3 +9,9 @@ Checks exact recipient/subject, date and clock time plus their same-line occurre
 **Validation.** Native schema admission passed. Retained episode score, candidate findings and reload/rescore were recorded at [`/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_meeting_confirm.json`](/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_meeting_confirm.json); archive SHA-256 `dd67ae55154e096b1bbf5ae8a44776283b38a2e7a7d36bc327660cd8f0546413`. Four genuine-handler controls (positive, omission, missing ACK and wrong entity) include actual reward maps, raw dispatch/return receipts, ACK materials and full task context under `/tmp/automationbench-luna-simple-batch16-20261005/controls`; scored wire episodes are separately saved under `/tmp/automationbench-luna-simple-batch16-20261005/controls/scored_archives` with per-archive SHA-256 values in `review.json`. All control/reload findings and reward maps matched; source inventory was stable (`59a23c931845d6021e6253315a79ff779ce8215f3635264546b3b6dcd4d425b9`).
 
 **Known limits.** No action credit, training eligibility or whole-task qualification. The message must confirm the request; whether its wording communicates confirmation/acceptance is a semantic language requirement.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are wrong-recipient. Goals re-derived from the prompt and task data. Luna replay: 4/4 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Accept Feb 25 / February 25 / 25th spellings for the meeting date.

@@ -8,3 +8,4 @@ Gaps remain for the public stale cutoff, one-to-one email-to-engagement reconcil
 
 Draft SHA-256: `7f98d175c024110beb5127dad8b2b709cde1d8ab7ea2f08377776db370d31b69`
 Episode SHA-256: `a5c1aa41aada01dadfd9932b9791ce18295efcc5e70c901c164dfcc7120bc648`
+- Shard-1 re-review: added goals chatgpt-drafted-cont_hs_101/102 (prompt: 'using ChatGPT to craft the messaging'): a ChatGPT completion for the contact must exist, mentioning the company or industry.

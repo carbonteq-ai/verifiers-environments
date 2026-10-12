@@ -22,3 +22,9 @@ Controls:
 - **missing_target_ack**: /tmp/automationbench-luna-simple-b18-20261005/controls/simple.new_hire_asana_email/missing_ack.result.json (SHA-256 `f2f7d9c6b0e7e20d6290083dd60b7d8c2b9cd2d45a760a82a6e37727f1ad3e30`); findings `[{"findings":[{"reason":"obligation_effect_scope_unavailable","signal_id":"simple.new_hire_asana_email.onboarding_task_action","status":"abstained","value":null}],"reason":null,"run_id":"1e6cc50391bd436a85d37e6cd9730f09","status":"complete"},{"findings":[{"reason":"obligation_scope_unavailable","signal_id":"simple.new_hire_asana_email.onboarding_task_action.coverage","status":"abstained","value":null}],"reason":null,"run_id":"7061a7f3d35f40e881a88bd526c30c07","status":"complete"},{"findings":[{"reason":"obligation_witnessed_required_effect","signal_id":"simple.new_hire_asana_email.welcome_email_routed","status":"valid","value":1.0}],"reason":null,"run_id":"b55b825101f14e85adc8d0e2567d13cb","status":"complete"},{"findings":[{"reason":"obligation_scope_unavailable","signal_id":"simple.new_hire_asana_email.welcome_email_routed.coverage","status":"abstained","value":null}],"reason":null,"run_id":"ac7652b9cf5d47d19386075a148f9704","status":"complete"}]`.
 
 Coverage findings report only population/scope completeness. They do not show that the requested action succeeded. No action credit or whole-task qualification is claimed. Public requirements, action receipts, terminal object state, and semantic limitations remain separate.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are duplicate-task, wrong-recipient. Goals re-derived from the prompt and task data. Luna replay: 2/2 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Welcome email goal now requires the word welcome in subject or body.

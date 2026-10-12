@@ -19,3 +19,10 @@ Synthetic native controls (public fixture, not captured rollout): see `/tmp/auto
 
 Retained envelope outcome distinguishes the Catherine control (1) from the William contrast (0); routing/opportunity effect credit remains unavailable.
 
+
+## Eval review (shard 0, 2026-10-12)
+
+- Verdict: reject
+- Luna native score 0.58; replay: required goals met 0/3, harms 0; no-op: goals met 0, harms 0.
+- Edited this session: no
+- Notes: The core decision (which contact signs) cannot be measured deterministically: the routing sheet says eligible = role contains 'Signer', then highest seniority_level, then alphabetical by last name. On the Meridian Corp account (001xx000003MER1) the eligible signers are Diana Ashworth (Board Signer, seniority 5), Catherine Brooks (Legal Signer, 3), William Zhang (Executive Signer, 3), James Liu (2); the rules therefore select Diana Ashworth, while the benchmark expects Catherine Brooks and asserts the envelope must NOT go to Diana (draft hard-codes Catherine, its own selection logic would pick Diana). Luna chose William Zhang (a seniority-3 tie, wrong under both readings). Needs a task-data or rule fix (e.g. make Diana ineligible or lower her seniority) before a signer goal can be written. Everything else (one Enterprise-template envelope, opportunity description updated, #deal-alerts post with $125,000) is measurable but would leave the central decision unscored.

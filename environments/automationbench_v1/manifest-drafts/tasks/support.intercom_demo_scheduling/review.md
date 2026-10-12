@@ -22,3 +22,13 @@ No errors; bindings admitted; scalar rewards and episode bytes unchanged; rescor
 
 Known gaming (not closed):
 - Summary names a booked company that was never booked — Not joined to the event effect; event checks lose credit separately.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `fff6dc70cac8984e3bb18f50b75a55811bbaf82015fdf7f0152e75074d3334ee`.
+
+No edits in this review.
+
+Luna replay (step-credit reader): 31 of 36 decided required findings met; failing goal checks: demo-event-invites-sales, demo-event-named, demo-event-tier-length, qualified-contact-notified, summary-names-booked; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Unchanged and rigorous (policy-derived sets, overrides, tiers). Luna skipped qualified contact ic_c614 (DevForge): real miss.

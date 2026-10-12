@@ -24,3 +24,10 @@ connection set is declared. Status: qualified candidate.
 ## Simulator controls
 
 No source-grounded correct action variant was defined for the current outcome diagnostic; the missing input and action scopes remain explicit gaps.
+
+## Eval review (shard 0, 2026-10-12)
+
+- Verdict: needs-fix
+- Luna native score 0.50; replay: required goals met 7/7, harms 0; no-op: goals met 0, harms 0.
+- Edited this session: no
+- Notes: Draft logic otherwise sound (7/7 goals met on Luna's replay with the old schema; no-op clean). Blocking issue: it binds the whole LinkedIn profiles and connections lists, and the current simulator renamed their fields (profile id 'id' -> 'profile_id', 'current_title' -> 'title', connections 'connected_profile_id' -> 'profile_id'), so the digests differ from Luna's episode data and from the 14/16-turn tasks. A draft cannot bind both; it must be rewritten for the current schema (profile_id) and re-validated on a Luna episode recorded on the current simulator. Not editable here without changing the replay evidence.

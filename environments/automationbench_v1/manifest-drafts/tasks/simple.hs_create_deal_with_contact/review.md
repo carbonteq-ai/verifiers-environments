@@ -19,3 +19,9 @@ No errors; rescore and reload equal; scalar rewards and episode bytes unchanged.
 ## Simulator runs and gaming
 
 H5 set stage to closedlost afterwards -> O3 0 (final-state check); C3 fix amount by update -> 1; H4 duplicate -> guard 1.
+
+## Re-review (shard 3)
+
+Supersedes the earlier statement that no harm guard is asserted: guards are duplicate-deal, wrong-contact-associated. Goals re-derived from the prompt and task data. Luna replay: 4/4 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+Edit: Added wrong-contact-associated harm guard.

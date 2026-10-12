@@ -33,3 +33,13 @@ Errors: 0; scalar unchanged: True; bytes unchanged: True; rescore repeated: True
 
 ## Known gaming
 - Create a neutral Salesforce record for every account (no 'unhealthy' word) -> flag obligation 1.0 for both unhealthy accounts and no guard fires (see game run). Fix: Require a flag marker on the record (status/flag field) or absent-in-scope over healthy names.
+
+## Eval review 2026-10-12 (shard 2 reviewer)
+
+Verdict: **eval-ready**. Draft sha256 `64b53f3cd3efc2f26c30790ed4277001cf55b3a43c2889cde09a1ef4dab3bf3b`.
+
+No edits in this review.
+
+Luna replay (step-credit reader): 9 of 17 decided required findings met; failing goal checks: dashboard-score-per-rules, dashboard-status-per-threshold, unhealthy-account-flagged-in-salesforce; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
+
+Unchanged. Scores verified from rules; Luna scored all five wrong and flagged nothing in Salesforce (real misses).

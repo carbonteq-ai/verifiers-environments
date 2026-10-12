@@ -96,6 +96,10 @@
     "emails": {
       "adapter": "gmail.messages@1",
       "kind": "send"
+    },
+    "org_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
     }
   },
   "checks": [
@@ -149,19 +153,43 @@
       "population": "schedule",
       "source": "schedule_updates",
       "required_when": {
-        "op": "eq",
-        "left": {
-          "kind": "field",
-          "path": [
-            "request",
-            "Status"
-          ],
-          "domain": "string"
-        },
-        "right": {
-          "kind": "literal",
-          "value": "Scheduled"
-        }
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Affected Org"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "Acme Corp",
+                "TechFlow",
+                "MultiContact Corp"
+              ]
+            }
+          }
+        ]
       },
       "effect_match": {
         "op": "all",
@@ -306,21 +334,6 @@
       "population": "schedule",
       "source": "calendar_creates",
       "required_when": {
-        "op": "eq",
-        "left": {
-          "kind": "field",
-          "path": [
-            "request",
-            "Status"
-          ],
-          "domain": "string"
-        },
-        "right": {
-          "kind": "literal",
-          "value": "Scheduled"
-        }
-      },
-      "effect_match": {
         "op": "all",
         "args": [
           {
@@ -328,50 +341,36 @@
             "left": {
               "kind": "field",
               "path": [
-                "effect",
-                "record",
-                "summary"
+                "request",
+                "Status"
               ],
               "domain": "string"
             },
             "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
               "kind": "field",
               "path": [
                 "request",
-                "Service"
+                "Affected Org"
               ],
               "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "Acme Corp",
+                "TechFlow",
+                "MultiContact Corp"
+              ]
             }
           }
         ]
-      },
-      "match_cardinality": "per_candidate",
-      "max_instances": 4096
-    },
-    {
-      "check_id": "scheduled-window-customer-email",
-      "signal_id": "support.zendesk_maintenance_notify.scheduled_window_customer_email",
-      "role": "goal",
-      "population": "schedule",
-      "source": "emails",
-      "operator": "effects.required_when@1",
-      "semantics": "new_occurrence",
-      "match_cardinality": "unique_candidate",
-      "max_instances": 4096,
-      "required_when": {
-        "op": "eq",
-        "left": {
-          "kind": "field",
-          "path": [
-            "request",
-            "Status"
-          ],
-          "domain": "string"
-        },
-        "right": {
-          "kind": "literal",
-          "value": "Scheduled"
-        }
       },
       "effect_match": {
         "op": "all",
@@ -382,7 +381,8 @@
               "kind": "field",
               "path": [
                 "effect",
-                "body_text"
+                "record",
+                "summary"
               ],
               "domain": "string"
             },
@@ -402,7 +402,8 @@
               "kind": "field",
               "path": [
                 "effect",
-                "body_text"
+                "record",
+                "start__dateTime"
               ],
               "domain": "string"
             },
@@ -414,7 +415,249 @@
               ],
               "domain": "string"
             },
-            "mode": "verbatim"
+            "mode": "prefix"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "scheduled-window-customer-email",
+      "signal_id": "support.zendesk_maintenance_notify.scheduled_window_customer_email",
+      "role": "goal",
+      "population": "schedule",
+      "source": "emails",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Affected Org"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "Acme Corp",
+                "TechFlow",
+                "MultiContact Corp"
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Service"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Date"
+                  ],
+                  "domain": "string"
+                },
+                "mode": "verbatim"
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Affected Org"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "Acme Corp"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "in",
+                        "left": {
+                          "kind": "literal",
+                          "value": "ops-team@acmecorp.com"
+                        },
+                        "right": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "recipients"
+                          ],
+                          "domain": "sequence"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Affected Org"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "TechFlow"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "in",
+                        "left": {
+                          "kind": "literal",
+                          "value": "infra@techflow.io"
+                        },
+                        "right": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "recipients"
+                          ],
+                          "domain": "sequence"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Affected Org"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "MultiContact Corp"
+                    }
+                  },
+                  {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "in",
+                        "left": {
+                          "kind": "literal",
+                          "value": "admin@multicontact.com"
+                        },
+                        "right": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "recipients"
+                          ],
+                          "domain": "sequence"
+                        }
+                      },
+                      {
+                        "op": "in",
+                        "left": {
+                          "kind": "literal",
+                          "value": "ops@multicontact.com"
+                        },
+                        "right": {
+                          "kind": "field",
+                          "path": [
+                            "effect",
+                            "recipients"
+                          ],
+                          "domain": "sequence"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -445,6 +688,25 @@
             "right": {
               "kind": "literal",
               "value": "Scheduled"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Affected Org"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "Acme Corp",
+                "TechFlow",
+                "MultiContact Corp"
+              ]
             }
           },
           {
@@ -554,19 +816,46 @@
       "source": "emails",
       "operator": "effects.prohibited_when@1",
       "prohibited_when": {
-        "op": "ne",
-        "left": {
-          "kind": "field",
-          "path": [
-            "request",
-            "Status"
-          ],
-          "domain": "string"
-        },
-        "right": {
-          "kind": "literal",
-          "value": "Scheduled"
-        }
+        "op": "any",
+        "args": [
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Affected Org"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "Acme Corp",
+                  "TechFlow",
+                  "MultiContact Corp"
+                ]
+              }
+            }
+          }
+        ]
       },
       "effect_match": {
         "op": "all",
@@ -608,6 +897,589 @@
                 "Date"
               ],
               "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "no-calendar-event-for-unscheduled-or-unmatched-window",
+      "signal_id": "support.zendesk_maintenance_notify.no-calendar-unmatched",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "schedule",
+      "source": "calendar_creates",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "prohibited_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Affected Org"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "Acme Corp",
+                  "TechFlow",
+                  "MultiContact Corp"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "summary"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Service"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "start__dateTime"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Date"
+              ],
+              "domain": "string"
+            },
+            "mode": "prefix"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "no-notified-status-for-unscheduled-or-unmatched-window",
+      "signal_id": "support.zendesk_maintenance_notify.no-notified-unmatched",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "schedule",
+      "source": "schedule_updates",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "prohibited_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "ne",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Affected Org"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "Acme Corp",
+                  "TechFlow",
+                  "MultiContact Corp"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Affected Org"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Affected Org"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Service"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Service"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Date"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Date"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Start Time"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Start Time"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Notified"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "slack-notification-for-email-and-slack-org",
+      "signal_id": "support.zendesk_maintenance_notify.slack-acme",
+      "role": "goal",
+      "population": "schedule",
+      "source": "output",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Affected Org"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Acme Corp"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_acme"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Service"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "email-notes-midnight-crossing",
+      "signal_id": "support.zendesk_maintenance_notify.midnight-note",
+      "role": "goal",
+      "population": "schedule",
+      "source": "emails",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Scheduled"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Affected Org"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "MultiContact Corp"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Service"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "midnight"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "crosses"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "overnight"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "body_text"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "next day"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "no-slack-notice-for-email-only-orgs",
+      "signal_id": "support.zendesk_maintenance_notify.no-slack-email-only",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "output",
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096,
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "C_tf",
+            "C_mc"
+          ]
+        }
+      }
+    },
+    {
+      "check_id": "summary-states-window-count",
+      "signal_id": "support.zendesk_maintenance_notify.summary-count",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "output",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_ops"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "4"
             },
             "mode": "verbatim"
           }
