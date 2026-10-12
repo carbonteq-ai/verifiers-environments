@@ -10,3 +10,11 @@ Partial component authoring only; whole-task status: not qualified.
 - Limitation: The synthetic control changes Aisha and verifies her notice and HR Ops summary. Other named records are checked in the source-bound manifest but the component controls do not independently exercise every manager update.
 - No whole-task qualification, action-credit qualification, or downstream eligibility is claimed.
 - Handler fixture identity was verified against this episode and public prompt, initial state, and tool catalog; late-bound SHA metadata was corrected without changing control results.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Bindings only: rebound the prompt binding to the user message and/or dropped the unused system-message binding (it hashes differently at the 14- and 16-turn loads); no check was changed.
+- Luna replay: 0/12 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 12/12, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `bc5266f71887ee61a5ebfd3efa49d930ecd3c5a9f975c7062ac2359f5ca1639d`.

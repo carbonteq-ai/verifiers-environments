@@ -37,3 +37,10 @@ No edits in this review.
 Luna replay (step-credit reader): 22 of 31 decided required findings met; failing goal checks: kb-link-shared; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
 
 Unchanged. Luna routes and tags correctly but sent KB links with a wrong tool: kb-link-shared fails (real). Inert (not scored by the step-credit reader): routed-to-domain-expert, tagged-with-domain.
+
+
+## Round 2 review (reviewer A, small-fix item 4): inert goal removed
+
+Removed inert goal(s): routed-to-domain-expert, tagged-with-domain (final assignee/tag on each routed conversation). It was a retained-state kind (records.retained_when / collections.counts_when), which the training step-credit reader (manifest_outcomes) never counts, so it carried no reward and no measurement.
+Counted replacement: routed-to-domain-expert-update and tagged-with-domain-update (counted effects goals on the same conversations).
+Evidence: Luna replay: 31 required, 22 met (unchanged; kb-link-shared fails for a wrong tool: real miss); required/met/harm counts identical before and after the removal (required 31 -> 31, met 22 -> 22, harms 0 -> 0); no-op control meets 0 goals and 0 harms; bindings clean at turn budgets 14 and 16; 0 assessment/credit errors. Sources used only by the removed goal were dropped.

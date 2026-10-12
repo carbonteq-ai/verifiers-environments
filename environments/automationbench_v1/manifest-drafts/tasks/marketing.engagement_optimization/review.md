@@ -10,3 +10,11 @@ Real-handler controls: correct, alternative, harmful, missing_ack; independent o
 Checks authored: 3; qualification: not granted.
 
 Remaining documented gaps: engagement-lift-percentage-point-field, top-slot-quantity-per-platform, excluded-item-notification-silence.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Restricted the best-slot schedule and Slack-notify goals to the two core platforms LinkedIn and Twitter (the draft also demanded LinkedIn Live, Twitter Spaces and LinkedIn Newsletter rows, which the official says are different platforms and must not appear in the schedule) and added harm no-schedule-for-variant-platforms; the schedule goal now also requires a non-empty engagement_lift. Kept the harm for scheduling the paid-boost, 2024-pilot, on-hold-legal and anomaly-week observations. Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/2 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 4/4, official fraction 0.833, harms fired none.
+- Draft SHA-256 refreshed to `7f32c11760b7ed9ae7a5e39332d48221b5aab849b8f87375979a296a63102ea2`.

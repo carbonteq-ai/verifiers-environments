@@ -18,3 +18,15 @@ Genuine-handler controls:
 - **quoted_or_negated_content_semantic_diagnostic** — [result](/tmp/automationbench-luna-simple-b21-20261005/controls-v3/simple.slack_deployment_notice/safe_quote.result.json) SHA-256 `ec2826a6a5417bd03fb683d6560fdbf48c0fb46410a330f7c8afdc63be6d1829`; current draft `4eb2b883f8490a88a2b250cdf1f28a074e8a7062b17519a6145265a288e1bb6c`; findings `[{"findings":[{"reason":"obligation_witnessed_required_effect","signal_id":"simple.slack_deployment_notice.channel_message","status":"valid","value":1.0}],"reason":null,"run_id":"5828b03bfd0843e6a83245db77b90184","status":"complete"},{"findings":[{"reason":"obligation_scope_closed","signal_id":"simple.slack_deployment_notice.channel_message.coverage","status":"valid","value":1.0}],"reason":null,"run_id":"9591f3ae6f344150b9223033798aa202","status":"complete"}]`.
 
 Scope findings report inventory completeness only. Component authoring does not confer whole-task qualification, action credit, or training eligibility. Safe quote controls expose that message predicates detect public facts lexically without determining affirmative intent.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; every goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0). Added harm notice-in-other-channel (the v2.4.0 notice posted to a channel other than #engineering; #general exists as a decoy).
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official assertion needs only v2.4.0 in #engineering; goal requires every fact the prompt lists (10 PM EST, webhook system, v2.4.0, dashboard performance fixes, 15 minutes).
+
+Notes: Facts are matched as stated in the prompt (e.g. '10 PM EST' verbatim).

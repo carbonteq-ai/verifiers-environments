@@ -12,3 +12,9 @@ Remaining public gaps: right-channels-and-schedule, audience-and-offer-details.
 Whole task status: not qualified.
 
 Validation source module fingerprint: `b010f8e273a8d3cc352245cfe92e1f2aea0a1688f6355f944c34c9bdc7c482fd` before and `b010f8e273a8d3cc352245cfe92e1f2aea0a1688f6355f944c34c9bdc7c482fd` after; identical across 775 Python files.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `4c3d95517d3f547b028de980d70bdf286aae2ce29ef63948491aaa740189f3e5`. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna scheduled nothing: goal unmet = all 3 scored buffer assertions failed. Positive control (twitter+facebook+instagram posts with title/code/date after reading both emails) meets the goal, benchmark 1.0, no harm. Caveat: goal is satisfied by ONE qualifying post on any org channel while the benchmark wants three channels; lenient but not wrong.

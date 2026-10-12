@@ -43,3 +43,10 @@ No edits in this review.
 Luna replay (step-credit reader): 9 of 17 decided required findings met; failing goal checks: dashboard-score-per-rules, dashboard-status-per-threshold, unhealthy-account-flagged-in-salesforce; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
 
 Unchanged. Scores verified from rules; Luna scored all five wrong and flagged nothing in Salesforce (real misses).
+
+
+## Round 2 review (reviewer A, small-fix item 3): proposal draft.proposed.json
+
+draft.json is untouched. draft.proposed.json is a byte copy of the reviewed eval draft (the draft.json in this folder) proposed as the replacement of the installed qualified manifest; adopting it needs requalification of the credit declarations because the check set changes.
+Why: Installed qualified manifest only guards the excluded dashboard account. The reviewed draft keeps that and adds the prompt-stated goals (dashboard row per scored account, score per the rules, status per threshold, unhealthy accounts flagged in Salesforce) and five guards against flagging healthy or excluded accounts in Salesforce (account/task/case/note creates and updates). Luna met 9 of 17 required goals; the failures (all five scores wrong, nothing flagged in Salesforce) are real Luna misses.
+Evidence (replay.py): installed manifest: binding(14/16)=manifest_source_binding_mismatch/manifest_source_binding_mismatch; Luna required=0 met=0 harms=0; no-op goals=0 harms=0. Reviewed/proposed draft: binding(14/16)=ok/ok; Luna required=17 met=9 harms=0; no-op goals=0 harms=0. Guard violation controls for the added guards that Luna did not trigger are listed in round2/a/guards/guard-controls.json (small-fix item 5).

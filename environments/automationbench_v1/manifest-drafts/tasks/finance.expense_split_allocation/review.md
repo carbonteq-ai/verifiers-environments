@@ -35,3 +35,11 @@ Status: **qualified candidate**, with one open gaming risk for review. Coverage 
 ## Current-byte validation addendum (2026-10-05)
 
 The exact current draft was `2e64372ad8458691ea876778678f02081df86403545b925b175680bd66cc1526`; the historical review draft hash above remains preserved as a prior revision. The retained episode was scored against this draft and pack in `/tmp/finance-current-byte-validation-luna-20261005-03/expense-current-source.json`; native candidate reload/rescore/scalar parity was independently confirmed on the exact serialized wire by the coordinator gate `/tmp/root-finance-expense-current-gate.json` (SHA-256 `bdeb0844accec5aeae99451a0d78cb622f801731112f37ae0dd5e40b4e70a202`). The first pass and contemporaneous AutomationBench source map remain in the linked artifact. The compact native gate does not contain a contemporaneous Verifiers module-source fingerprint, so that provenance detail remains limited. This is retained-development validation only; the prior reference score and review conclusions remain unchanged, and it grants no qualification or eligibility.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.375; draft changed vs. last commit: True.
+- Removed the sole-amount restriction from the 20 per-department charge-emailed goals: they rejected any email line that carried both the source amount and the department's charge (Luna's natural line format), although the prompt asks to include source amounts and charges. Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 28/52 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 52/52, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `fc2d844de4e5cabcead2900009a8bce97aabff21c669bc248da80b5cbbe24b1f`.

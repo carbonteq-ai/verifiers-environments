@@ -10,3 +10,9 @@ Real-handler controls: correct, alternative, harmful, missing_ack; independent o
 Checks authored: 4; qualification: not granted.
 
 Remaining documented gaps: article-curation-priority-topics, no-repeat-from-newsletter-history, newsletter-article-eligibility-and-facts, send-on-scheduled-monday-9am-est, pending-subscriber-row-not-deleted.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `6db09b564172fd8bb6f323efdb6e0d00c4bdfa2224966f59dc62089e230e80cc`. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna agreement: row-5 update (only passed scored assertion) = 1 of 3 stale-set goals met; rows 6,7 and the send assertions fail = goals unmet. Synthetic positive control (3 sheet updates + newsletter send) meets all goals, benchmark 1.0, no harm. Article-curation content is only partly modelled (documented gaps in review.md).

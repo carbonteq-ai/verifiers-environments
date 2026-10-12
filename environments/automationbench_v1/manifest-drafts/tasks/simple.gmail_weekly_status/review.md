@@ -9,3 +9,13 @@ Checks exact recipient/subject and same-line customer-onboarding-dashboard/80% p
 **Validation.** Native schema admission passed. Retained episode score, candidate findings and reload/rescore were recorded at [`/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_weekly_status.json`](/tmp/automationbench-luna-simple-batch16-20261005/archives/simple.gmail_weekly_status.json); archive SHA-256 `abdd1647cacf4e094b168dac0bd6d74352fe4f929494e46e697eb587af21c267`. Four genuine-handler controls (positive, omission, missing ACK and wrong entity) include actual reward maps, raw dispatch/return receipts, ACK materials and full task context under `/tmp/automationbench-luna-simple-batch16-20261005/controls`; scored wire episodes are separately saved under `/tmp/automationbench-luna-simple-batch16-20261005/controls/scored_archives` with per-archive SHA-256 values in `review.json`. All control/reload findings and reward maps matched; source inventory was stable (`59a23c931845d6021e6253315a79ff779ce8215f3635264546b3b6dcd4d425b9`).
 
 **Known limits.** No action credit, training eligibility or whole-task qualification. The completed Salesforce integration and next-week QA/bug-fix plan are status-summary statements whose paraphrased/negated meaning needs semantic review; exact 80% dashboard progress is checked.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; every goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0). Added goals send-salesforce-integration (API integration + Salesforce) and send-next-week-focus (QA testing + bug fixes), the two prompt-stated updates that had no goal. Wrong-recipient harm no longer requires the exact subject.
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official assertion needs Salesforce + 'onboarding dashboard'; goals add subject, 80%, QA testing/bug fixes (prompt-stated).

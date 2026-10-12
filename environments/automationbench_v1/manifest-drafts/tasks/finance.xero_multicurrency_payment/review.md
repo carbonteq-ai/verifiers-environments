@@ -17,3 +17,11 @@ Source episode SHA-256: `085bb9201b2c38576179da1b7fae20b44364efb614fba1542e9c547
 ## Validation
 
 Native replay, same-trace rescore, serialized reload/rescore, scalar preservation, and source-byte checks passed for the current draft hash. Four genuine-handler controls are recorded in `review.json` and `/tmp/automationbench-luna-finance-20261005-batch09/controls.json` (SHA256 `2993e75c27a227db87c767bf1e1be71da5a861943759fcb461f0051a60b4717e`); each has actual handler arguments/results/ACKs, error inventory, current draft hash, and before/after source fingerprints. Positive, harmful, missing-write-ACK, and missing-read-ACK results remain distinct. Unsupported public actions remain explicit gaps. No action credit is assigned. The recorded original score remains 0.0 and whole-task status remains not qualified.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- The payment goals required effect.record.currency_code == the row's currency (EUR / JPY), but xero_create_payment always stores USD (it has no currency parameter), so a correct payment could never satisfy them. The currency clause was removed; the invoice number and amount (9000 / 1500000, the invoice currency amounts) are still required. Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/4 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 4/4, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `dbebfbea964ef60dd08c4575304854dba97f565097aedf2b32e699df92227893`.

@@ -20,3 +20,15 @@ Latest runs completed with no assessment or credit errors. Correct replay and se
 - Extra events and duplicates are not public harms for these prompts; no harm guard is asserted. These limited checks do not award action credit.
 - Shared system narration instructions are out of scope. Recorded success and component coverage do not qualify the full task.
 - The review records other task-specific time/calendar and all-day scope limits in `review.json`.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; every goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0). Added harm retreat-task-in-wrong-workspace.
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official calendar assertion needs only 'Retreat Planning' in the summary; the goal pins the full summary, date, 11:00 AM start and 1 hour length (prompt states them).
+
+Notes: Timezone not checked (prompt gives none).

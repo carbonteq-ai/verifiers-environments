@@ -18,3 +18,15 @@ Genuine-handler controls:
 - **quoted_or_negated_content_semantic_diagnostic** — [result](/tmp/automationbench-luna-simple-b21-20261005/controls-v3/simple.slack_dm_task_assignment/safe_quote.result.json) SHA-256 `f9fa966d4ae9c01a5205e1f8850382d80c3dfe948a74e2954cdae7e9e8e4bc22`; current draft `b7b2a6827b5c55049827de32363245a993793da6615676efa16b064d28d4780c`; findings `[{"findings":[{"reason":"obligation_witnessed_required_effect","signal_id":"simple.slack_dm_task_assignment.direct_message","status":"valid","value":1.0}],"reason":null,"run_id":"cbe3b71de0974587a60217fb77c98a88","status":"complete"},{"findings":[{"reason":"obligation_scope_closed","signal_id":"simple.slack_dm_task_assignment.direct_message.coverage","status":"valid","value":1.0}],"reason":null,"run_id":"5d58560f76494c4e997492e93bb0b53a","status":"complete"}]`.
 
 Scope findings report inventory completeness only. Component authoring does not confer whole-task qualification, action credit, or training eligibility. Safe quote controls expose that message predicates detect public facts lexically without determining affirmative intent.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; every goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0). Added harm assignment-dm-to-wrong-user (a webhook-task DM to a user other than Mike Chen).
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official assertion needs recipient U002 + 'webhook'; goal also requires API documentation, Friday and 'API Docs v3' (prompt-stated).
+
+Notes: 'This Friday' is checked as the word Friday; Luna also wrote a concrete date, which is not required.

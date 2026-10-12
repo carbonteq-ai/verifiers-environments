@@ -17,3 +17,7 @@ Coverage: 2 expressible action components, 1 public obligations unavailable, 3 o
 - These are component manifests only; training eligibility/action credit/whole-task qualification are not granted.
 
 Native/control module fingerprints stayed unchanged during the final run (`ad19a666ff603276197cecb0bec58f061ae941d6cb305a39e90f08ae11b8c2ae` snapshot). Raw controls, dispatch/return envelopes, ACKs and scored WireEpisode links: `/tmp/automationbench-luna-simple-b11-20261005/controls/simple.airtable_update_slack_notify.json`.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready. Goal comparisons on possibly absent effect fields are now guarded by `present` (omitted field = decided miss, not an abstention). Baseline binding mismatch = whole-prompt binding (system message carries the turn budget), not data drift; fixed by narrowing channel_id authority to the initial slack channels and rewriting via replay.py --write-rebound (binding None at 14 and 16). Added a done/completed text requirement to the notification goal and harm `wrong-project-completed`. Luna replay 2/2 goals, no harm; no-op 0/2, 0 harms. Controls: all goal one-field-wrong variants go unmet; guard fires for another row set to Completed and not for a different status.

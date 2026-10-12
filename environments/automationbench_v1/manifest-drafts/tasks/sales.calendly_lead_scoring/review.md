@@ -18,3 +18,9 @@ Controls used the task’s original prompt, initial state, assertions and full t
 Full population eligibility, score derivation and complete route bands remain open. Synthetic outcome controls do not establish action credit.
 
 Control evidence: 5 genuine-handler scored controls; actual ordinary and manifest numeric reward maps are recorded in `review.json` and `/tmp/automationbench-luna-sales-batch05-20261005/controls-first-rewardmaps.json`. Control script SHA-256: `43004c2bec9c3c4d4efc30c1e539d133b448358ef56bd7726f29a315dfc3fa5e`. Draft SHA is bound per control. Ordinary and manifest maps match for all 5 controls.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `209198d0b612e05f35315c740f7fa6bb9b2105572e6be9925d7bb8bfa119b105`. The two outcome goals were records.retained_when (not counted by the step-credit reader). Replaced by effects goals on Salesforce lead updates: lead 00Qxx000006HS01 status Qualified; lead 00Qxx000006LS01 description mentions 'review' and the score 10. Kept the senior-rep DM goal and the competitor-not-updated harm; added harms for a High Score DM to the junior rep U_RP and for any DM naming the competitor 'Spy Person' (the benchmark's negative assertions).
+
+Evidence: Luna replay: all 3 required goals unmet, harms 0, noop clean; bindall [] (see output). Positive control (2 lead updates, DM to U_SR) meets 3/3, no harm, benchmark 1.0.

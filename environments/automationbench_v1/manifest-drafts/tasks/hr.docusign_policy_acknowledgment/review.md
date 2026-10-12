@@ -12,3 +12,7 @@
 - Limitation `tracker-completion`: The public tracker contains Signed but no Sent/Envelope Status field, and sending an envelope does not mean the employee signed. The prompt says to update the tracker but supplies no field/value transition, so no status update can be inferred.
 
 Whole-task status: **not qualified**. Source revisions: env HEAD `3d7ebc418d7e4c34390129847b517d55be5cdfda`, native HEAD `959da6381394942596cb15e0cbe78f4df8594c22`; see `review.json` for working-tree hashes.
+
+## Round 2 review (reviewer A)
+
+Edited. The baseline "required=0" was not a counting bug in the replay: every goal was an objects.created_and_retained check (created-object retention), which manifest_outcomes/step credit does not count, so only the two harms were live. Replaced them with effects.required_when goals on the docusign envelope-create source (template tmpl_policy_ack, status sent, signer name/email from the row; employees with Signed=No and On Leave=No: Alice, Dave, Eve) and on the tracker row updates (any update of the same row). The old Carol goal contradicted the official deferral and the On Leave column; Carol is now unconstrained (ambiguous). Added a harm for setting Signed=Yes on an unsigned employee. Luna 6/6, no harm; no-op 0/6. Controls fin_hr/p11.py. Verdict ready.

@@ -23,3 +23,17 @@ Controls:
 - **missing_target_ack**: /tmp/automationbench-luna-simple-b18-20261005/controls/simple.jira_login_bug_from_email/missing_ack.result.json (SHA-256 `c95d89d798ec4c39a30595f151991a6c225e37e8f14f99c79968a9aa6d9e47d3`); findings `[{"findings":[{"reason":"obligation_effect_scope_unavailable","signal_id":"simple.jira_login_bug_from_email.jira_action_acknowledged","status":"abstained","value":null}],"reason":null,"run_id":"fba0913acabe4e7fba759ace024a091e","status":"complete"},{"findings":[{"reason":"obligation_scope_unavailable","signal_id":"simple.jira_login_bug_from_email.jira_action_acknowledged.coverage","status":"abstained","value":null}],"reason":null,"run_id":"89f91e9bd95d4c2d94ad456bbd6acbef","status":"complete"},{"findings":[{"reason":"obligation_witnessed_required_effect","signal_id":"simple.jira_login_bug_from_email.source_email_read","status":"valid","value":1.0}],"reason":null,"run_id":"c19a86c3a344488782f7a80326144d20","status":"complete"},{"findings":[{"reason":"obligation_scope_unavailable","signal_id":"simple.jira_login_bug_from_email.source_email_read.coverage","status":"abstained","value":null}],"reason":null,"run_id":"88306783a34f4b1e8a96fd80bd4e507f","status":"complete"},{"findings":[{"reason":"created_matching_fresh_object_absent","signal_id":"simple.jira_login_bug_from_email.issue_created_retained","status":"valid","value":0.0}],"reason":null,"run_id":"a69fea2fee1d45698144d9f634777740","status":"complete"},{"findings":[{"reason":"created_scope_closed","signal_id":"simple.jira_login_bug_from_email.issue_created_retained.coverage","status":"valid","value":1.0}],"reason":null,"run_id":"e60b825b82f0402dbed249063bcb4f72","status":"complete"}]`.
 
 Coverage findings report only population/scope completeness. They do not show that the requested action succeeded. No action credit or whole-task qualification is claimed. Public requirements, action receipts, terminal object state, and semantic limitations remain separate.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; the counted goals comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0).
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official assertion checks only the created issue; goals also require reading the inbox email first (prompt: 'Check my inbox').
+
+Notes: Inert duplicate goal issue-created-and-retained is not counted. No wrong-project guard possible (single seeded project).
+
+Gaps: Retained-issue goal (inert duplicate).

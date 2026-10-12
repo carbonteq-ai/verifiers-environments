@@ -34,3 +34,11 @@ Genuine-handler artifact SHA-256: `c24359c3191d1996124b22759bbaccfad487be66f4773
 Native replay, repeat scoring, and serialized reload/rescore preserve the recorded scalar reward and source bytes. Genuine controls preserve the ordinary scorer reward and bind exact draft/source hashes; no case grants whole-task qualification.
 
 Reward equality evidence: [/tmp/automationbench-luna-finance-20261005-batch06/controls-final-bound4-reward-equality.json](/tmp/automationbench-luna-finance-20261005-batch06/controls-final-bound4-reward-equality.json) SHA-256 `c24359c3191d1996124b22759bbaccfad487be66f47736296582f16565afa41c`. Fields `ordinary_rewards` and `manifest_rewards` are identical per completed scenario; `rewards_equal_exactly=true` records the native runner assertion.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Bindings only: rebound the prompt binding to the user message and/or dropped the unused system-message binding (it hashes differently at the 14- and 16-turn loads); no check was changed.
+- Luna replay: 0/5 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 5/5, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `95fa6645cb4e93f6bcd4b51563cccd7111cf9d5e807276d686044ca9b0557ad1`.

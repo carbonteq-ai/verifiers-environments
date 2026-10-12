@@ -12,3 +12,11 @@ Remaining public gaps: exactly-one-qualifying-asset-and-publication.
 Whole task status: not qualified.
 
 Validation source module fingerprint: `b010f8e273a8d3cc352245cfe92e1f2aea0a1688f6355f944c34c9bdc7c482fd` before and `b010f8e273a8d3cc352245cfe92e1f2aea0a1688f6355f944c34c9bdc7c482fd` after; identical across 775 Python files.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Bindings only: rebound the prompt binding to the user message and/or dropped the unused system-message binding (it hashes differently at the 14- and 16-turn loads); no check was changed.
+- Luna replay: 0/1 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 1/1, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `92de327cd1d0ac1666ab771e61da2b06e62278d8948df28e9cfaa7e25c00facd`.

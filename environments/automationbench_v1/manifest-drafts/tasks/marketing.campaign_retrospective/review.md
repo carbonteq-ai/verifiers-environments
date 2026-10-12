@@ -10,3 +10,11 @@ Real-handler controls: correct, alternative, harmful, missing_ack; independent o
 Checks authored: 9; qualification: not granted.
 
 Remaining documented gaps: achievement-percentage.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- (1) All goals referenced request.recipient and request.code, absent from the results-sheet population (they abstain once any email exists); replaced with the literals director@company.example.com and RETRO-812-Q4. (2) The 'Referral Program (Beta)' row (notes: folded into main Referral Program totals, do not report separately) and the SEO row's raw bot-inflated 14500 were treated as normal rows to report; added 'do not report separately' to the exclusion notes (goals and harm) and excluded the bot-traffic note from the plain-row goals (the dedicated SEO cleaned-7200 goal remains). (3) Removed the two cost_per_registrant met/missed goals (the $22 vs $15 comparison was unevaluable and lower cost is better, so 'met' is ambiguous). Kept harms for pending-validation, cancelled and merged rows. Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/11 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 11/11, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `612b1e822f674355dd4028f3270d8a828961d5294376240b2b5b10239b1a6a04`.

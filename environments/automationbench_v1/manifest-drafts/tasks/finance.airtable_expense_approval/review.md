@@ -17,3 +17,11 @@ Known limitations:
 - The persisted-write checks bind exact base/table/record identity and before/after Status for four decisions; the Equipment row is guarded to remain Pending while the public policy requires additional VP approval. They do not generalize every policy combination or prevent unrelated-field edits.
 - The rejection check requires a nonempty Reason but does not verify that the text explains the missing receipt. Email checks bind recipient, submitter name, and outcome, not full message correctness. The public silent-exclusion rule is excluded from check scope.
 - The nonexistent-target control demonstrates that an updateRecord ActionRecord alone does not satisfy persisted row status; see /tmp/automationbench-luna-finance-20261005-batch05/airtable_persisted_controls.json and the original nested-write reproducer.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Bindings only: rebound the prompt binding to the user message and/or dropped the unused system-message binding (it hashes differently at the 14- and 16-turn loads); no check was changed.
+- Luna replay: 0/9 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 9/9, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `2f9403690f870a6195058161a8c48a75b969db82de54e45ff908510c09b2361c`.

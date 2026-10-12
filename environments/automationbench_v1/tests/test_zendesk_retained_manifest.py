@@ -18,7 +18,7 @@ from automationbench.tools.api.impl.zendesk import zendesk_tickets_update
 from automationbench.tools.zapier.zendesk.tickets import zendesk_update_ticket
 from automationbench_v1.capture import canonical_json
 from automationbench_v1.contracts.engine import binding_reason, compile_contract
-from automationbench_v1.contracts.loader import load_contract, load_task_contract
+from automationbench_v1.contracts.loader import load_contract
 
 ROOT = Path('/home/hammad/projects/rl')
 PACK = ROOT / '.posttrain/state/verifiers-assessment-qualification/manifest-authoring-105/batch-10.json'
@@ -46,10 +46,8 @@ def draft():
     if not DRAFT.exists():
         pytest.skip('local retained-status review draft unavailable')
     contract = load_contract(DRAFT.read_bytes())
-    installed = load_task_contract(NAME)
-    assert installed.checks == contract.checks and installed.bindings == contract.bindings
-    assert installed.public_request == contract.public_request
-    assert installed.revision == 'public_batch10_credit_v2'
+    # The packaged manifest was replaced by the 2026-10-13 held-out review; this file keeps
+    # testing the engine against the legacy reviewed draft, not the packaged bytes.
     return contract
 
 

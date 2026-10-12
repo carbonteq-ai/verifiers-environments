@@ -32,3 +32,10 @@ Edits in this review:
 Luna replay (step-credit reader): 2 of 2 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
 
 Luna full pass: every required goal met, no harm; empty run meets nothing. Inert (not scored by the step-credit reader): requested-record-field.
+
+
+## Round 2 review (reviewer A, small-fix item 4): inert goal removed
+
+Removed inert goal(s): requested-record-field (final lead rating == Hot). It was a retained-state kind (records.retained_when / collections.counts_when), which the training step-credit reader (manifest_outcomes) never counts, so it carried no reward and no measurement.
+Counted replacement: write-requested-record (counted effects goal: update of the target lead with rating Hot, bounded to one) plus no-other-record-updated guard.
+Evidence: Luna replay: 2/2 required met (unchanged), 0 harms; required/met/harm counts identical before and after the removal (required 2 -> 2, met 2 -> 2, harms 0 -> 0); no-op control meets 0 goals and 0 harms; bindings clean at turn budgets 14 and 16; 0 assessment/credit errors. Sources used only by the removed goal were dropped.

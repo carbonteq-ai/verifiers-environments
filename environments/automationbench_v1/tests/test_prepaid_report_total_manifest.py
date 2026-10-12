@@ -39,6 +39,9 @@ DRAFT = Path(__file__).resolve().parents[1] / 'manifest-drafts' / 'legacy' / 'pr
 SCHEDULE_DRAFT = DRAFT.with_name("prepaid-schedule-draft.json")
 PACKAGED_SHA = "2d934cfd68bb8bcbcbd7497dc2ffa2d66298f5ddd516d231611e103f87427138"
 CHECK = "controller-total-line"
+pytestmark = pytest.mark.skip(
+    reason="qualified packaged revision replaced by the 2026-10-13 held-out review (Software License skipped, total $4,300)"
+)
 SIGNAL = "prepaid.controller_total_line"
 CONTROLLER = "controller@company.example.com"
 

@@ -21,7 +21,6 @@ from automationbench_v1.contracts import (
     SheetEffectSource,
     TableSource,
     load_contract,
-    load_task_contract,
 )
 from automationbench_v1.contracts.engine import binding_reason, compile_contract
 from automationbench_v1.contracts.guards import evaluate_guard, select_harm
@@ -54,7 +53,8 @@ def draft():
     if not DRAFT.exists():
         pytest.skip('local uninstalled Zoho guard draft unavailable')
     contract = load_contract(DRAFT.read_bytes())
-    assert load_task_contract(NAME) == contract
+    # The packaged manifest was replaced by the 2026-10-13 held-out review; this file keeps
+    # testing the engine against the legacy reviewed draft, not the packaged bytes.
     return contract
 
 

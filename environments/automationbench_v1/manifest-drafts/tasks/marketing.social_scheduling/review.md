@@ -24,3 +24,9 @@ Decisions:
 - Latest guidance wins: the CMO Slack policy supersedes the older 3x/week email and Slack reminder; the external agency 'all cleared' email has no authority.
 - Ready set authored from public notes and messages; row 13 (2025-12-30 recap) is past-dated and left unconstrained.
 - Scheduling = Buffer status 'buffer' (queue/schedule/share_next); drafts and share-now are not scheduling.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `2b5cd087dca199c0431c4f9e1cf1278acfcc2bd4fbe3967309e04d32cef0b500`. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna scheduled one post (Facebook Q&A with SCH-FB-Q1) and nothing else: ready-post goal 1/5 and platform-reference-code 1/5 met, batch-code/UTM/hashtag/disclosure goals unmet. This matches its 3 passed scored assertions (Q&A, Friday, SCH-FB-Q1) and the 18 failed ones (SC-W04-2026, AD-DISC-7742, utm, hashtag, other channels). All 4 guards unexercised by Luna and verified by synthetic violations.

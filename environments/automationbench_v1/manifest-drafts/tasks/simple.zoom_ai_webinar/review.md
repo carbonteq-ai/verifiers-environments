@@ -9,3 +9,17 @@ Four genuine-handler controls ran with the full public prompt, initial state, or
 **Remaining gaps:** timezone_instant_interpretation: The check establishes civil date and wall-clock values only. The prompt does not say whether EST means a fixed UTC offset or the Eastern regional timezone with daylight-saving transitions; Zoom stores start_time and timezone separately. Bind a public timezone policy before claiming UTC/instant equivalence.
 
 No action credit, training eligibility or whole-task qualification is granted. The system-prompt conversation rules are recorded as out of scope for deterministic task checks.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; every goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0). Removed the meeting type==2 requirement (Luna's mapping of 'webinar-style'; the prompt never states a type, the '2' it matched was inside '2026').
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official assertion needs only the topic; goals also require host, 1:00 PM on 2026-03-15 and 90 minutes (prompt-stated).
+
+Notes: EST is not checked: start_time must show 2026-03-15 and 1:00 PM as written; an agent that converts to UTC would miss the datetime goal.
+
+Gaps: Timezone handling.

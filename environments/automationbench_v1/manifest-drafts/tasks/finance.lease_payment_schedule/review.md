@@ -23,3 +23,11 @@ Genuine-handler control artifact: [/tmp/automationbench-luna-finance-20261005-ba
 - No lease-agreement source documents are present, so agreement verification is unverified. Due Day values say “1st” but do not independently prove payment preparation or transaction completion. The schedule check only requires each 1st-day lease to appear in controller mail containing 2026-02; amounts are not verified. Renewal check is limited to the two records whose public Lease End dates fall within 90 days; alert wording is only identity checked.
 
 Reward-map evidence is stored in `review.json` → `luna_controls.cases[]` and the linked control artifact; fields are `ordinary_benchmark_rewards`, `manifest_benchmark_rewards`, and `rewards_equal_exactly`. Source fingerprint includes native HEAD, dirty diff hash, and per-module hashes recorded at control execution.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Removed unmotivated requirements: the schedule email no longer must name the month 'February'; the renewal Slack alert no longer needs the exact lease name or end date (accepts 'Warehouse' / 'Copier' as the official asserts, and renew/renewal/expiring/ends wording). Added harm renewal-alert-for-far-lease (Main Office, Company Vehicles are not within 90 days; the official excluded assertions forbid their alerts).
+- Luna replay: 0/6 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 6/6, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `d2e85c32012e6fb6da9c96e2fcca5bdbe624fa18098dc2dda82d7a755a5ac3ee`.

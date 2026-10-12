@@ -28,3 +28,9 @@ Controls: Task-bound correct, alternative, harmful, and missing-ACK component co
 ## Shared-source refresh (2026-10-05)
 
 After the shared source-position selection and Buffer channel-read changes settled, the native three-phase replay and all persisted genuine-handler controls for this task were executed again. Current results are recorded in `/tmp/automationbench-luna-operations-20261005-batch07/operations07_shared_source_refresh.json`; prior run artifacts and reviews remain under `/tmp/automationbench-luna-operations-20261005-batch07/history_pre_shared_source_refresh_20261005`. The current replay retained findings/scalar/source-byte parity with zero errors. Control ordinary and manifest reward maps match in every rerun variant. Current source snapshot: 46 hashed files of 54 requested paths; missing source paths are listed in the linked JSON artifact. These component results do not grant whole-task qualification.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `3259358989b61ed17586e77279d5d4951808849ccf5f861212a8b2b9c3ae2dc7`. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna read the two policy sheets and the Apex email (3 read goals met) but did no Pipefy move/status update and no Slack post: ready-phase, approved-status and ops-notification goals unmet = the 5 failed assertions. Synthetic positive control (2 policy reads, Apex email read, card_56 move to phase_ready, status Approved, #ops-updates post) meets 6/6, no harm, benchmark 1.0.

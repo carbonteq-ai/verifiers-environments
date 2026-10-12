@@ -8,3 +8,9 @@ Correct-control positive signals: support-zoho_vendor_tickets.no-inactive-vendor
 Harm-control zero-valued signals: support-zoho_vendor_tickets.no-inactive-vendor-contact, support-zoho_vendor_tickets.no-inactive-vendor-contact.compliance.
 Unclosed public requirements retained as gaps: sla-escalation-decision, vendor-ticket-contact-reconciliation.
 Synthetic cases are component controls through real simulator handlers; they are not original trajectory replays.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `d9b4abe32546ecbc15809c85d0f60d76323225f2612496c94c13e79f1abd0ff6`. Draft covered the vendor email and log row for zv_01/zv_02 but nothing for the prompt's 'escalate as needed'. Added goal vendor-ticket-escalated (zv_01, zv_02): the original ticket updated (status Escalated, a comment, or a priority change) or an escalation ticket created with the ticket subject (alternative). Added harms: email to the internal contact hank@corp.com, a log row for the expired-vendor ticket zv_06, and any escalation update to zv_06/zv_08 (existing harm keeps old@vendordelta.com).
+
+Evidence: Luna replay: all 6 required findings met (emails to vendors, log rows, status escalation) vs official 6 passes and 8 failures (escalation tickets, comments, zv_08). Positive control (escalation via update and via new ticket, 2 vendor emails, 2 log rows) meets 6/6, bench 0.5, no harm.

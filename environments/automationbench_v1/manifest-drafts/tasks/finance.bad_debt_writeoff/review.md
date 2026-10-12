@@ -15,3 +15,11 @@ Known limitations:
 - Ineligible-row and narrative guards are bounded to the supplied candidate table, recognized write-off status labels, and source invoice + amount + write-off wording in Gmail/Slack. They do not cover every possible phrase, negation, or write-off destination.
 - No named write-off ledger or persisted transaction destination is supplied; no positive terminal write-off state is asserted.
 - The $50,000 boundary is treated as ineligible because the rule requires amounts under $50,000; exactly $50,000 is not separately clarified.
+
+## Round 2 (reviewer C)
+
+- Verdict: ready (luna-agreement); Luna partial credit 0.0; draft changed vs. last commit: True.
+- Added goal eligible-debt-row-processed (rows meeting all five policy criteria must be updated, official asserts row 2 updated) and widened the ineligible write-off claim harms to also match 'written off' and 'write off' phrasings (12 checks now guard email and Slack). Bindings also rewritten (user-message rebinding / unused system binding dropped / stale hash refreshed).
+- Luna replay: 0/6 required goal instances met, harms none; no-op control: goals met 0, harms 0; the draft binds at 14 and 16 turns.
+- Synthetic positive control (real handlers): goals 6/6, official fraction 0.857, harms fired none.
+- Draft SHA-256 refreshed to `e9ab734bf7fec37bba453964389dad2163977b6977b2321c528ac6648f32299f`.

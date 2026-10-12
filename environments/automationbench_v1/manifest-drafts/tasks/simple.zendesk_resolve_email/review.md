@@ -29,3 +29,10 @@ Supersedes the earlier statement that no harm guard is asserted: guards are wron
 Edit: Added ticket-status-solved effect goal (zendesk_update_ticket, ZD-501 -> solved) because the retained-state goal is not read by manifest_outcomes.
 
 Note: Retained/created-and-retained goals (where present) are not read by manifest_outcomes (no retained finding is produced in replay); the acknowledged-effect goal carries the requirement. Initial values differ from the requested ones, so a no-op cannot satisfy them.
+
+
+## Round 2 review (reviewer A, small-fix item 3): proposal draft.proposed.json
+
+draft.json is untouched. draft.proposed.json is a byte copy of the reviewed eval draft (the draft.json in this folder) proposed as the replacement of the installed qualified manifest; adopting it needs requalification of the credit declarations because the check set changes.
+Why: Installed qualified manifest uses records.retained_when for ticket ZD-501 solved, which the step-credit reader does not count. The reviewed draft adds counted goals (ticket update to solved, resolution email to the customer) and a wrong-recipient guard; the installed check was identical in intent.
+Evidence (replay.py): installed manifest: binding(14/16)=manifest_source_binding_mismatch/manifest_source_binding_mismatch; Luna required=0 met=0 harms=0; no-op goals=0 harms=0. Reviewed/proposed draft: binding(14/16)=ok/ok; Luna required=2 met=2 harms=0; no-op goals=0 harms=0. Guard violation controls for the added guards that Luna did not trigger are listed in round2/a/guards/guard-controls.json (small-fix item 5).

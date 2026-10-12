@@ -22,3 +22,10 @@ Coverage: 8 in scope, 8 expressed, 0 gaps, 3 shared system rules out of scope. P
 - Luna native score 1.00; replay: required goals met 5/5, harms 0; no-op: goals met 0, harms 0.
 - Edited this session: no
 - Notes: Inbox request: void env_apex_001, resend Apex Industries contract with the Premium template (tmpl_prem_001) to j.ceo@apex-ind.example.com, update the Opportunity amount to $175,000, confirm to sales_rep@ with account and amount; env_beta_001 must stay untouched. Goals: Apex envelope voided, new envelope from the Premium template sent to the signer, Opportunity amount 175000, rep confirmation naming Apex Industries and $175,000. Guards: Beta envelope voided, Apex resent with the old/standard template. Luna 1.0: all 5 goals met, 0 harms (full pass). No-op clean.
+
+
+## Round 2 review (reviewer A, small-fix item 3): proposal draft.proposed.json
+
+draft.json is untouched. draft.proposed.json is a byte copy of the reviewed eval draft (the draft.json in this folder) proposed as the replacement of the installed qualified manifest; adopting it needs requalification of the credit declarations because the check set changes.
+Why: Installed qualified manifest checks only the negotiated amount (record.fields_equal) plus coverage. The reviewed draft keeps both and adds the other prompt-stated requirements: void env_apex_001, resend from the Premium template to the signer, confirm to the rep naming the account and $175,000, and guards for the Beta envelope and the wrong template. Luna passes all five (official 1.0).
+Evidence (replay.py): installed manifest: binding(14/16)=ok/ok; Luna required=1 met=1 harms=0; no-op goals=0 harms=0. Reviewed/proposed draft: binding(14/16)=ok/ok; Luna required=5 met=5 harms=0; no-op goals=0 harms=0. Guard violation controls for the added guards that Luna did not trigger are listed in round2/a/guards/guard-controls.json (small-fix item 5).

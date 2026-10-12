@@ -26,3 +26,10 @@ Both in-scope obligations are expressed and verified on the simulator, but the r
 ## Re-review (shard 3)
 
 Supersedes the earlier statement that no harm guard is asserted: guards are duplicate-audit-issue. Goals re-derived from the prompt and task data. Luna replay: 1/1 required goals met, 0 harms. No-op control (prompt, no tool calls): 0 goals met, 0 harms. Verdict: eval-ready.
+
+
+## Round 2 review (reviewer A, small-fix item 3): proposal draft.proposed.json
+
+draft.json is untouched. draft.proposed.json is a byte copy of the reviewed eval draft (the draft.json in this folder) proposed as the replacement of the installed qualified manifest; adopting it needs requalification of the credit declarations because the check set changes.
+Why: Installed qualified manifest uses the retained-state kind objects.created_and_retained, which the training step-credit reader does not count and which scored the correct Luna run 0 (its recorded Jira handler predates persisted issues). The reviewed draft counts the creation as an effects goal (QA project, issue type, summary, exactly one) and adds a duplicate-issue guard; it drops the retained credit declaration (credit 1 -> 0).
+Evidence (replay.py): installed manifest: binding(14/16)=manifest_source_binding_mismatch/manifest_source_binding_mismatch; Luna required=0 met=0 harms=0; no-op goals=0 harms=0. Reviewed/proposed draft: binding(14/16)=ok/ok; Luna required=1 met=1 harms=0; no-op goals=0 harms=0. Guard violation controls for the added guards that Luna did not trigger are listed in round2/a/guards/guard-controls.json (small-fix item 5).

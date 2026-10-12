@@ -35,3 +35,10 @@ Edits in this review:
 Luna replay (step-credit reader): 20 of 20 decided required findings met; failing goal checks: none; harms fired: none. No-op control (no tool calls): 0 goals met, 0 harms; required goals abstain.
 
 All ten conversations now required (prompt: assign each). Luna passes all. Inert (not scored by the step-credit reader): language-agent-assignment, language-route-tag.
+
+
+## Round 2 review (reviewer A, small-fix item 4): inert goal removed
+
+Removed inert goal(s): language-agent-assignment, language-route-tag (final assignment/tag on all ten conversations). It was a retained-state kind (records.retained_when / collections.counts_when), which the training step-credit reader (manifest_outcomes) never counts, so it carried no reward and no measurement.
+Counted replacement: language-agent-assignment-update and language-route-tag-update (counted effects goals) plus the two wrong-language/unsupported-language guards.
+Evidence: Luna replay: 20/20 required met (unchanged), 0 harms; required/met/harm counts identical before and after the removal (required 20 -> 20, met 20 -> 20, harms 0 -> 0); no-op control meets 0 goals and 0 harms; bindings clean at turn budgets 14 and 16; 0 assessment/credit errors. Sources used only by the removed goal were dropped.

@@ -15,3 +15,15 @@
 ## Limits
 
 - No action or token credit is declared. Shared narration policies remain out of scope. Wrong-goal controls do not claim harm absent public prohibition.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; every goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0). Removed the custom_type=='contact' requirement (an optional tool argument Luna happened to pass; the prompt does not require it). Added harm note-on-wrong-parent (same title on another parent).
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Official-assertion differences: Official assertion needs only body contains 'data integration' + parent 003003; goal requires the exact title and body the prompt quotes.
+
+Notes: Body must match the quoted text exactly.

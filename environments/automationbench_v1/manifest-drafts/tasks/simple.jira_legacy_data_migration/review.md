@@ -21,3 +21,15 @@ Controls:
 - **missing_target_ack**: /tmp/automationbench-luna-simple-b18-20261005/controls/simple.jira_legacy_data_migration/missing_ack.result.json (SHA-256 `fae9267be230f64118cf4882f14106d61922172b7dc9dc4c275d0e6b32e7df74`); findings `[{"findings":[{"reason":"obligation_effect_scope_unavailable","signal_id":"simple.jira_legacy_data_migration.jira_action_acknowledged","status":"abstained","value":null}],"reason":null,"run_id":"75f954967e2747c0becfeaeb40316f22","status":"complete"},{"findings":[{"reason":"obligation_scope_unavailable","signal_id":"simple.jira_legacy_data_migration.jira_action_acknowledged.coverage","status":"abstained","value":null}],"reason":null,"run_id":"632dce62b1a643ffb54393aef3178c11","status":"complete"},{"findings":[{"reason":"created_matching_fresh_object_absent","signal_id":"simple.jira_legacy_data_migration.issue_created_retained","status":"valid","value":0.0}],"reason":null,"run_id":"2009441edcc04eeb9c1055c609a07219","status":"complete"},{"findings":[{"reason":"created_scope_closed","signal_id":"simple.jira_legacy_data_migration.issue_created_retained.coverage","status":"valid","value":1.0}],"reason":null,"run_id":"8a061af9d39e444d8054d9c4c8fb5dcc","status":"complete"}]`.
 
 Coverage findings report only population/scope completeness. They do not show that the requested action succeeded. No action credit or whole-task qualification is claimed. Public requirements, action receipts, terminal object state, and semantic limitations remain separate.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready.
+
+Changes: Rewritten bound to the user message (replay.py --write-rebound) so it binds at 14 and 16 turn budgets; the counted goal comparison on a possibly absent effect field is now guarded by `present` so an omitted field is a decided miss instead of an abstention (abstained goals drop out of the training denominator: a call that omits the field would have scored 0/0).
+
+Evidence: Luna full pass (official 1.0): every counted goal met, no harm; no-op: 0 goals met, 0 harms; binding None at turn budgets 14 and 16; no assessment or credit errors. Synthetic controls (one-field-wrong, omitted-field, wrong-target, missing call) are in round2/a/simple/controls.json: every goal control leaves the targeted goal unmet and every guard control fires its harm (non-violating variants do not fire it).
+
+Notes: Inert duplicate goal issue-created-and-retained is not counted. No wrong-project guard possible (single seeded project).
+
+Gaps: Retained-issue goal (inert duplicate).

@@ -9,3 +9,9 @@ All three genuine-handler component controls retain raw simulator materials, nat
 Known limitations: The public Airtable initial state contains no base/table row inventory. The checked result is the authenticated action record and its parameters, not a verified provider-side terminal row.
 
 Whole-task status: **not qualified**. No action credit or eligibility is claimed.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `a13eb406f3ea0551ba5fd6ecc1c95c5a07870eeaddfc7be6f021f73cb68b7550`. requested_creates required the Airtable field key 'Project Name' (copied from Luna's call); now accepts either 'Project Name' or 'Name' for the project name (Status must still equal the email's Planning). Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: No harm guards (single create task, no prohibited action stated). Positive control (read email, create record with Name/Status) meets 2/2, bench 1.0; wrong Status leaves the create goal unmet.

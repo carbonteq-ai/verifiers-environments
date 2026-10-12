@@ -29,3 +29,9 @@ Source file SHA-256 fingerprints are recorded in `review.json`.
 Native full scored episode and latest-complete-per-run extraction: `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/native/conference_room_booking_conflicts_scored_episode.json` and `/tmp/automationbench-luna-operations-20261005-batch06/provenance_refresh/native/conference_room_booking_conflicts.json` (SHA-256 `d354cd46e44ec5a121820f10e84f711df3b55b5d954259557ffcbc720c465041`).
 
 Genuine-handler controls are retained at `/tmp/automationbench-luna-operations-20261005-batch06/handler_controls_batch06.json` (SHA-256 `2d94d9ddbb3490399ae51d93b12fa97c4a75447e8a4a752950133debe4796217`), including lifecycle snapshots, one latest complete result per run ID, raw returned receipt envelopes and state-write ACK payloads. Each scenario records pre/post SHA-256 fingerprints for its effective core, handlers, Verifiers modules, and harness files. Prior control and compact replay artifacts remain preserved and linked in `review.json`.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `af93d5c5d13f59c55c7bae1fdd3b91c50b493ae003e8c7d0a7cf0501ca3b251c`. The report goal demanded the exact phrases '2 conflicts' and '60 overlapping minutes'; replaced by standalone-number (amount) mentions of 2 and 60, since the prompt only asks for the total number of conflicts and total overlapping minutes. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna did nothing that counts (no Slack report or emails; no policy-sheet read): 4/4 goals unmet = all 9 failed assertions. Synthetic positive control (policy read, calendar read, #office-ops report, two emails to the later-created events' organizers) meets 4/4, no harm, benchmark 1.0.

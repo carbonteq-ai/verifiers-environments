@@ -38,3 +38,9 @@ After the shared source-position selection and Buffer channel-read changes settl
 
 
 The final shared-source refresh includes the later settled `slack.user_reads` and import-cleanup changes. All five Rachel variants were rerun against the current fingerprint set and remained stable; the exact raw dispatch/return/ACK envelopes and reward maps are in `/tmp/automationbench-luna-operations-20261005-batch07/mailchimp_sync_rachel_cardinality_controls_final_current_source.json`. The earlier source-drift set is retained under `/tmp/automationbench-luna-operations-20261005-batch07/history_during_source_drift_refresh_20261005`.
+
+## Round-2 review D (ready)
+
+Draft SHA-256 now `343b059fd7818ebac2f7588677c1cada771417d04eb13d7848a8e7068eb4474d`. Binding: rebound whole-prompt binding to the user message (prompt[1].content).
+
+Evidence: Luna did none of it (0/14 required instances met, 6 failed scored assertions). Draft already complete: 5 policy-sheet reads, 4 exception-email reads, 3 eligible registrants + Rachel Simmons at her corrected address, Slack summary with names and count 4. Synthetic positive control meets 14/14, no harm, benchmark 1.0. Company names the benchmark asserts in the Slack text are not required.

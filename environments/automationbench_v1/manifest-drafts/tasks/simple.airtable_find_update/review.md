@@ -16,3 +16,7 @@ Coverage: 1 expressible action components, 2 public obligations unavailable, 2 o
 - These are component manifests only; training eligibility/action credit/whole-task qualification are not granted.
 
 Native/control module fingerprints stayed unchanged during the final run (`ad19a666ff603276197cecb0bec58f061ae941d6cb305a39e90f08ae11b8c2ae` snapshot). Raw controls, dispatch/return envelopes, ACKs and scored WireEpisode links: `/tmp/automationbench-luna-simple-b11-20261005/controls/simple.airtable_find_update.json`.
+
+## Round 2 review (reviewer A)
+
+Verdict: ready. Goal comparisons on possibly absent effect fields are now guarded by `present` (omitted field = decided miss, not an abstention). Cause of the baseline binding mismatch: draft bound the whole prompt (system message includes the turn budget), not data drift; initial state hash is identical. Rewrote via replay.py --write-rebound after replacing the unused/unstated existing_record_id field (now copied from the seeded findRecord record). Added harm `existing-contact-overwritten`. Luna replay: 1/1 goal, no harm; no-op: 0 goals, 0 harms; binding None at 14 and 16. Controls: update of rec_001 fires the harm, update of another row does not; Status=Active / wrong table leave the goal unmet. Gap: the find step is not expressible as a goal.
