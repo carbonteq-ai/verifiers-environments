@@ -1,0 +1,1163 @@
+{
+  "schema_version": 1,
+  "manifest_id": "support-helpscout_response_audit",
+  "revision": "luna_batch03_partial_v1",
+  "public_request": "Run a quality audit on HelpScout conversation responses. Check replies against the criteria in ss_audit (ws_criteria), flag any issues, log violations to ws_log, and email the report to quality@ourcompany.example.com. Skip automated/bot replies when auditing.\n\nUse Gmail for all email sends.",
+  "bindings": [
+    {
+      "path": [
+        "task_evidence",
+        "prompt",
+        1,
+        "content"
+      ],
+      "canonical_sha256": "3f9791b62eeedf272a2121f13d6ff331fa871b3490b5d352ae01cb2fc282d00d"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "google_sheets",
+        "rows"
+      ],
+      "canonical_sha256": "d308571bed611bf146d6b84cb235d489ea327d31bca0e3a393ae31665e5f238f"
+    },
+    {
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpscout",
+        "conversations"
+      ],
+      "canonical_sha256": "28ad869bf964dd6b3e8dc0d73af8be75ebb657593a1d41a54cb4d68f8f8e20f9"
+    }
+  ],
+  "sources": {
+    "request": {
+      "adapter": "public.request@1",
+      "member_key": "task-output",
+      "fields": {
+        "request_anchor": {
+          "value": "support.helpscout_response_audit",
+          "authority_paths": [
+            [
+              "task_evidence",
+              "prompt",
+              1,
+              "content"
+            ]
+          ]
+        }
+      }
+    },
+    "output": {
+      "adapter": "gmail.messages@1",
+      "kind": "send"
+    },
+    "audit_logs": {
+      "adapter": "google_sheets.row_writes@1",
+      "kind": "append",
+      "spreadsheet_id": "ss_audit",
+      "worksheet_id": "ws_log"
+    },
+    "conversations": {
+      "adapter": "initial.records@1",
+      "path": [
+        "task_evidence",
+        "initial",
+        "helpscout",
+        "conversations"
+      ],
+      "identity_path": [
+        "id"
+      ],
+      "fields": {
+        "id": [
+          "id"
+        ],
+        "threads": [
+          "threads"
+        ]
+      },
+      "key_fields": [
+        "id"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "check_id": "requested-report-recipient",
+      "signal_id": "support-helpscout_response_audit.requested-output",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "output",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "task-output"
+        }
+      },
+      "effect_match": {
+        "op": "in",
+        "left": {
+          "kind": "literal",
+          "value": "quality@ourcompany.example.com"
+        },
+        "right": {
+          "kind": "field",
+          "path": [
+            "effect",
+            "recipients"
+          ],
+          "domain": "sequence"
+        }
+      }
+    },
+    {
+      "check_id": "min-reply-length-violation",
+      "signal_id": "support-helpscout_response_audit.min-reply-length-violation",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "population": "conversations",
+      "source": "audit_logs",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "any_item",
+        "items": {
+          "kind": "field",
+          "path": [
+            "request",
+            "threads"
+          ]
+        },
+        "where": {
+          "op": "all",
+          "args": [
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "thread_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "reply"
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "created_by"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": [
+                        "support-bot@co.com",
+                        "autobot@co.com"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "op": "lt",
+              "left": {
+                "kind": "text_length",
+                "text": {
+                  "kind": "field",
+                  "path": [
+                    "item",
+                    "body"
+                  ],
+                  "domain": "string"
+                },
+                "unit": "unicode_codepoints"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 50
+              }
+            }
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Conversation ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Violation Type"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Min Reply Length"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "request",
+                "threads"
+              ]
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "all",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "item",
+                          "thread_type"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "reply"
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "arg": {
+                        "op": "in",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "created_by"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": [
+                            "support-bot@co.com",
+                            "autobot@co.com"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "lt",
+                  "left": {
+                    "kind": "text_length",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "unit": "unicode_codepoints"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 50
+                  }
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "created_by"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "after_cells",
+                      "Agent"
+                    ],
+                    "domain": "string"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "greeting-required-violation",
+      "signal_id": "support-helpscout_response_audit.greeting-required-violation",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "population": "conversations",
+      "source": "audit_logs",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "any_item",
+        "items": {
+          "kind": "field",
+          "path": [
+            "request",
+            "threads"
+          ]
+        },
+        "where": {
+          "op": "all",
+          "args": [
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "thread_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "reply"
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "created_by"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": [
+                        "support-bot@co.com",
+                        "autobot@co.com"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "op": "not",
+              "arg": {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "hello"
+                    },
+                    "mode": "words"
+                  },
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "hi"
+                    },
+                    "mode": "words"
+                  },
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "good morning"
+                    },
+                    "mode": "words"
+                  },
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "dear"
+                    },
+                    "mode": "words"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Conversation ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Violation Type"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Greeting Required"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "request",
+                "threads"
+              ]
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "all",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "item",
+                          "thread_type"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "reply"
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "arg": {
+                        "op": "in",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "created_by"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": [
+                            "support-bot@co.com",
+                            "autobot@co.com"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "hello"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "hi"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "good morning"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "dear"
+                        },
+                        "mode": "words"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "created_by"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "after_cells",
+                      "Agent"
+                    ],
+                    "domain": "string"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "closing-required-violation",
+      "signal_id": "support-helpscout_response_audit.closing-required-violation",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "population": "conversations",
+      "source": "audit_logs",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "required_when": {
+        "op": "any_item",
+        "items": {
+          "kind": "field",
+          "path": [
+            "request",
+            "threads"
+          ]
+        },
+        "where": {
+          "op": "all",
+          "args": [
+            {
+              "op": "all",
+              "args": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "thread_type"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "reply"
+                  }
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "in",
+                    "left": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "created_by"
+                      ],
+                      "domain": "string"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": [
+                        "support-bot@co.com",
+                        "autobot@co.com"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "op": "not",
+              "arg": {
+                "op": "any",
+                "args": [
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "regards"
+                    },
+                    "mode": "words"
+                  },
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "thanks"
+                    },
+                    "mode": "words"
+                  },
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "best"
+                    },
+                    "mode": "words"
+                  },
+                  {
+                    "op": "mentions",
+                    "text": {
+                      "kind": "field",
+                      "path": [
+                        "item",
+                        "body"
+                      ],
+                      "domain": "string"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": "sincerely"
+                    },
+                    "mode": "words"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Conversation ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Violation Type"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Closing Required"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "request",
+                "threads"
+              ]
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "all",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "item",
+                          "thread_type"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "reply"
+                      }
+                    },
+                    {
+                      "op": "not",
+                      "arg": {
+                        "op": "in",
+                        "left": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "created_by"
+                          ],
+                          "domain": "string"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": [
+                            "support-bot@co.com",
+                            "autobot@co.com"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "not",
+                  "arg": {
+                    "op": "any",
+                    "args": [
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "regards"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "thanks"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "best"
+                        },
+                        "mode": "words"
+                      },
+                      {
+                        "op": "mentions",
+                        "text": {
+                          "kind": "field",
+                          "path": [
+                            "item",
+                            "body"
+                          ],
+                          "domain": "string"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": "sincerely"
+                        },
+                        "mode": "words"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "created_by"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "after_cells",
+                      "Agent"
+                    ],
+                    "domain": "string"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "check_id": "never-log-bot-replies",
+      "signal_id": "support-helpscout_response_audit.never-log-bot-replies",
+      "role": "harm",
+      "operator": "effects.prohibited_when@1",
+      "population": "conversations",
+      "source": "audit_logs",
+      "prohibited_when": {
+        "op": "any_item",
+        "items": {
+          "kind": "field",
+          "path": [
+            "request",
+            "threads"
+          ]
+        },
+        "where": {
+          "op": "all",
+          "args": [
+            {
+              "op": "eq",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "item",
+                  "thread_type"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": "reply"
+              }
+            },
+            {
+              "op": "in",
+              "left": {
+                "kind": "field",
+                "path": [
+                  "item",
+                  "created_by"
+                ],
+                "domain": "string"
+              },
+              "right": {
+                "kind": "literal",
+                "value": [
+                  "support-bot@co.com",
+                  "autobot@co.com"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "after_cells",
+                "Conversation ID"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "candidate",
+                "native_record_id"
+              ],
+              "domain": "string"
+            }
+          },
+          {
+            "op": "any_item",
+            "items": {
+              "kind": "field",
+              "path": [
+                "request",
+                "threads"
+              ]
+            },
+            "where": {
+              "op": "all",
+              "args": [
+                {
+                  "op": "all",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "item",
+                          "thread_type"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": "reply"
+                      }
+                    },
+                    {
+                      "op": "in",
+                      "left": {
+                        "kind": "field",
+                        "path": [
+                          "item",
+                          "created_by"
+                        ],
+                        "domain": "string"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": [
+                          "support-bot@co.com",
+                          "autobot@co.com"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "kind": "field",
+                    "path": [
+                      "item",
+                      "created_by"
+                    ],
+                    "domain": "string"
+                  },
+                  "right": {
+                    "kind": "field",
+                    "path": [
+                      "effect",
+                      "after_cells",
+                      "Agent"
+                    ],
+                    "domain": "string"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "credit": []
+}
