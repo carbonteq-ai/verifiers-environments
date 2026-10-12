@@ -23,3 +23,7 @@ No errors; bindings admitted; scalar rewards and episode bytes unchanged; rescor
 
 Known gaming (not closed):
 - Put the KB link in an internal note instead of a customer-visible message — service.record_writes@1 exposes the whole conversation; predicates cannot test fields of the newly appended message element (visibility). Excluding the word 'internal' from values_text would also fail a legitimate internal routing note plus customer reply.
+
+## Revision 2026-10-12 (shard 2 eval validation, second pass)
+
+added effect goals routed-to-domain-expert-update and tagged-with-domain-update mirroring the retained checks. Replayed on the Luna episode with the step-credit reader. draft_sha256 in review.json predates this revision.

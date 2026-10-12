@@ -8,3 +8,7 @@ Correct-control positive signals: support-helpscout_knowledge_gap_analysis.email
 Harm-control zero-valued signals: support-helpscout_knowledge_gap_analysis.email-content-lead, support-helpscout_knowledge_gap_analysis.slack-knowledge-base.
 Unclosed public requirements retained as gaps: stale-or-missing-topics, webhooks-gap-ticket, counts-in-messages, complete-gap-topic-reconciliation.
 Synthetic cases are component controls through real simulator handlers; they are not original trajectory replays.
+
+## Revision 2026-10-12 (shard 2 eval validation, second pass)
+
+Jira source uses the standard create_issue collection; added DOCS story goals for sso (stale, high volume) and webhooks (no article) and a guard for current fully covered topics. Replayed on the Luna episode with the step-credit reader. draft_sha256 in review.json predates this revision.

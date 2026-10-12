@@ -20,3 +20,7 @@ Synthetic simulator alternatives used genuine local handlers over the exact reta
 - **missing_ack** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
 - **gaming** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
 - **duplicate** via `reamaze_update_conversation` (operation 3): language-agent-assignment: values=[1.0], statuses={'valid': 10, 'inapplicable': 16}; language-route-tag: values=[1.0], statuses={'valid': 12, 'inapplicable': 14}; errors=0; scalar rewards unchanged=True.
+
+## Revision 2026-10-12 (shard 2 eval validation, second pass)
+
+added effect goals language-agent-assignment-update and language-route-tag-update mirroring the retained checks (which the replay readers do not evaluate). Replayed on the Luna episode with the step-credit reader. draft_sha256 in review.json predates this revision.

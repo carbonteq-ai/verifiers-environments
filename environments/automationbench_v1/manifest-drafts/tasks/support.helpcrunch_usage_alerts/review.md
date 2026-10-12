@@ -9,3 +9,7 @@ Native replay: native replay passed; prompt-bound public initial state matched t
 Four minimized public-initial component controls (correct, harmful, missing acknowledgement, false-fact exploratory) exercised genuine simulator handlers with no execution errors. They are not original-trajectory replays and do not establish complete task coverage; detailed per-check outcomes and limitations are in `review.json`.
 
 No action credit is assigned. Passing components and unchanged partial scalar are not whole-task qualification or downstream eligibility.
+
+## Revision 2026-10-12 (shard 2 eval validation, second pass)
+
+low-task-* checks use per_candidate (task subject matching shared text was undecidable). Replayed on the Luna episode with the step-credit reader. draft_sha256 in review.json predates this revision.
