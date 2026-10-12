@@ -19,3 +19,7 @@ Latest runs completed with no assessment or credit errors. Correct replay and se
 - Extra events and duplicates are not public harms for these prompts; no harm guard is asserted. These limited checks do not award action credit.
 - Shared system narration instructions are out of scope. Recorded success and component coverage do not qualify the full task.
 - The review records other task-specific time/calendar and all-day scope limits in `review.json`.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+rebound from the whole-prompt binding to the user message (prompt[1].content). Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

@@ -7,16 +7,18 @@
     {
       "path": [
         "task_evidence",
-        "prompt"
+        "initial"
       ],
-      "canonical_sha256": "ed93600aba9c0f542f05b5132881e3f10d79566a877d65142b9f78e123406663"
+      "canonical_sha256": "d1e25a7da351753bd847c60a46120f31d8a769a4c55155693296f7c3b59af0fd"
     },
     {
       "path": [
         "task_evidence",
-        "initial"
+        "prompt",
+        1,
+        "content"
       ],
-      "canonical_sha256": "d1e25a7da351753bd847c60a46120f31d8a769a4c55155693296f7c3b59af0fd"
+      "canonical_sha256": "de46b0d1a9f4aa10155b073436129111cf29942d26427d89817de1b7729822df"
     }
   ],
   "sources": {
@@ -210,6 +212,14 @@
     "alerts": {
       "adapter": "slack.messages@1",
       "kind": "channel_message"
+    },
+    "tickets_created": {
+      "adapter": "service.record_writes@1",
+      "service": "zendesk",
+      "collection": [
+        "tickets"
+      ],
+      "kind": "create"
     }
   },
   "checks": [
@@ -389,6 +399,116 @@
         ]
       },
       "max_instances": 4096
+    },
+    {
+      "check_id": "high-priority-ticket-created",
+      "signal_id": "simple.escalation_zendesk_slack.high_priority_ticket_created",
+      "role": "goal",
+      "operator": "effects.required_when@1",
+      "semantics": "new_occurrence",
+      "match_cardinality": "unique_candidate",
+      "max_instances": 4096,
+      "population": "request",
+      "source": "tickets_created",
+      "required_when": {
+        "op": "eq",
+        "left": {
+          "kind": "field",
+          "path": [
+            "request",
+            "request_key"
+          ],
+          "domain": "string"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "enterprise_escalation"
+        }
+      },
+      "effect_match": {
+        "op": "all",
+        "args": [
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "priority"
+              ],
+              "domain": "scalar"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "high"
+            }
+          },
+          {
+            "op": "mentions",
+            "text": {
+              "kind": "field",
+              "path": [
+                "effect",
+                "record",
+                "description"
+              ],
+              "domain": "string"
+            },
+            "value": {
+              "kind": "field",
+              "path": [
+                "request",
+                "sender_email"
+              ],
+              "domain": "string"
+            },
+            "mode": "verbatim"
+          },
+          {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "join",
+                "prior_read"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "matched"
+            }
+          }
+        ]
+      },
+      "effect_joins": [
+        {
+          "alias": "prior_read",
+          "source": "reads",
+          "timing": "before",
+          "match": "any",
+          "where": {
+            "op": "eq",
+            "left": {
+              "kind": "field",
+              "path": [
+                "joined",
+                "message_id"
+              ],
+              "domain": "string"
+            },
+            "right": {
+              "kind": "field",
+              "path": [
+                "request",
+                "message_id"
+              ],
+              "domain": "string"
+            }
+          }
+        }
+      ]
     },
     {
       "check_id": "channel-escalation-includes-public-facts",

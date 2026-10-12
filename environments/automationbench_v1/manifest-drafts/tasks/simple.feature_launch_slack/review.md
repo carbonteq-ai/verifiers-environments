@@ -25,3 +25,7 @@ H2 duplicate -> guard 1; H4 task without post -> O1/O2 0; posting elsewhere fail
 Known gaming: Post 'analytics dashboard launch postponed' in #product (Launch meaning is out of scope (requires_judgement).)
 
 Mechanism notes: Installed launch-monitor-creation (asana.actions@1) cannot close scope when the public initial world has no Asana service: wrong workspace (H3) and no task (N0) are abstained, never 0. Worked around with the service.record_writes@1 companion (decides 0); the installed check is unchanged.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+field authority paths moved from the whole prompt to the user message (4 goals were abstaining with request_field_authority_unbound). Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

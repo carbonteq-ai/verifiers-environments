@@ -9,3 +9,7 @@ All three genuine-handler component controls retain raw simulator materials, nat
 Known limitations: The correct-handler create is blocked on the exact public initial state: jira.projects is empty, and jira_create_issue(project=PROD, issuetype=Story, ...) returns success=false, jira_project_not_found; the create finding is known 0 in both positive and adverse controls. No synthetic project was seeded. The reply component is independently checked and discriminates correct from wrong recipient.
 
 Whole-task status: **not qualified**. No action credit or eligibility is claimed.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+rebound; reply need not share the source thread id; accepts Thanks/Thank you; accepts the first name; story summary must mention CSV and export instead of the verbatim phrase. Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

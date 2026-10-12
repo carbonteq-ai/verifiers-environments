@@ -16,3 +16,7 @@ Coverage: 1 expressible action components, 1 public obligations unavailable, 2 o
 - These are component manifests only; training eligibility/action credit/whole-task qualification are not granted.
 
 Native/control module fingerprints stayed unchanged during the final run (`ad19a666ff603276197cecb0bec58f061ae941d6cb305a39e90f08ae11b8c2ae` snapshot). Raw controls, dispatch/return envelopes, ACKs and scored WireEpisode links: `/tmp/automationbench-luna-simple-b11-20261005/controls/simple.asana_api_docs_task.json`.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+rebound from the whole-prompt binding to the user message (prompt[1].content); field authority moved to the initial-state evidence or an ISO date spelled out in the prompt. Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

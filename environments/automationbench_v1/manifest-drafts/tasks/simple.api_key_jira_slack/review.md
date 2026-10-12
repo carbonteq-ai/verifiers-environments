@@ -17,3 +17,7 @@ Coverage: 2 expressible action components, 0 public obligations unavailable, 3 o
 - These are component manifests only; training eligibility/action credit/whole-task qualification are not granted.
 
 Native/control module fingerprints stayed unchanged during the final run (`ad19a666ff603276197cecb0bec58f061ae941d6cb305a39e90f08ae11b8c2ae` snapshot). Raw controls, dispatch/return envelopes, ACKs and scored WireEpisode links: `/tmp/automationbench-luna-simple-b11-20261005/controls/simple.api_key_jira_slack.json`.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+rebound to the user message (channel id and project authorities fixed); added effect goal jira-rotation-issue-create-action (project, summary, priority). Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

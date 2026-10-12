@@ -16,3 +16,7 @@ Recorded native replay: [replay artifact](/tmp/automationbench-luna-simple-batch
 Synthetic public-input component controls: [full raw controls](/tmp/automationbench-luna-simple-batch14-20261005/controls_full_v2.json) (`1377978d84e6e95d2ef22047bf37220d2b8086b588f823b4594731f88d13242a`), using [runner](/tmp/automationbench-luna-simple-batch14-20261005/controls_full.py) (`87983ecb81802728b4a5c62328dbfdaff5a5dfcb75b4022e1bf927ee07e71f7b`). Correct, harmful, and missing-ACK cases use genuine handlers and retain dispatch/return envelopes, ACKs, raw handler material, scored WireEpisodes, reward maps, findings, and pre/post source fingerprints. This is a component harness, not trajectory replay. Its ordinary task comparison uses empty assertions on the synthetic public fixture; hidden benchmark baseline parity is unavailable.
 
 The full per-case findings and provenance hashes are in `review.json`. No credit, eligibility, or whole-task qualification is inferred.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+rebound from the whole-prompt binding to the user message (prompt[1].content); field authority moved to the initial-state evidence or an ISO date spelled out in the prompt. Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

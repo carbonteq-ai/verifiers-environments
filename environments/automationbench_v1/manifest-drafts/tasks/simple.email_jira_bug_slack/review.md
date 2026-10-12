@@ -16,3 +16,7 @@ Three authentic-handler component scenarios (positive, candidate mismatch, and m
 - **expressed — goal:** notify-engineering — notify the #engineering Slack channel
 
 No action-credit policy is declared. The public request, destination identity, retained-state limits and semantic report gaps are kept separate from the component findings.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+added effect goal jira-bug-issue-created (project PLAT, issue type Bug, after the email read). Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.

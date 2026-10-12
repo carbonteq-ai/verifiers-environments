@@ -9,3 +9,7 @@ Native replay: native replay passed; prompt-bound public initial state matched t
 Targeted real-handler priority control now discriminates the expressed migration check: public mig_t1 priority 3→Zoho Medium passes; changing only the destination priority to Low scores 0. Missing acknowledgement abstains for the create effect. This validates only the attempted row, not migration completeness or requester mapping. Other minimized component controls and their exact findings are in `review.json`.
 
 No action credit is assigned. Passing components and unchanged partial scalar are not whole-task qualification or downstream eligibility.
+
+## Revision 2026-10-12 (shard 2 eval validation)
+
+create-mig_* now require the Zoho description to mention the original description (verbatim) instead of equal it; Luna's provenance suffix no longer fails them. Replayed on the Luna episode with the step-credit reader (outcome counts in manifest-validation/shard2-results.json). draft_sha256 in review.json predates this revision.
