@@ -5,7 +5,7 @@
 
 from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from automationbench.schema.linkedin.base import (
     LinkedInRecord,
@@ -15,6 +15,10 @@ from automationbench.schema.linkedin.base import (
 
 class PostContent(LinkedInRecord):
     """Media or link content attached to a LinkedIn post."""
+
+    # Persisted worlds use field names; API responses use camelCase aliases.
+    # Accept both while retaining LinkedInRecord's strict extra-field policy.
+    model_config = ConfigDict(populate_by_name=True)
 
     title: Optional[str] = None
     description: Optional[str] = None

@@ -1,5 +1,17 @@
 # Environment source and vendored dependency ledger
 
+Local124-task Jira fixture repair (2026-10-20, unpublished): mirror the five
+fixture corrections owned by /home/hammad/projects/automationbench at base
+f96cb666066577dd8c203e20579fa282753f7ae4. Four public task projects were absent
+(INFRA,PLAT,SAFETY,FIRE); the existing INC entity lacked its public Incident
+Management name. Generic creation/lookup validation is unchanged and unknown
+projects still fail. Three actual Jira-source bindings move to manifest revision
+batch03_v1_eval1_jira_fixture_v2 with recorded before/after digests; checks,
+public requests and non-Jira state remain unchanged. Seven native source and
+persisted-creation regressions plus52 related environment tests pass(59total).
+Do not describe this as unchanged source or publish/update pins without consent.
+The124-task qualification must use a new hashed source snapshot and fresh controls.
+
 Local Trello label inventory repair (2026-10-05, unpublished): acknowledge
 audited native `trello_card_label` as a write beside list searches. The label
 does not emit a read; missing ACK keeps inventory unavailable. Root genuine
@@ -473,3 +485,118 @@ exact vendor files and record hashes; qualify/package/publish the environment
 repository; only then update framework immutable selections and lockfiles.
 Rebase/update preserves native trace replay and each package's independent
 dependencies. Do not replace existing immutable pins with dirty source hashes.
+
+## Candidate heldout62 serialization repair (2026-10-17)
+
+Status: unpublished candidate. No immutable consumer pin has been updated.
+
+This environment repository is maintained at
+https://github.com/carbonteq-ai/verifiers-environments. This candidate starts
+from exact repository commit a0c7378b179e2b267382b8125192876502d82f89.
+Its AutomationBench source is vendored from CarbonTeq AutomationBench commit
+e193bce99af1ea7cca272644a2b3a1676a587b4a, as recorded in the environment README.
+That vendor's upstream is https://github.com/zapier/AutomationBench; consult
+the maintained AutomationBench fork's ledger for the rest of its delta.
+The environment repository uses origin carbonteq-ai/verifiers-environments;
+it does not require a separate upstream remote.
+
+The additional candidate delta is limited to
+environments/automationbench_v1/src/automationbench/schema/linkedin/post.py:
+PostContent accepts its Python field names as well as API aliases. The inherited
+extra-field rejection remains enabled. WorldState JSON uses field names, so the
+old model rejected its own serialized article fields during tool-state reload
+and final scoring. Assertions, contracts, task selection and grader semantics
+are unchanged.
+
+Regression coverage in
+environments/automationbench_v1/tests/test_linkedin_post_roundtrip.py checks
+null/nonempty article data, persisted JSON reload, API aliases, unknown-field
+rejection and final scoring with the real sales.milestone_celebration assertions.
+Python 3.12 and the package's existing immutable Verifiers pin are retained;
+there are no dependency changes.
+
+From environments/automationbench_v1:
+
+    uv --system-certs sync --locked --python 3.12
+    .venv/bin/python -m pytest tests/test_linkedin_post_roundtrip.py tests/test_world_codec.py -q
+    .venv/bin/ruff check tests/test_linkedin_post_roundtrip.py
+    .venv/bin/pyright --pythonpath .venv/bin/python tests/test_linkedin_post_roundtrip.py
+    uv --system-certs build --wheel
+
+Before publication, build and install all six environment wheels together and
+run scripts/verify_combined_install.py with that combined interpreter. GPU
+qualification is a subsequent fresh heldout62 run on the newly published SHA;
+old native evidence must remain intact.
+
+On rebase, check whether the vendor already enables field-name validation on
+PostContent. Retain regression coverage and strict unknown-field rejection;
+drop the local schema change if the upstream behavior is equivalent. Other
+schema/tool fixes and old benchmark outcomes are outside this candidate.
+
+Published candidate commit: none. Publication requires explicit authorization
+under this repository's AGENTS.md.
+
+### Local heldout62 observability candidate (2026-10-18)
+
+The same frozen base now has an additional opt-in access repair. Taskset config
+additional_tools_by_task adds only explicitly selected, registered tools, rejects
+unknown tools and unselected task names, and preserves default tool sets.
+Task config world_time_context_if_declared exposes an existing declared clock
+for mixed timed/timeless tasksets without a host-date fallback. The older strict
+world_time_context boolean still rejects missing clocks.
+
+The lab selection adds Gmail search/read for sales tax and Slack channel listing
+for prepaid amortization, and exposes15 declared clocks across62 tasks. No user
+request, initial state, assertion, threshold or dependency pin changes. Existing
+LinkedIn PostContent roundtrip repair remains included. Regression tests are
+tests/test_observability_repairs.py and tests/test_linkedin_post_roundtrip.py;
+the environment/codec subset passes36 tests. All six wheels were built and
+installed together; scripts/verify_combined_install.py is the loader gate.
+
+Source is still unpublished: no Git commit, tag or push. Protected workstation
+experiment images may carry a content-addressed local snapshot, with exact
+source/wheel receipts in the framework's heldout62-observability audit plan.
+On rebase compare upstream clock/tool-selection options and preserve opt-in
+defaults, validation and the absence of privileged scoring context.
+
+### Local strict argument admission candidate (2026-10-20)
+
+Base remains a0c7378b179e2b267382b8125192876502d82f89, unpublished. The opt-in
+strict_tool_arguments flag applies only to limited_zapier and rejects unsupported
+toolset modes. Its native MCP middleware checks raw argument keys against actual
+registered function signatures before the SDK discards extras. Rejection returns
+a tool-error result, executes no action and does not echo values. Declared
+parameter coercion/defaults remain native. Regression tests reproduce the old
+include_grid_data -> ignored/default-false behavior, reject it explicitly in the
+new mode, and execute includeGridData=True exactly once. Thirty-five environment,
+transport, clock and codec tests pass locally. This is not yet model or deployment
+qualification. The consumer's ten-task fresh-control plan selects this option
+with declared-clock context; no historical scores are relabelled. On rebase,
+retain raw-before-validation rejection or prove equivalent upstream behavior.
+No commit, push, version bump or immutable consumer pin change is authorized.
+
+### Local LinkedIn source immutability repair (2026-10-20)
+
+The user requested fixing failing tasks rather than dropping them. Investigation
+showed sales.linkedin_job_change and sales.linkedin_sales_prospecting match their
+unchanged original authority hashes before construction. Profile's before-validator
+mutated nested caller dictionaries while converting aliases such as profile_url,
+profile_id and title. Copying that dictionary before normalization preserves the
+original task evidence and leaves canonical Profile values/precedence unchanged.
+No manifest binding, check, source fixture or public requirement was rewritten.
+Three regressions failed before the fix; model construction, native setup and
+validation now preserve both tasks' source. The related environment/codec/
+deterministic subset passes52 tests. All46 protected-set-clear candidates from
+the124pool pass source/manifest checks again. No tasks were quarantined or dropped.
+This is an unpublished local vendor compatibility patch; upstream promotion and
+release qualification remain separate from the source-hashed workstation trial.
+
+### Research handoff source snapshot (2026-10-22)
+
+The user explicitly authorized committing the investigation for a colleague.
+This supersedes historical no-commit instructions for these local repairs only.
+The source snapshot includes strict argument admission, opt-in clock/tool
+observability, LinkedIn roundtrip/source immutability and corresponding fixture
+bindings. The focused repair subset passed24 tests. This remains unpublished;
+no remote push, dependency repin, release or retroactive rescoring is authorized.
+Historical capsule hashes remain the authority for historical experiments.

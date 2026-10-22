@@ -8005,6 +8005,7 @@ def get_ops_twilio_afterhours_incident_task() -> dict:
                                     "searchByParameter": "Incident Management",
                                     "project": "INC",
                                     "project_id": "proj_inc",
+                                    "project_name": "Incident Management",
                                 },
                             }
                         ]
@@ -26635,7 +26636,10 @@ def get_ops_chemical_inventory_safety_audit_task() -> dict:
                         }
                     ]
                 },
-                "jira": {"actions": {"project": []}},
+                "jira": {
+                    "actions": {"project": []},
+                    "projects": [{"key": "SAFETY", "name": "SAFETY"}],
+                },
                 "gmail": {
                     "messages": [
                         # Cross-modal: confirms Isopropanol SDS renewal -> exempts from SDS flag
@@ -29557,7 +29561,10 @@ def get_ops_fire_suppression_testing_task() -> dict:
                     "labels": [],
                     "drafts": [],
                 },
-                "jira": {"actions": {}},
+                "jira": {
+                    "actions": {},
+                    "projects": [{"key": "FIRE", "name": "FIRE"}],
+                },
                 "twilio": {"sms_messages": [], "calls": [], "whatsapp_messages": []},
             },
             "assertions": [

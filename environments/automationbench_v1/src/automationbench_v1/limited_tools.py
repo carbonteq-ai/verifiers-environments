@@ -194,6 +194,37 @@ def selected_tool_definitions(names: tuple[str, ...]) -> list[dict[str, Any]]:
 
 class AutomationBenchLimitedToolsetConfig(vf.ToolsetConfig):
     allowed_tools: tuple[str, ...]
+    strict_tool_arguments: bool = False
+
+
+class RejectUnknownToolArguments:
+    """Reject undeclared raw keys before MCP's argument model discards them.
+
+    Declared parameter types/defaults keep the native SDK behavior. A normal
+    error tool result lets the policy repair its call without a transport or
+    task failure. No tool executes and no argument values enter the error.
+    """
+
+    def __init__(self, allowed: dict[str, frozenset[str]]) -> None:
+        self.allowed = allowed
+
+    async def __call__(self, ctx: Any, call_next: Any) -> Any:
+        from mcp.types import CallToolResult, TextContent
+
+        params = ctx.params
+        if ctx.method == "tools/call" and isinstance(params, dict):
+            name, arguments = params.get("name"), params.get("arguments", {})
+            if isinstance(name, str) and name in self.allowed and isinstance(arguments, dict):
+                extra = set(arguments) - self.allowed[name]
+                if extra:
+                    message = (
+                        f"Unsupported arguments for {name}: {', '.join(sorted(extra))}. "
+                        "Use the declared tool parameter names. No action was executed."
+                    )
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=message)], isError=True
+                    )
+        return await call_next(ctx)
 
 
 def _call_arguments(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
@@ -276,6 +307,14 @@ class AutomationBenchLimitedToolset(
         return wrapper
 
     def register(self, mcp: Any) -> None:
+        if self.config.strict_tool_arguments:
+            arguments = {
+                name: frozenset(
+                    p for p in inspect.signature(_ZAPIER_TOOLS[name]).parameters if p != "world"
+                )
+                for name in self.config.allowed_tools
+            }
+            mcp.middleware.append(RejectUnknownToolArguments(arguments))
         for name in self.config.allowed_tools:
             try:
                 func = _ZAPIER_TOOLS[name]

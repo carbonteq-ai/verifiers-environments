@@ -8419,6 +8419,7 @@ def get_simple_email_jira_bug_slack() -> dict:
                     "labels": [],
                     "drafts": [],
                 },
+                "jira": {"projects": [{"key": "PLAT", "name": "PLAT"}]},
                 "slack": {
                     "channels": [
                         {"id": "CENG001", "name": "engineering", "member_ids": []},
@@ -9346,6 +9347,7 @@ def get_simple_api_key_jira_slack() -> dict:
         "info": {
             "zapier_tools": ["jira_create_issue", "slack_send_channel_message"],
             "initial_state": {
+                "jira": {"projects": [{"key": "INFRA", "name": "INFRA"}]},
                 "slack": {
                     "channels": [
                         {"id": "CSEC01", "name": "security", "member_ids": []},

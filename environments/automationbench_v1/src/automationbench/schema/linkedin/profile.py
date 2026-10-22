@@ -43,6 +43,9 @@ class Profile(LinkedInRecord):
     def normalize_profile_fields(cls, data: dict) -> dict:
         """Remap alternate field names to canonical ones for backwards compatibility."""
         if isinstance(data, dict):
+            # A nested before-validator receives the caller's dictionary. Keep
+            # task source/provenance immutable while normalizing the model.
+            data = dict(data)
             # profile_id -> id
             if "profile_id" in data and "id" not in data:
                 data["id"] = data.pop("profile_id")

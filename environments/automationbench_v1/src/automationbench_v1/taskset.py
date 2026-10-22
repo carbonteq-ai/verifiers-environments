@@ -213,6 +213,12 @@ class AutomationBenchTaskConfig(vf.TaskConfig):
     turn_budget: int | None = Field(default=None, gt=0)
     # Explicit, versioned public context; False preserves upstream prompts.
     world_time_context: bool = False
+    # Mixed tasksets may contain both declared clocks and timeless record updates.
+    # Expose declared clocks without inventing host-time dates for timeless tasks.
+    world_time_context_if_declared: bool = False
+    # Refuse undeclared keys before MCP can silently replace them with defaults.
+    # Explicit opt-in keeps historical task/runtime fingerprints reproducible.
+    strict_tool_arguments: bool = False
     # Host-side raw material for calibration; never exposed as a tool argument.
     capture_actions: bool = False
     # Fixed world clock, identifiers and random choices per call (simulation.py), so
@@ -270,8 +276,12 @@ def training_nodes(trace: Any) -> list[Any] | None:
     terminal = [branch for branch in branches if len(branch.nodes) == depth]
     if len(terminal) != 1:
         return None
-    sampled = [node for branch in branches for node in branch.nodes
-               if node.sampled and node.message.role == "assistant"]
+    sampled = [
+        node
+        for branch in branches
+        for node in branch.nodes
+        if node.sampled and node.message.role == "assistant"
+    ]
     resolved = []
     for node in terminal[0].nodes:
         if node.message.role != "assistant" or node.sampled:
@@ -326,6 +336,8 @@ class AutomationBenchTask(
 
     @classmethod
     def toolsets(cls, task_config: AutomationBenchTaskConfig) -> list[vf.Toolset]:
+        if task_config.strict_tool_arguments and task_config.toolset != "limited_zapier":
+            raise ValueError("strict_tool_arguments is qualified only for limited_zapier")
         if task_config.toolset == "api":
             return cast(list[vf.Toolset], [AutomationBenchApiToolset(task_config.tools)])
         if task_config.toolset == "limited_zapier":
@@ -333,6 +345,7 @@ class AutomationBenchTask(
                 {
                     **task_config.tools.model_dump(mode="python"),
                     "allowed_tools": task_config.allowed_tools,
+                    "strict_tool_arguments": task_config.strict_tool_arguments,
                 }
             )
             return cast(list[vf.Toolset], [AutomationBenchLimitedToolset(limited_config)])
@@ -435,11 +448,15 @@ class AutomationBenchTask(
             from .manifest_step_credit import apply_manifest_step_credit
 
             training = training_nodes(trace)
-            turn_nodes = [node for node in training or ()
-                          if node.sampled and node.message.role == "assistant"]
+            turn_nodes = [
+                node for node in training or () if node.sampled and node.message.role == "assistant"
+            ]
             trace.info[TURN_EVIDENCE_KEY] = apply_manifest_step_credit(
-                trace.info[TURN_EVIDENCE_KEY], turns=[node.message for node in turn_nodes],
-                events=trace.tool_execution_events, trace=trace, config=config,
+                trace.info[TURN_EVIDENCE_KEY],
+                turns=[node.message for node in turn_nodes],
+                events=trace.tool_execution_events,
+                trace=trace,
+                config=config,
                 node_turns=node_turns(trace, turn_nodes),
             )
 
@@ -478,7 +495,10 @@ class AutomationBenchTask(
         """Register the mistake penalty only when a penalty is selected, so tasks
         scored without one keep exactly the official reward set."""
         fns = super().hooks(attr)
-        if attr == "reward" and cast(AutomationBenchTaskConfig, self.config).mistake_penalty is None:
+        if (
+            attr == "reward"
+            and cast(AutomationBenchTaskConfig, self.config).mistake_penalty is None
+        ):
             fns = [fn for fn in fns if fn.__name__ != "tool_mistake_penalty"]
         return fns
 
@@ -545,6 +565,8 @@ class AutomationBenchConfig(vf.TasksetConfig):
     domains: list[Domain] = Field(default_factory=lambda: ["simple"])
     task_names: list[str] = Field(default_factory=list)
     task: AutomationBenchTaskConfig = Field(default_factory=AutomationBenchTaskConfig)
+    # Explicit, versioned task-access repairs. No additions occur by default.
+    additional_tools_by_task: dict[str, tuple[str, ...]] = Field(default_factory=dict)
     task_metadata_path: Path | None = None
     task_metadata_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
@@ -639,14 +661,23 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
                 if self.config.task.turn_budget is not None:
                     prompt = _with_turn_budget(prompt, self.config.task.turn_budget)
                 initial_state = _strip_none(info.get("initial_state", {}))
-                if self.config.task.world_time_context:
-                    prompt = _with_world_time(
-                        prompt, initial_state.get("meta", {}).get("current_time")
-                    )
+                declared_time = initial_state.get("meta", {}).get("current_time")
+                if self.config.task.world_time_context or (
+                    self.config.task.world_time_context_if_declared and declared_time is not None
+                ):
+                    prompt = _with_world_time(prompt, declared_time)
                 assertions = tuple(_strip_none(item) for item in info.get("assertions", []))
                 zapier_tools = tuple(str(item) for item in info.get("zapier_tools", []))
                 if self.config.task.toolset == "limited_zapier":
                     zapier_tools = _with_spreadsheet_discovery(zapier_tools, prompt, initial_state)
+                additions = self.config.additional_tools_by_task.get(task_name, ())
+                if additions:
+                    if self.config.task.toolset != "limited_zapier":
+                        raise ValueError("additional task tools require limited_zapier")
+                    from .limited_tools import selected_tool_definitions
+
+                    selected_tool_definitions(additions)  # Fail before GPU/model allocation.
+                    zapier_tools = tuple(dict.fromkeys((*zapier_tools, *additions)))
                 task_type = task_type_for(task_name, self.config.task)
                 tasks.append(
                     task_type(
@@ -668,6 +699,11 @@ class AutomationBenchTaskset(vf.Taskset[AutomationBenchTask, AutomationBenchConf
         missing = requested - found
         if missing:
             raise ValueError(f"unknown AutomationBench task_names: {', '.join(sorted(missing))}")
+        unused_additions = set(self.config.additional_tools_by_task) - found
+        if unused_additions:
+            raise ValueError(
+                "additional tools refer to unselected tasks: " + ", ".join(sorted(unused_additions))
+            )
         if self.config.task_metadata_path is not None:
             from .task_metadata import attach_task_metadata, load_task_metadata
 
