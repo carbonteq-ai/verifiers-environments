@@ -7134,8 +7134,8 @@ def get_trending_topic_task() -> dict:
                                             "row_id": 6,
                                             "cells": {
                                                 "topic": "Compliance Updates",
-                                                "mentions_last_week": "900",
-                                                "mentions_this_week": "920",
+                                                "mentions_last_week": "3200",
+                                                "mentions_this_week": "5400",
                                                 "sentiment": "neutral",
                                                 "notes": "",
                                             },

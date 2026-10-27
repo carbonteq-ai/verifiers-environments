@@ -29915,7 +29915,10 @@ def get_ops_compressed_gas_cylinder_tracking_task() -> dict:
                     ]
                 },
                 "gmail": {"messages": [], "labels": [], "drafts": []},
-                "jira": {"actions": {}},
+                "jira": {
+                    "actions": {},
+                    "projects": [{"id": "safety", "key": "SAFETY", "name": "Safety"}],
+                },
             },
             "assertions": [
                 # CYL-001: Nitrogen (inert) in Lab A -> 7-year cycle, tested 2020-06-15 -> NOT overdue

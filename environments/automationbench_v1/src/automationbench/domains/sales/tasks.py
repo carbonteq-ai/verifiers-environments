@@ -4119,6 +4119,28 @@ def get_zoom_crm_meeting_task() -> dict:
                             "label_ids": ["INBOX"],
                             "is_read": True,
                         },
+                        # Guidelines communicated by sales operations
+                        {
+                            "id": "msg_zoom_003",
+                            "thread_id": "thread_zoom_003",
+                            "from_": "sales-ops@ourcompany.example.com",
+                            "to": ["sales@ourcompany.example.com"],
+                            "subject": "Current guidelines: scheduling executive demos",
+                            "body_plain": (
+                                "Team,\n\n"
+                                "Current guidelines for executive demo requests:\n"
+                                "1. When a request comes from a division or subsidiary, book the demo "
+                                "under the parent account (the top-level account its parent_id points "
+                                "to) and use the parent account's name in the meeting topic.\n"
+                                "2. Register only one attendee: the contact at the parent account with "
+                                "a VP-or-higher title and the longest tenure (years_at_company). Do not "
+                                "register subsidiary contacts, other VPs, or contacts at similarly named "
+                                "accounts.\n\n"
+                                "Thanks,\nSales Operations"
+                            ),
+                            "label_ids": ["INBOX"],
+                            "is_read": True,
+                        },
                     ],
                     "labels": [],
                     "drafts": [],
@@ -28574,7 +28596,23 @@ def get_zoom_recurring_meeting_optimizer_task() -> dict:
                     ],
                 },
                 "salesforce": {
-                    "accounts": [{"id": "001_MAJOR", "account_name": "MajorClient"}],
+                    "accounts": [
+                        {
+                            "id": "001_MAJOR",
+                            "account_name": "MajorClient",
+                            "description": (
+                                "Account health policy: if attendance at the account's recurring "
+                                "review meeting is below 50% in 3 consecutive weeks, flag the "
+                                "account as an engagement risk. To flag it: (1) add 'engagement "
+                                "risk' to the description of the account's opportunity; (2) post "
+                                "a message naming the account in the #account-health Slack "
+                                "channel; (3) create a Salesforce note on the account recording "
+                                "the attendance trend; (4) email the account owner. Escalate "
+                                "to the owner only; never email the meeting registrants "
+                                "directly about low attendance."
+                            ),
+                        }
+                    ],
                     "opportunities": [
                         {
                             "id": "opp_major",

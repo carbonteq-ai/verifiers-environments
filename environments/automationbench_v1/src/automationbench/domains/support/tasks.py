@@ -38974,6 +38974,7 @@ def get_support_hiver_mailbox_audit_task() -> dict:
                 "google_sheets_find_worksheet",
             ],
             "initial_state": {
+                "meta": {"current_time": "2026-02-07T09:00:00Z"},
                 "hiver": {
                     "conversations": [
                         {
