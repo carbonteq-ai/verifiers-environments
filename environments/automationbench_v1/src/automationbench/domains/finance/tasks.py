@@ -6926,7 +6926,8 @@ def get_fin_expense_reclass_task() -> dict:
                     "The department heads flagged several expenses that were miscategorized "
                     "last month. Review the reclassification requests in the spreadsheet "
                     "and update each expense's category. Verify against our chart of accounts "
-                    "before making changes. Email a confirmation to controller@company.example.com "
+                    "before making changes, and set each request's Status to \"Completed\" once applied "
+                    "or \"Rejected\" if it can't be applied. Email a confirmation to controller@company.example.com "
                     "with a list of all changes made. "
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
@@ -16038,6 +16039,7 @@ def get_fin_accounts_payable_turnover_task() -> dict:
                     "Email the analysis to controller@company.example.com. Flag any vendors "
                     "where we're paying too quickly or too slowly. Make sure you're using "
                     "our current DPO targets \u2014 there may have been some recent changes."
+                    " The AP team also posts corrections to vendor figures in Slack, so check there before calculating."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s)."
                 ),
             },

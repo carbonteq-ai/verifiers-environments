@@ -32560,6 +32560,7 @@ def get_support_reamaze_multilanguage_task() -> dict:
                                         "Language Name",
                                         "Agent Email",
                                         "Supported",
+                                        "Routing Notes",
                                     ],
                                     "rows": [
                                         {
@@ -32569,6 +32570,7 @@ def get_support_reamaze_multilanguage_task() -> dict:
                                                 "Language Name": "English",
                                                 "Agent Email": "english@support.com",
                                                 "Supported": "Yes",
+                                                "Routing Notes": "",
                                             },
                                         },
                                         {
@@ -32578,6 +32580,7 @@ def get_support_reamaze_multilanguage_task() -> dict:
                                                 "Language Name": "Spanish",
                                                 "Agent Email": "spanish@support.com",
                                                 "Supported": "Yes",
+                                                "Routing Notes": "",
                                             },
                                         },
                                         {
@@ -32587,6 +32590,7 @@ def get_support_reamaze_multilanguage_task() -> dict:
                                                 "Language Name": "French",
                                                 "Agent Email": "french@support.com",
                                                 "Supported": "Yes",
+                                                "Routing Notes": "",
                                             },
                                         },
                                         {
@@ -32596,6 +32600,10 @@ def get_support_reamaze_multilanguage_task() -> dict:
                                                 "Language Name": "German",
                                                 "Agent Email": "english@support.com",
                                                 "Supported": "No",
+                                                "Routing Notes": (
+                                                    "Unsupported language: assign to the English team and add a "
+                                                    "message to the conversation noting that translation is needed."
+                                                ),
                                             },
                                         },
                                     ],

@@ -14266,7 +14266,8 @@ def get_docusign_void_resend_task() -> dict:
                 "content": (
                     "There's an unread contract update request in the inbox. "
                     "Handle it per standard procedure - void, resend with the right "
-                    "template, update CRM, and confirm with the requesting rep."
+                    "template, update CRM (the opportunity amount, plus a description noting "
+                    "the new template and the voided envelope ID), and confirm with the requesting rep."
                     " Include the names of affected entities and the relevant amounts in your message(s)."
                 ),
             },
@@ -27884,7 +27885,7 @@ def get_zoom_webinar_lead_scoring_task() -> dict:
                 "content": (
                     "Today is January 22, 2026. "
                     "Score leads from the recent Product Launch 2026 webinar. "
-                    "Use the scoring rubric and create leads in Salesforce with "
+                    "Use the scoring rubric (check email for any recent updates to it) and create leads in Salesforce with "
                     "appropriate ratings and score breakdowns in the description."
                 ),
             },

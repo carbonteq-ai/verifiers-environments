@@ -33,7 +33,7 @@ QUALIFIED = {
     "operations.zoom_training_setup": (
         "operations-zoom-training-setup.json", "61e8e4bdb9ddfff0d98a495603935ac47ececdd3139fd5f691922caad8772b64"),
     "operations.calendly_equipment_inspection": (
-        "operations-calendly-equipment-inspection.json", "eba5ab47899161a7d251857b54ad361684fb1c387cb29950caa0d4c15b4c037b"),
+        "operations-calendly-equipment-inspection.json", "2beed8507c64c3f0d9dd2dad861ed44a21be06a2dc08da04eefd1d06ebceab2a"),
 }
 
 # Reviewed Luna outcome per check: "status/value" -> number of candidate findings.
