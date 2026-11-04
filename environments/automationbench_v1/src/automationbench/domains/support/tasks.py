@@ -22587,7 +22587,8 @@ def get_support_zendesk_gdpr_purge_task() -> dict:
                     "Handle the GDPR erasure requests in ss_gdpr (ws_requests). For each "
                     "request, find the user in Zendesk, anonymize their tickets, and remove "
                     "the account — but check the legal-hold list (ws_legal_hold) first. Log "
-                    "everything to ws_compliance_log and post a summary to #privacy-ops."
+                    "everything to ws_compliance_log and post a summary to #privacy-ops. Anonymize with the subject prefix from "
+                    "ws_config, tag each anonymized ticket 'gdpr-purged', and include the ws_config batch reference in the summary."
                     "Include the names of affected entities and the relevant amounts in your message(s)."
                 ),
             },
