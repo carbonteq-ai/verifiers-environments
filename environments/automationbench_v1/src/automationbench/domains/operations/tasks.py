@@ -6646,8 +6646,9 @@ def get_ops_asana_slack_sheets_audit_task() -> dict:
                     "Time to set up the Q1 ops audit. Can you create the Asana task and log it?\n\n"
                     "Check the Audit Calendar spreadsheet for the next full-scope Q1 audit - "
                     "there are scheduling policies in there too so review those before picking anything. "
-                    "Create a task named 'Q1 Ops Audit' in the Asana compliance project, section Q1, "
-                    "and tag it as Audit. "
+                    "Create a task named 'Q1 Ops Audit' in the Asana compliance project (workspace ws_ops, project "
+                    "proj_compliance), section Q1 (sec_q1), and tag it as Audit; when adding it to the section and "
+                    "tagging it, refer to it by its Asana task id 1208765432109876. "
                     "Log it in the audit log spreadsheet and post to #ops-updates."
                 ),
             },
