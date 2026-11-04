@@ -21308,7 +21308,7 @@ def get_calendly_discovery_call_task() -> dict:
                     "Check the lead booking policy spreadsheet (spreadsheet_id='ss_booking_policy_001') "
                     "to confirm which event type applies for this lead's role. "
                     "Ensure you follow any current booking process guidelines. "
-                    "Update the lead's CRM record with the outcome."
+                    "Update the lead's CRM record with the outcome (Status 'Working - Contacted', and note in the description that the call was booked via Calendly)."
                 ),
             },
         ],
