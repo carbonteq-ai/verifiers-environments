@@ -8502,7 +8502,9 @@ def get_support_gorgias_refund_processing_task() -> dict:
                     "draft Gmail confirmations or escalate to Jira (project FIN, issuetype "
                     "Task) as the policy dictates. Log each one to the refund log "
                     "(ws_refund_log) with Action values: 'Draft', 'Escalated', "
-                    "'Not Found', 'Expired', or 'Denied'. Post a summary to #finance-ops."
+                    "'Not Found', 'Expired', or 'Denied'. Reply on each processed Gorgias ticket saying what happened "
+                    "(refund confirmation drafted, escalated, order not found, outside the refund window, or denied). "
+                    "Post a summary to #finance-ops."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s)."
                 ),
             },
@@ -9217,6 +9219,15 @@ def get_support_gorgias_refund_processing_task() -> dict:
                                                 "Value": "fraud-review",
                                                 "Action": "Escalate to Jira regardless of amount. Match by order Flags field in orders sheet.",
                                                 "Reason": "Orders flagged for fraud review must go through manual finance review",
+                                            },
+                                        },
+                                        {
+                                            "row_id": 4,
+                                            "cells": {
+                                                "Rule Type": "Always Escalate",
+                                                "Value": "Repeat Refunder Email",
+                                                "Action": "Escalate to Jira regardless of amount when an otherwise eligible refund comes from a customer email listed as Repeat Refunder Email in Thresholds.",
+                                                "Reason": "Repeat refunders need manual finance review",
                                             },
                                         },
                                     ],
