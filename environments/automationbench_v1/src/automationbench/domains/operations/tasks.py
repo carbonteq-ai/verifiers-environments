@@ -16671,7 +16671,7 @@ def get_ops_linkedin_abm_outreach_task() -> dict:
                     "filter by the seniority criteria, and check their LinkedIn profiles and recent "
                     "posts so we can personalize the outreach.\n\n"
                     "Send connection requests on LinkedIn with personalized messages, create a "
-                    "Salesforce task for each account's AE, and log everything to the ABM tracker "
+                    "Salesforce task for each account's AE (subject 'ABM Touch - <account name>'), and log everything to the ABM tracker "
                     "spreadsheet. Let #abm-team know which accounts and contacts you reached out to.\n\n"
                     "Today is 2026-01-28."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
