@@ -37867,6 +37867,13 @@ def get_support_helpcrunch_trial_nurture_task() -> dict:
                                                 "Value": "Create Salesforce task for follow-up",
                                             },
                                         },
+                                        {
+                                            "row_id": 4,
+                                            "cells": {
+                                                "Setting": "Stuck_Threshold_Days",
+                                                "Value": "3 (no new milestone in 3 or more days)",
+                                            },
+                                        },
                                     ],
                                 },
                             ],
