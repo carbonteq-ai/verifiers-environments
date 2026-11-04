@@ -41536,7 +41536,9 @@ def get_support_zendesk_customer_sentiment_task() -> dict:
                 "role": "user",
                 "content": (
                     "Review our open Zendesk tickets and flag any that need special attention based on "
-                    "how the customer is feeling. Adjust priority and routing as appropriate. Check the "
+                    "how the customer is feeling (tag frustrated customers' tickets 'retention-risk' and happy customers' "
+                    "tickets 'success-story'). Adjust priority and routing as appropriate (frustrated customers: urgent "
+                    "if they report an outage or data loss, otherwise high). Check the "
                     "sentiment config spreadsheet (ss_config, worksheet 'ws_config') for reporting parameters, "
                     "include its Batch_Reference value, and post a sentiment summary to #customer-health."
                 ),
