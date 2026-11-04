@@ -19095,7 +19095,7 @@ def get_ops_facility_incident_triage_task() -> dict:
                     "Just got notified about some facility incidents. Can you check the facility "
                     "incident log spreadsheet and handle "
                     "the most urgent one? There should be worksheets for open incidents and on-call contacts. Today is Monday, 2026-02-09.\n\n"
-                    "We need to get the worst unresolved issue into Jira (Facilities Ops project), "
+                    "We need to get the worst unresolved issue into Jira (Facilities Ops project, key FACOPS), "
                     "text whoever is on-call today, and post it to the incidents channel on Slack. "
                     "Only deal with the single most critical open incident - the rest will be "
                     "handled in the regular triage meeting.\n\n"
