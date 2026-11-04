@@ -25349,6 +25349,7 @@ def get_ops_safety_incident_investigation_routing_task() -> dict:
                     "post to #safety-critical on Slack\n"
                     "- Major: Create Jira issue (proj_safety) + post to #safety-incidents on Slack only\n"
                     "- Minor: Create Jira issue (proj_safety) only\n\n"
+                    "Use Jira project key SAFETY (proj_safety) for all issues. "
                     "Include incident type, location, and severity in all Jira issues."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
