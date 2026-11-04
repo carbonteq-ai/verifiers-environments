@@ -1330,7 +1330,7 @@ def get_format_ambiguity_task() -> dict:
                 "role": "user",
                 "content": (
                     "There should be a title update request somewhere in the inbox. "
-                    "Can you take care of it? Make sure to follow our contact identification procedures."
+                    "Can you take care of it, and note the promotion in the contact's description? Make sure to follow our contact identification procedures."
                 ),
             },
         ],
