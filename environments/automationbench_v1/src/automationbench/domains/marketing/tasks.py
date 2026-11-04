@@ -1322,7 +1322,7 @@ def get_ad_performance_review_task() -> dict:
                             "from_": "media-buyer@company.example.com",
                             "to": ["marketing@company.example.com"],
                             "subject": "Q1 Ad Review Protocol",
-                            "body_plain": "Team,\n\nBefore making any campaign changes this quarter, please follow these steps:\n\n1. Check the 'Protected Campaigns' tab in the Ad Performance sheet -- do not pause anything listed there.\n2. Respect any notes in the campaign data (audit holds, etc.).\n3. For the summary email, include the average CPA (cost per acquisition) across all paused campaigns. Finance wants this for the budget model.\n\nAverage CPA = total spend of paused campaigns / total conversions of paused campaigns.\n\nThanks,\nMedia Buyer",
+                            "body_plain": "Team,\n\nBefore making any campaign changes this quarter, please follow these steps:\n\n1. Check the 'Protected Campaigns' tab in the Ad Performance sheet -- do not pause anything listed there.\n2. Respect any notes in the campaign data (audit holds, etc.).\n3. For the summary email, include the average CPA (cost per acquisition) across all paused campaigns. Finance wants this for the budget model.\n4. A campaign is underperforming if it has run at least 30 days and has a CTR (clicks / impressions) of 0.5% or lower and a CPA above $100.\n\nAverage CPA = total spend of paused campaigns / total conversions of paused campaigns.\n\nThanks,\nMedia Buyer",
                             "date": "2026-01-25T09:00:00Z",
                             "is_read": False,
                             "label_ids": ["INBOX"],
