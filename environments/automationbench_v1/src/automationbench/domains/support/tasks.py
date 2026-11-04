@@ -34294,8 +34294,9 @@ def get_support_zoho_vendor_tickets_task() -> dict:
                 "content": (
                     "Process vendor-related Zoho Desk tickets. Look up vendors in "
                     "ss_vendors/ws_vendors to find their details and SLA terms, "
-                    "escalate as needed, and email vendor contacts. Log actions "
-                    "to ss_vendors/ws_log.\n\nUse Gmail for all email sends."
+                    "escalate as needed (create a Zoho Desk ticket titled 'Vendor Escalation: <original subject>'), "
+                    "and email vendor contacts. For tickets whose account is not in ws_vendors, comment that it is not a vendor "
+                    "and still log it. Log actions to ss_vendors/ws_log.\n\nUse Gmail for all email sends."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
             },
