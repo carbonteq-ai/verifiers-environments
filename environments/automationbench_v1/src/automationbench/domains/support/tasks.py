@@ -16842,6 +16842,7 @@ def get_support_freshdesk_sla_monitoring_task() -> dict:
                         }
                     ],
                 },
+                "jira": {"projects": [{"key": "SUPPORT"}]},
             },
             "assertions": [
                 # sla_ft1: critical breach (300%) -> priority 4 (already 4), Jira, email VP
