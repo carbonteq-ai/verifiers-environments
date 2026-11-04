@@ -11827,7 +11827,7 @@ def get_fin_bad_debt_writeoff_task() -> dict:
                                 "1. Invoice is 120+ days past due\n"
                                 "2. At least 3 collection attempts documented\n"
                                 "3. No payment activity in the last 90 days\n"
-                                "4. Customer has NOT filed for bankruptcy (if bankrupt, route to legal instead)\n"
+                                "4. Customer has NOT filed for bankruptcy (if bankrupt, route to legal@company.example.com instead)\n"
                                 "5. Amount must be under $50,000 (over $50k requires board approval - do not write off)\n\n"
                                 "Notify the assigned sales rep. Post to #finance-alerts. Report to cfo@company.example.com.\n\n- CFO"
                             ),
