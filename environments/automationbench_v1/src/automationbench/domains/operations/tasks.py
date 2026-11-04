@@ -19994,7 +19994,15 @@ def get_ops_safety_certification_gap_analysis_task() -> dict:
                     ]
                 },
                 "jira": {
-                    "actions": {},
+                    "actions": {
+                        "project": [
+                            {
+                                "id": "jira_proj_1",
+                                "action_key": "project",
+                                "params": {"project": "SAFE", "project_id": "proj_safe"},
+                            },
+                        ]
+                    },
                 },
                 "gmail": {"messages": [], "labels": [], "drafts": []},
             },
