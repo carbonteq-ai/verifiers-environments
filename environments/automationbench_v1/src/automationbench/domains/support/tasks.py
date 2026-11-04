@@ -13783,7 +13783,8 @@ def get_support_zoho_desk_ticket_categorization_task() -> dict:
                     "departments with proper classification. The categorization policy is in the "
                     "spreadsheet (spreadsheet 'ss_categories', worksheets 'ws_keyword_rules' and "
                     "'ws_department_routing'). Make sure department leads know what's coming their "
-                    "way, and post a breakdown to #support-ops.\n\nUse Gmail for all email sends."
+                    "way, and post a breakdown to #support-ops. If a ticket matches none of the keyword rules, add a comment "
+                    "saying it is unclassified and do not route it.\n\nUse Gmail for all email sends."
                 ),
             },
         ],
