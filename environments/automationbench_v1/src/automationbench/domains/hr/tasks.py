@@ -7468,6 +7468,7 @@ def get_hr_docusign_nda_collection_task() -> dict:
                                                 "Employee": "Alicia Fernandez",
                                                 "Email": "alicia.fernandez@company.example.com",
                                                 "NDA Status": "Not Sent",
+                                                "Envelope ID": "env_nda_alicia",
                                                 "Start Date": "2026-03-24",
                                             },
                                         },
@@ -7477,6 +7478,7 @@ def get_hr_docusign_nda_collection_task() -> dict:
                                                 "Employee": "Tyrone Washington",
                                                 "Email": "tyrone.washington@company.example.com",
                                                 "NDA Status": "Not Sent",
+                                                "Envelope ID": "env_nda_tyrone",
                                                 "Start Date": "2026-03-25",
                                             },
                                         },
@@ -7495,6 +7497,7 @@ def get_hr_docusign_nda_collection_task() -> dict:
                                                 "Employee": "Mei-Ling Chow",
                                                 "Email": "meiling.chow@company.example.com",
                                                 "NDA Status": "Not Sent",
+                                                "Envelope ID": "env_nda_meiling",
                                                 "Start Date": "2026-03-24",
                                             },
                                         },
@@ -7505,7 +7508,50 @@ def get_hr_docusign_nda_collection_task() -> dict:
                     ],
                 },
                 "docusign": {
-                    "envelopes": [],
+                    "envelopes": [
+                        {
+                            "envelope_id": "env_nda_alicia",
+                            "status": "created",
+                            "email_subject": "Employee NDA - Alicia Fernandez",
+                            "template_id": "tmpl_nda",
+                            "signers": [
+                                {
+                                    "recipient_id": "1",
+                                    "email": "alicia.fernandez@company.example.com",
+                                    "name": "Alicia Fernandez",
+                                    "routing_order": "1",
+                                }
+                            ],
+                        },
+                        {
+                            "envelope_id": "env_nda_tyrone",
+                            "status": "created",
+                            "email_subject": "Employee NDA - Tyrone Washington",
+                            "template_id": "tmpl_nda",
+                            "signers": [
+                                {
+                                    "recipient_id": "1",
+                                    "email": "tyrone.washington@company.example.com",
+                                    "name": "Tyrone Washington",
+                                    "routing_order": "1",
+                                }
+                            ],
+                        },
+                        {
+                            "envelope_id": "env_nda_meiling",
+                            "status": "created",
+                            "email_subject": "Employee NDA - Mei-Ling Chow",
+                            "template_id": "tmpl_nda",
+                            "signers": [
+                                {
+                                    "recipient_id": "1",
+                                    "email": "meiling.chow@company.example.com",
+                                    "name": "Mei-Ling Chow",
+                                    "routing_order": "1",
+                                }
+                            ],
+                        },
+                    ],
                     "templates": [
                         {
                             "template_id": "tmpl_nda",
