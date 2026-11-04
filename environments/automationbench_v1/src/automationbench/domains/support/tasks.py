@@ -45660,8 +45660,9 @@ def get_support_intercom_conversation_quality_task() -> dict:
                 "role": "user",
                 "content": (
                     "Audit the quality of our recent Intercom conversations. Review agent "
-                    "responses for helpfulness and completeness, tag conversations with quality "
-                    "ratings, add coaching notes where needed, log scores to our quality tracker "
+                    "responses for helpfulness and completeness (greeting, level of detail), tag conversations with quality "
+                    "ratings (quality-high or quality-low), add coaching notes where needed (marked 'Coaching' and "
+                    "naming each gap), log scores to our quality tracker "
                     "(ss_quality), and post agent performance summary to #quality-review."
                     "\n\nToday is February 07, 2026."
                 ),
