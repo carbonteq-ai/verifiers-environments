@@ -3575,7 +3575,7 @@ def get_ops_notion_gmail_checklist_update_task() -> dict:
                     "into Notion and confirm with them?\n\n"
                     "Check the emails from ops-leads@company.example.com about the vendor onboarding checklist "
                     "and find the latest update. Make sure it's specifically about vendor onboarding, not other checklists.\n\n"
-                    "Create a Notion page under pg_ops with the update, and reply to confirm it's done.\n\n"
+                    "Create a Notion page under pg_ops titled 'Vendor Onboarding Checklist - Update' with the update, and reply to confirm it's done.\n\n"
                     "If the update adds any security-related steps (like badge request, access control, "
                     "or security clearance), also post to #security-team so they're aware."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
