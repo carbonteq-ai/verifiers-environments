@@ -29777,7 +29777,8 @@ def get_support_helpscout_auto_categorization_task() -> dict:
                     "Some of our HelpScout conversations may need better routing. "
                     "There's a spreadsheet with category definitions somewhere "
                     "(ss_categories) -- figure out which ones need attention and "
-                    "make sure the right channel knows about it."
+                    "make sure the right channel knows about it. Add an internal note to each conversation you "
+                    "categorize saying it was categorized and naming the category."
                 ),
             },
         ],
