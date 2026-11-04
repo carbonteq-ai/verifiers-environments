@@ -31365,7 +31365,8 @@ def get_support_reamaze_knowledge_routing_task() -> dict:
                     "Route Re:amaze conversations to knowledge domain experts "
                     "using our domain mapping spreadsheet. Assign to the "
                     "right expert, tag with the domain, and share relevant KB "
-                    "article links with the customer."
+                    "article links with the customer. Conversations that match no domain keyword go to "
+                    "the general expert and are tagged 'uncategorized'."
                 ),
             },
         ],
