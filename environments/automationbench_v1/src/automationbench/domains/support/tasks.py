@@ -13444,8 +13444,8 @@ def get_support_reamaze_intercom_migration_task() -> dict:
                 "content": (
                     "We're switching support platforms. There is a migration config "
                     "spreadsheet (ss_migration) with details on what to move and how. "
-                    "Make sure nothing important gets lost and keep the team updated "
-                    "in Slack."
+                    "Make sure nothing important gets lost, tag each migrated contact in Intercom "
+                    "'migrated-from-reamaze', and keep the team updated in Slack."
                     "Include the names of affected entities in your message(s)."
                 ),
             },
