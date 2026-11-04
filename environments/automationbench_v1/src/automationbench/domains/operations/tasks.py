@@ -14978,7 +14978,7 @@ def get_ops_contractor_onboarding_workflow_task() -> dict:
                     "Process the new contractor onboarding queue. Check the contractor management "
                     "spreadsheet for entries with Status 'Pending Onboarding'.\\n\\n"
                     "For each pending contractor, create an Asana onboarding task in the onboarding project "
-                    "under the 'New Contractors' section "
+                    "(workspace ws_hr, project proj_onboarding) under the 'New Contractors' section (sec_new) "
                     "with their name and start date.\\n\\n"
                     "Send each pending contractor a welcome email to their personal email with "
                     "their start date and reporting manager's name from the sheet.\\n\\n"
