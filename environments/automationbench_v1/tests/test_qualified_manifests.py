@@ -31,7 +31,7 @@ QUALIFIED = {
     "finance.escrow_tracking": (
         "finance-escrow-tracking.json", "8fe35e6d359a0f17ce8176884f8fede377b916dcfd383338aeb5dd6bdec83048"),
     "operations.zoom_training_setup": (
-        "operations-zoom-training-setup.json", "61e8e4bdb9ddfff0d98a495603935ac47ececdd3139fd5f691922caad8772b64"),
+        "operations-zoom-training-setup.json", "bdf78520b4e979cf94e7cbea538943dbbd99810a5c462e4031087990b2bcc02a"),
     "operations.calendly_equipment_inspection": (
         "operations-calendly-equipment-inspection.json", "2beed8507c64c3f0d9dd2dad861ed44a21be06a2dc08da04eefd1d06ebceab2a"),
 }
