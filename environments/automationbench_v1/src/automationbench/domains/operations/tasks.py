@@ -2552,7 +2552,8 @@ def get_ops_monday_slack_inventory_task() -> dict:
                     "Today is 2026-02-19.\n\n"
                     "Check the badge inventory sheet (ss_inventory/ws_badges) for waiting items "
                     "and pick the most urgent one.\n\n"
-                    "Update the matching Monday item on board brd_ops "
+                    "Update the matching Monday item on board brd_ops (set its status column (status) to In Progress "
+                    "and its date column (due) to the Needed By date) "
                     "and let #ops-updates know. If it needs immediate attention, also alert #ops-alerts."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the names of affected entities in your message(s)."
                 ),
