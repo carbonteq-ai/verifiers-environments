@@ -2649,6 +2649,7 @@ def get_fin_xero_bill_entry_task() -> dict:
                 "gmail_find_email",
                 "gmail_get_email_by_id",
                 "xero_create_sales_invoice",
+                "xero_create_bill",
                 "xero_find_contact",
                 "slack_send_channel_message",
                 "slack_get_channel_messages",
