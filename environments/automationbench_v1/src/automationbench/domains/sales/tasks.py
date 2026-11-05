@@ -22528,7 +22528,8 @@ def get_cross_platform_account_health_score_task() -> dict:
                 "content": (
                     "Run the quarterly health check on our Enterprise accounts. "
                     "Pull signals from all the usual platforms, score them, and update "
-                    "Salesforce accordingly. Flag anything that needs attention and "
+                    "Salesforce accordingly (record each account's classification label in its "
+                    "Description field). Flag anything that needs attention and "
                     "post a summary to #account-health."
                 ),
             },
