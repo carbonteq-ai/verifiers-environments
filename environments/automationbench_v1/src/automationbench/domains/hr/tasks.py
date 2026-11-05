@@ -16755,7 +16755,7 @@ def get_task_5111() -> dict:
                                             "row_id": 3,
                                             "cells": {
                                                 "Rule": "Balance Correction",
-                                                "Action": "Update the balance, set Status to 'Corrected', and email the employee with their new balance.",
+                                                "Action": "Update the balance, set Status to 'Corrected', and email the employee with their full name and new balance.",
                                             },
                                         },
                                         {
