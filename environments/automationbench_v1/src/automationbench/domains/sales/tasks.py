@@ -13353,10 +13353,12 @@ def get_linkedin_event_promotion_task() -> dict:
                 "role": "user",
                 "content": (
                     "Promote our upcoming webinar to relevant LinkedIn connections. Get the "
-                    "webinar details from the webinar promotion email. Target Salesforce contacts "
-                    "whose industry and seniority match the webinar topic — send messages to existing "
+                    "webinar details from the webinar promotion email. Target Salesforce contacts and leads "
+                    "whose industry and seniority match the webinar topic (managers and above count as "
+                    "senior; analysts do not) — send messages to existing "
                     "connections and connection requests to others. Update contact records with outreach "
-                    "status and summarize results in #marketing-outreach."
+                    "status (set the contact's Description to 'Webinar invite sent') and summarize results "
+                    "in #marketing-outreach, stating how many invites and connection requests were sent."
                 ),
             },
         ],
