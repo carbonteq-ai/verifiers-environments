@@ -16689,7 +16689,11 @@ def get_fin_quarterly_tax_estimate_task() -> dict:
                                 "1. Calculate taxable income: Revenue - Deductible Expenses\n"
                                 "2. Apply the effective tax rate from the Tax Rates worksheet\n"
                                 "3. Subtract any tax credits from the Credits worksheet\n"
-                                "4. Divide annual estimate by 4 for quarterly payment\n"
+                                "4. Divide annual estimate by 4 for quarterly payment. The annual estimate is "
+                                "computed on annualized income: multiply the quarter's year-to-date taxable income "
+                                "by 4, apply the combined federal + state effective rate (if the state rate changed "
+                                "during the quarter, use the simple average of the quarter's three monthly state "
+                                "rates), then subtract the annual credits. Keep full precision until step 6.\n"
                                 "5. Subtract prior quarter payments already made\n"
                                 "6. Round to the nearest dollar\n\n- Controller"
                             ),
