@@ -17920,7 +17920,7 @@ def get_ops_inventory_enrichment_task() -> dict:
                     "weight data, which is causing issues with shipping cost estimates. Can you "
                     "cross-reference against our reference catalog and fill in what's missing?\n\n"
                     "Once you've updated everything, document the changes in the ops reports "
-                    "database in Notion and send a summary to the inventory manager. Make sure "
+                    "database in Notion (create the page with parent_page db_ops_reports) and send a summary to the inventory manager. Make sure "
                     "you only touch records that actually need updating - don't overwrite anything "
                     "that already has data, even if it differs from the reference."
                 ),
