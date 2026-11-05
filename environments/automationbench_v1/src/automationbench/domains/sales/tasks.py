@@ -6678,7 +6678,8 @@ def get_update_contact_phone_task() -> dict:
                     "Process the phone update requests from HR.\n\n"
                     "Find the latest batch email from the HR updates team and apply the phone "
                     "changes to the matching Salesforce contacts. Handle any conflicts or "
-                    "duplicates appropriately. Create a note for each update you apply."
+                    "duplicates appropriately. Create a note for each update you apply, stating the new "
+                    "number. Write phone numbers as NNN-NNN-NNNN in both the contact and the note."
                 ),
             },
         ],
