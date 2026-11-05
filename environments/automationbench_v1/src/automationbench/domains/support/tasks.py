@@ -24069,7 +24069,8 @@ def get_support_zendesk_data_quality_task() -> dict:
                 "role": "user",
                 "content": (
                     "Our Zendesk data quality has been slipping — run an audit using the "
-                    "rules in ss_quality (ws_rules). Tag tickets with issues 'data-quality-issue', log them to "
+                    "rules in ss_quality (ws_rules); only open tickets are in scope (solved tickets are not "
+                    "audited). Tag tickets with issues 'data-quality-issue', log them to "
                     "ws_log, and send a report to data-team@company.example.com that states the number "
                     "of tickets with issues as 'N failing tickets'.\n\nUse Gmail for all email sends."
                     "Include relevant counts in your message(s)."
