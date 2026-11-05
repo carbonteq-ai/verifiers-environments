@@ -12064,7 +12064,10 @@ def get_support_freshdesk_reamaze_migration_task() -> dict:
                 "role": "user",
                 "content": (
                     "We're moving support over from Freshdesk to Re:amaze. The migration "
-                    "rules (ss_migration_rules) have the details on what qualifies. Get "
+                    "rules (ss_migration_rules) have the details on what qualifies. Only open "
+                    "and pending tickets qualify (resolved and closed tickets stay in Freshdesk), "
+                    "tickets tagged migration-review are still migrated, and every migrated "
+                    "conversation is created in Re:amaze with status unresolved. Get "
                     "everything moved and email support-migration@company.example.com a report "
                     "when it's done. Log your progress in the tracking records as you go.\n\nUse Gmail for all email sends."
                     "Include the names of affected entities in your message(s)."
