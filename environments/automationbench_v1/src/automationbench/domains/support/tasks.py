@@ -32855,7 +32855,9 @@ def get_support_reamaze_cross_platform_dedup_task() -> dict:
                 "content": (
                     "Deduplicate between Re:amaze and Freshdesk. Find conversations "
                     "and tickets from the same customer about the same issue, "
-                    "close the Re:amaze side with a cross-reference note, and "
+                    "close the Re:amaze side with a cross-reference note, add a private "
+                    "note on each matched Freshdesk ticket referencing the Re:amaze "
+                    "conversation id, and "
                     "log to ss_dedup/ws_log. Some customers use multiple email "
                     "addresses — check ss_dedup/ws_aliases for known aliases."
                 ),
