@@ -49134,7 +49134,9 @@ def get_support_gorgias_inventory_routing_task() -> dict:
                     "per the alert policy to #inventory-alerts. "
                     "Check your inbox for any relevant fulfillment updates before responding. "
                     "In replies, write dates as month name and day (e.g. 'March 3'); for a recalled "
-                    "product, explain the recall and do not describe its availability at all."
+                    "product, explain the recall and do not describe its availability at all; if a customer "
+                    "asks for more units than are in stock, state how many remain and do not quote a total "
+                    "for the requested quantity."
                     "Include the relevant amounts from the source data in your message(s)."
                 ),
             },
