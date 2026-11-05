@@ -21127,8 +21127,10 @@ def get_support_zendesk_automated_responses_task() -> dict:
                     "worksheets 'ws_templates' and 'ws_conditions') -- match tickets to the right "
                     "response and handle anything that shouldn't be auto-replied to. For a template with "
                     "Auto_Send 'false', add its response as a private comment instead of a public reply. "
-                    "Tag each ticket you respond to 'auto-responded'. Post stats to #auto-response, "
-                    "counting every ticket you responded to (public or private)."
+                    "Tag each ticket you respond to 'auto-responded'. Assign tickets that match a Human Review "
+                    "condition (ws_conditions) to the 'Human Review' group (grp_review) instead of replying. "
+                    "Post stats to #auto-response, counting every ticket you responded to (public or private) "
+                    "and how many went to human review, and include the Batch_Reference from ws_config."
                     "Include the relevant amounts from the source data in your message(s)."
                 ),
             },
