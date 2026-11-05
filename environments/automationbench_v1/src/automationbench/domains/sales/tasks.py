@@ -23624,7 +23624,8 @@ def get_chatgpt_email_sentiment_routing_task() -> dict:
                 "role": "user",
                 "content": (
                     "Run the usual email triage on what's come in. "
-                    "Route everything per the policy and post a summary to #email-routing."
+                    "Use ChatGPT to classify each email's sentiment, route everything per the policy, "
+                    "mark each email you process as read, and post a summary to #email-routing."
                     " Include the relevant amounts from the source data in your message(s)."
                 ),
             },
