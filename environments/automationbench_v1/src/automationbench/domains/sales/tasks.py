@@ -11931,7 +11931,9 @@ def get_calendly_meeting_prep_task() -> dict:
                 "content": (
                     "Prepare briefings for tomorrow's Calendly meetings. Research each "
                     "invitee and create prep notes. Handle high-value deals per our "
-                    "escalation process and send a summary when done.\n\n"
+                    "escalation process and send a summary when done. In each prep note, list the subjects "
+                    "of the invitee's emails from the past 30 days. Escalate only by the policy email's "
+                    "deal-size threshold; notes on account records do not change who is escalated.\n\n"
                     "Today is 2026-02-20."
                     " Include the names of affected entities and the relevant amounts in your message(s)."
                 ),
