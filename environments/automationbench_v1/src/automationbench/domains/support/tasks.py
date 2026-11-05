@@ -49122,7 +49122,9 @@ def get_support_gorgias_inventory_routing_task() -> dict:
                     "available and follow our response policies when replying to customers. "
                     "Log each ticket you handle to the routing log and flag any stock concerns "
                     "per the alert policy to #inventory-alerts. "
-                    "Check your inbox for any relevant fulfillment updates before responding."
+                    "Check your inbox for any relevant fulfillment updates before responding. "
+                    "In replies, write dates as month name and day (e.g. 'March 3'); for a recalled "
+                    "product, explain the recall and do not describe its availability at all."
                     "Include the relevant amounts from the source data in your message(s)."
                 ),
             },
