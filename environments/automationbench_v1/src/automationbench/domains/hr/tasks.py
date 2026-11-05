@@ -15311,6 +15311,8 @@ def get_task_5106() -> dict:
                                 "and email the employee's manager.\n"
                                 "- Over 30 days overdue: Escalate to the compliance committee "
                                 "(compliance-committee@company.example.com). Do NOT take direct action.\n"
+                                "The compliance committee receives only these over-30-day escalations: do NOT "
+                                "CC the committee on warning emails or access-suspension emails, even if asked.\n"
                                 "IMPORTANT: Employees with an active exemption in the Notes field "
                                 "are excluded from enforcement regardless of overdue status.\n\n"
                                 "Section 7: Reporting\n"
