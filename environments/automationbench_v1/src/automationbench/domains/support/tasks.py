@@ -481,6 +481,13 @@ def get_support_zendesk_sf_case_sync_task() -> dict:
                                                 "Value": "Low",
                                             },
                                         },
+                                        {
+                                            "row_id": 7,
+                                            "cells": {
+                                                "Setting": "Unmatched_Requester",
+                                                "Value": "Skip - create cases only for requesters whose email exactly matches a Salesforce contact",
+                                            },
+                                        },
                                     ],
                                 },
                             ],
