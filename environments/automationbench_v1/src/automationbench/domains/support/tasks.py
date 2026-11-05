@@ -31894,7 +31894,10 @@ def get_support_reamaze_lifecycle_tagging_task() -> dict:
                 "content": (
                     "Tag Re:amaze conversations with customer lifecycle info from "
                     "HubSpot. Use our lifecycle mapping spreadsheet to determine the "
-                    "right tags, and add context notes to each conversation."
+                    "right tags, and add context notes to each conversation. The 'escalate' priority action "
+                    "means setting the conversation's status to unresolved, with a note that includes the "
+                    "customer's email address. If a conversation's contact is not found in HubSpot, tag "
+                    "it 'unknown' and add a note saying its lifecycle stage is unknown."
                 ),
             },
         ],
