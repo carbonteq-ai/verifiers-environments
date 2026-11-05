@@ -14221,7 +14221,11 @@ def get_fin_wave_client_statement_task() -> dict:
                                 "Statement distribution rules:\n\n"
                                 "1. Do not send statements for balances under $100\n"
                                 "2. Only send to clients with outstanding balances of $100 or more\n"
-                                "3. Include all unpaid invoices and aging breakdown\n\n- AR Manager"
+                                "3. Include all unpaid invoices and aging breakdown\n"
+                                "4. Send each statement to the client's billing contact:\n"
+                                "   wc_501 Bright Ideas Studio - pay@brightideas.example.com\n"
+                                "   wc_502 GreenLeaf Organics - finance@greenleaf.example.com\n"
+                                "   wc_503 Summit Ventures - ops@summit.example.com\n\n- AR Manager"
                             ),
                             "label_ids": ["INBOX"],
                             "is_read": True,
