@@ -13918,7 +13918,8 @@ def get_ops_mailchimp_campaign_tracking_task() -> dict:
                 "content": (
                     "Hey, we had some bounced emails from the last campaign. "
                     "Can you check Mailchimp for any bounced subscribers in aud_main?\n\n"
-                    "Update their Airtable records (base_contacts, Contacts table) per the sync policy "
+                    "Update their Airtable records (base_contacts, Contacts table; the email address goes in "
+                    "the 'email' field) per the sync policy "
                     "in the mailchimp rules worksheet (ss_sync_policy / ws_mailchimp_rules).\n\n"
                     "Then send a report to the address listed as Report Recipient in that same worksheet."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
