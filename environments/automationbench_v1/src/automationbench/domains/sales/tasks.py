@@ -10796,7 +10796,9 @@ def get_calendly_reschedule_chain_task() -> dict:
                 "content": (
                     "Handle the reschedule request that just came in. "
                     "Cancel and rebook following our reschedule policy, making sure there are no conflicts. "
-                    "Update CRM accordingly."
+                    "Update CRM accordingly. Treat all times as UTC (so 'after 2pm' means after 14:00 UTC), "
+                    "book the first conflict-free 30-minute slot, and write the new time in the CRM note "
+                    "in 12-hour format (e.g. '9:15 AM')."
                 ),
             },
         ],
