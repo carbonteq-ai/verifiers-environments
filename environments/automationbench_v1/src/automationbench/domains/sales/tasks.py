@@ -12238,7 +12238,9 @@ def get_docusign_compliance_template_task() -> dict:
                 "role": "user",
                 "content": (
                     "Today is January 22, 2026. This week's closed deals need contracts "
-                    "sent out per our standard compliance process."
+                    "sent out per our standard compliance process. After sending each contract, record "
+                    "the template used (GDPR, HIPAA, SOC2, Enterprise or Standard) in the opportunity's "
+                    "description in Salesforce."
                 ),
             },
         ],
