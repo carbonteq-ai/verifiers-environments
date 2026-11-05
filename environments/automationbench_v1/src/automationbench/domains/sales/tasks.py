@@ -29970,9 +29970,10 @@ def get_contract_renewal_coordinator_task() -> dict:
                     "expiring DocuSign envelopes, assess each account's health by checking "
                     "champion status and open support issues, then take the appropriate renewal "
                     "action based on how the relationship is going (healthy accounts: book a Renewal "
-                    "Discussion on Calendly with the champion; at-risk accounts: create an escalation "
+                    "Discussion on Calendly with the champion and send the champion the 'Renewal "
+                    "Agreement' DocuSign template; at-risk accounts: create an escalation "
                     "event on the primary Google Calendar with the account name in the title). "
-                    "Draft talking points, update "
+                    "Use ChatGPT to draft the talking points, update "
                     "the opportunity, and post status to #renewals."
                     " Include the names of affected entities and the relevant amounts in your message(s)."
                 ),
