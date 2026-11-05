@@ -12580,7 +12580,7 @@ def get_zoom_recording_distribution_task() -> dict:
                     "Distribute recordings from yesterday's completed Zoom meetings "
                     "per our distribution policy. "
                     "Route each recording to the right audience and log the distribution "
-                    "to #recording-log."
+                    "to #recording-log, including each recording's link."
                     " Include the names of affected entities in your message(s)."
                 ),
             },
