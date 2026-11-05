@@ -35892,7 +35892,9 @@ def get_linkedin_company_update_task() -> dict:
                 "role": "user",
                 "content": (
                     "Promote our upcoming webinar on our main Nimbus LinkedIn page (not the subsidiary). "
-                    "Target the post at customer support leaders. Follow our current posting guidelines.\n\n"
+                    "Target the post at customer support leaders. Follow our current posting guidelines. "
+                    "The webinar is on the Marketing calendar (calendar id cal_marketing); include its date "
+                    "in the post, written as month name and day (e.g. 'March 12').\n\n"
                     "Today is January 28, 2026."
                 ),
             },
