@@ -4987,7 +4987,8 @@ def get_hr_monday_onboarding_pipeline_task() -> dict:
                 "content": (
                     "Set up onboarding items on Monday.com for the new hires starting "
                     "next week. Each hire needs items with their name, start date, and "
-                    "department. Set the status to 'Not Started'. Review any notes before proceeding."
+                    "department (name each item '<Name> - <Department>'). Only full-time hires get "
+                    "onboarding items; contractors do not. Set the status to 'Not Started'. Review any notes before proceeding."
                 ),
             },
         ],
