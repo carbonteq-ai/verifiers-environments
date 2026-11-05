@@ -24691,7 +24691,7 @@ def get_industry_event_tracking_task() -> dict:
                                                 "focus_area": "SaaS",
                                                 "expected_attendees": "1500",
                                                 "sponsorship_cost": "$12000",
-                                                "notes": "Headline sponsor is Athenix - our main competitor. Avoid official presence.",
+                                                "notes": "Headline sponsor is Athenix - our main competitor. Avoid any presence (no sponsorship, speaking or attendance).",
                                             },
                                         },
                                         # Temporal trap: event already happened
@@ -24717,7 +24717,7 @@ def get_industry_event_tracking_task() -> dict:
                                                 "focus_area": "SaaS",
                                                 "expected_attendees": "1800",
                                                 "sponsorship_cost": "$20000",
-                                                "notes": "Registration deadline passed Jan 15 - cannot register as sponsor or speaker",
+                                                "notes": "Registration closed Jan 15 - no further registrations accepted (sponsor, speaker or attendee)",
                                             },
                                         },
                                     ],
