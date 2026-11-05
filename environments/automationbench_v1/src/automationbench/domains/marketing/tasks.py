@@ -34640,8 +34640,8 @@ def get_newsletter_sponsor_invoicing_task() -> dict:
                             "subject": "Invoice Processing Rules - NSINV-714-Q1",
                             "body_plain": (
                                 "Hi,\n\nFor this invoicing cycle (ref: NSINV-714-Q1):\n\n"
-                                "1. Include the tracking code NSINV-714-Q1 in the subject line of "
-                                "each invoice email you send.\n"
+                                "1. Include the tracking code NSINV-714-Q1 in the subject line and in the "
+                                "body of each invoice email you send.\n"
                                 "2. All invoice emails must include the exact Amount from the spreadsheet "
                                 "in the body.\n"
                                 "3. Ridgeway's due date is today (Jan 28) -- treat today as past due "
