@@ -13446,7 +13446,10 @@ def get_support_reamaze_intercom_migration_task() -> dict:
                 "role": "user",
                 "content": (
                     "We're switching support platforms. There is a migration config "
-                    "spreadsheet (ss_migration) with details on what to move and how. "
+                    "spreadsheet (ss_migration) with details on what to move and how. Only "
+                    "unresolved and pending conversations are migrated (resolved and archived ones stay "
+                    "in Re:amaze), and an Intercom contact is created only for a customer with at least "
+                    "one migrated conversation. "
                     "Make sure nothing important gets lost, tag each migrated contact in Intercom "
                     "'migrated-from-reamaze', and keep the team updated in Slack."
                     "Include the names of affected entities in your message(s)."
