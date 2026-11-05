@@ -29252,7 +29252,8 @@ def get_gcal_travel_time_buffer_task() -> dict:
                 "content": (
                     "Today is January 21, 2026. Review tomorrow's calendar (January 22) and "
                     "make sure there's travel time blocked before any in-person meetings. Log "
-                    "on-site visits in Salesforce and post the travel schedule to #field-sales. "
+                    "on-site visits in Salesforce and post the travel schedule to #field-sales, stating "
+                    "the number of in-person meetings (as 'N in-person meetings'). "
                     "If a buffer can't fit without a conflict, flag it."
                 ),
             },
