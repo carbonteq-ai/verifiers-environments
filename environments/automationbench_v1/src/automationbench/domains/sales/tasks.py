@@ -21015,7 +21015,8 @@ def get_form_to_crm_qualification_task() -> dict:
                 "role": "user",
                 "content": (
                     "Process the latest batch of website form submissions. "
-                    "Qualify them against ICP and get them into Salesforce with the right statuses. "
+                    "Qualify them against ICP and get them into Salesforce with the right statuses "
+                    "(leads below the MQL threshold get status 'New'). "
                     "Update the sheet and flag any standout prospects in #high-value-leads."
                     " Include the names of affected entities in your message(s)."
                 ),
