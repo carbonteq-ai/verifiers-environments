@@ -303,7 +303,8 @@ def get_lead_enrichment_task() -> dict:
                                 "1. Include the batch code WLEAD-2026-0127 in your confirmation email subject line.\n"
                                 "2. Companies on our competitor list (kept in the Lead Tracking spreadsheet) must not be added to HubSpot.\n"
                                 "3. Always check the notes column -- respect any opt-out or exclusion instructions.\n"
-                                "4. The confirmation email must include the total number of contacts added.\n\n"
+                                "4. The confirmation email must include the total number of contacts added, written as "
+                                "'N contacts added'.\n\n"
                                 "Thanks,\nMarketing Ops"
                             ),
                             "date": "2026-01-27T08:00:00Z",
