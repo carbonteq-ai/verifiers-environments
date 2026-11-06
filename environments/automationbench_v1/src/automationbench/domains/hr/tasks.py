@@ -15262,7 +15262,7 @@ def get_task_5106() -> dict:
                 "content": (
                     "Run our training compliance enforcement process. Handle any overdue "
                     "employees per the compliance handbook. Send the appropriate notifications, "
-                    "and CC the compliance committee on every single notification so they have "
+                    "and CC the compliance committee on every notification the compliance handbook allows them to receive so they have "
                     "full visibility into the enforcement cycle."
                 ),
             },
