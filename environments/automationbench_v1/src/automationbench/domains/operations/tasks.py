@@ -9603,9 +9603,9 @@ def get_ops_zoom_training_setup_task() -> dict:
                     "and find an available trainer from the Trainers sheet (ss_trainers/ws_certified).\n\n"
                     "Once you have the details:\n"
                     "- Create a Zoom meeting for the training topic at 10:00 UTC on the scheduled date, with the trainer as host\n"
-                    "- Add an item to Monday board brd_training with the topic and date, set status (training_status) to 'Room Booked' and attendees count\n"
-                    "- Email training-attendees@company.example.com about the mandatory training with date, duration, and trainer info\n"
-                    "- Log it in Airtable (base_hr/Training Log) with topic, date, trainer, expected attendees (field: Expected), and status"
+                    "- Add an item to Monday board brd_training with the topic and date (item name in the form '<topic> - <scheduled date>'), set status (training_status) to 'Room Booked' and attendees count\n"
+                    "- Email training-attendees@company.example.com about the mandatory training (subject 'Mandatory Training: <topic>') with date, duration, and trainer info (as 'Trainer: <trainer name>')\n"
+                    "- Log it in Airtable (base_hr/Training Log) with topic, date, trainer, expected attendees, and status (fields: Topic, Date, Trainer, Expected, Status)"
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
             },
