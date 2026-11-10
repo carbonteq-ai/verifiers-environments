@@ -21867,7 +21867,8 @@ def get_ops_purchase_order_three_way_match_task() -> dict:
                     "- Qty Received != Qty Ordered (UNLESS the Notes column says 'Partial - Expected')\n"
                     "- Invoice Amount != (Qty Ordered * Unit Price)\n\n"
                     "Create a Monday item on board 'Procurement Issues' for each discrepancy with details. "
-                    "Email procurement@supplychainco.com with a summary of all mismatches.\n\n"
+                    "Email procurement@supplychainco.com with a summary of all mismatches, with the word 'Mismatch' "
+                    "in the subject line.\n\n"
                     "Only match POs from January 2026 or later (PO Date >= 2026-01-01). Older POs have already "
                     "been reconciled."
                 ),
