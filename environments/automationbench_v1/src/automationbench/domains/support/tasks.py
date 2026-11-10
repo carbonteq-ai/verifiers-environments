@@ -8508,7 +8508,9 @@ def get_support_gorgias_refund_processing_task() -> dict:
                 "content": (
                     "Process refund requests from our Gorgias tickets. The refund policy "
                     "spreadsheet (ss_refund_policy) has all the rules and order data you "
-                    "need. Today is 2026-02-01. Work through the qualifying tickets, "
+                    "need. Today is 2026-02-01. Work through the qualifying tickets "
+                    "(a ticket qualifies when it is open and tagged refund-approved; leave "
+                    "all other tickets untouched), "
                     "draft Gmail confirmations or escalate to Jira (project FIN, issuetype "
                     "Task) as the policy dictates. Log each one to the refund log "
                     "(ws_refund_log) with Action values: 'Draft', 'Escalated', "
