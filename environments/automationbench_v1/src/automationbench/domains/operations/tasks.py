@@ -2996,7 +2996,9 @@ def get_ops_drive_slack_dock_schedule_task() -> dict:
                     "be a release tracking sheet that covers QA clearance -- ops has been stricter about "
                     "that lately so make sure nothing goes out without proper sign-off.\n\n"
                     "Let #ops-updates know once the latest revision is shared, and include the total "
-                    "number of files you moved plus the QA reference number so logistics can verify."
+                    "number of files you moved plus the QA reference number so logistics can verify. "
+                    "In that message, name the revision you shared and the revision you archived by "
+                    "their Rev labels."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
             },
