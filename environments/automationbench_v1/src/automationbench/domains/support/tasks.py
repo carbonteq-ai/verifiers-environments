@@ -23028,9 +23028,11 @@ def get_support_zendesk_cross_org_merge_task() -> dict:
                 "content": (
                     "We have duplicate Zendesk organizations that need to be consolidated. "
                     "Use the merge candidates in ss_merge (ws_candidates) to combine them, "
-                    "but skip any on the do-not-merge list (ws_dnm). For each merge, tag the source organization "
+                    "but skip any on the do-not-merge list (ws_dnm). For each merge, move the source organization's "
+                    "tickets to the target organization, tag the source organization "
                     "'merged-archived' and add the source organization's name to the target organization's notes. Log results to "
-                    "ws_results and post a summary to #ops-merges."
+                    "ws_results and post a summary to #ops-merges. Include the Batch_Reference from ws_config in the "
+                    "#ops-merges summary."
                     "Include the names of affected entities and the relevant amounts in your message(s)."
                 ),
             },
