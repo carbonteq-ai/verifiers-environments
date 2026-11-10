@@ -4851,7 +4851,7 @@ def get_fin_revenue_recognition_task() -> dict:
                     "contract term in months. Calculate the monthly recognized revenue "
                     "for each contract and add it to the Rev Rec Schedule spreadsheet. "
                     "Follow our recognition policy. "
-                    "Email the completed schedule to controller@company.example.com. "
+                    "Email the completed schedule to controller@company.example.com, including the total revenue recognized for the month. "
                     ""
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
