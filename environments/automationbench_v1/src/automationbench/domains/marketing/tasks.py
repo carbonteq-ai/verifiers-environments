@@ -4368,7 +4368,8 @@ def get_content_performance_task() -> dict:
                 "content": (
                     "Analyze blog content performance and report findings to "
                     "content@company.example.com. Data is in ss_ana / ws_posts. "
-                    "Focus on January 2026 content."
+                    "Focus on January 2026 content. Include the total conversions across "
+                    "the posts you report on."
                 ),
             },
         ],
