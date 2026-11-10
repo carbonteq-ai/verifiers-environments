@@ -18752,7 +18752,10 @@ def get_job_posting_contact_task() -> dict:
                 "role": "user",
                 "content": (
                     "Check LinkedIn for new hiring signals from our target accounts and "
-                    "create leads for the decision makers. Log everything in the Hiring "
+                    "create leads for the decision makers. Put the posted job title in each "
+                    "lead's description; if a decision maker already has a Salesforce lead, "
+                    "update that lead's description instead of creating a duplicate. "
+                    "Log everything in the Hiring "
                     "Signals sheet and post a summary to #new-signals on Slack."
                     " Include the names of affected entities in your message(s)."
                 ),
