@@ -8106,7 +8106,7 @@ def get_fin_financial_close_checklist_task() -> dict:
                 "role": "user",
                 "content": (
                     "Run through the January month-end close checklist. Check each item's "
-                    "status and send a close readiness report to the controller and CFO. "
+                    "status and send a close readiness report to the controller (controller@company.example.com) and CFO (cfo@company.example.com), stating how many items are complete. "
                     "Any incomplete items should be flagged with the responsible person. "
                     "Post the overall status to our finance alerts channel. "
                     ""
