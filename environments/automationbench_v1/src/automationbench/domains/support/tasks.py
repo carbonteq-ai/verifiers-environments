@@ -33412,7 +33412,8 @@ def get_support_reamaze_feedback_sentiment_task() -> dict:
                     "using the keyword rules in ss_sentiment/ws_rules. Tag "
                     "conversations with their sentiment, route the concerning "
                     "ones appropriately, and log results to "
-                    "ss_sentiment/ws_analytics."
+                    "ss_sentiment/ws_analytics. A conversation that matches both positive "
+                    "and negative keywords counts as negative."
                 ),
             },
         ],
