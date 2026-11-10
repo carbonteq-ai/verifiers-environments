@@ -9495,7 +9495,7 @@ def get_fin_expense_policy_violation_task() -> dict:
                     "Audit the latest expense submissions for policy violations. "
                     "Check each expense against our company policy and flag any violations. "
                     "Send a violation notice to each offending employee and a summary to compliance. "
-                    "Update the expense status in the tracker. "
+                    "Update the expense status in the tracker: set Status to 'Approved' for expenses that meet policy and 'Violation' for expenses that break it. "
                     ""
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
