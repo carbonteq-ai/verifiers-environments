@@ -51712,8 +51712,11 @@ def get_support_zoho_desk_capacity_planning_task() -> dict:
                     "Analyze our Zoho Desk ticket load for capacity planning. Use the agent roster "
                     "and capacity benchmarks (spreadsheet 'ss_capacity', worksheets 'ws_roster' and "
                     "'ws_benchmarks') to determine workload distribution across departments. "
-                    "Redistribute tickets from overloaded agents, log the capacity report to "
-                    "'ws_report', and post a summary to #capacity-planning.\n\nUse Gmail for all email sends."
+                    "Redistribute tickets from overloaded agents (add a comment on each reassigned ticket "
+                    "saying it was redistributed), log the capacity report to "
+                    "'ws_report' (list overloaded agents by Agent_ID), email the capacity report to "
+                    "support-leads@company.example.com with 'Capacity Report' in the subject, and post a "
+                    "summary to #capacity-planning that names overloaded agents by Agent_ID.\n\nUse Gmail for all email sends."
                 ),
             },
         ],
