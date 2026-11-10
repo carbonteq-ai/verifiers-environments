@@ -20198,7 +20198,10 @@ def get_competitive_displacement_outreach_task() -> dict:
                 "role": "user",
                 "content": (
                     "Run the competitive displacement campaign for Q1. "
-                    "Make sure to incorporate any recent targeting guidelines."
+                    "Make sure to incorporate any recent targeting guidelines. "
+                    "Put the competitor product as well as the campaign code in each lead "
+                    "description, and write each company's contract end date exactly as it "
+                    "appears in the intel spreadsheet."
                 ),
             },
         ],
