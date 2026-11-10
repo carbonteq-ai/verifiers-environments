@@ -2186,6 +2186,24 @@ def get_hr_probation_review_task() -> dict:
                             "is_read": True,
                             "date": "2026-01-15T08:00:00Z",
                         },
+                        {
+                            "id": "msg_probation_policy_update",
+                            "thread_id": "th_probation_policy_update",
+                            "from_": "hr-director@company.example.com",
+                            "to": ["hr-ops@company.example.com"],
+                            "subject": "Probation Review Policy - Update",
+                            "body_plain": (
+                                "Team,\n\n"
+                                "Update to the probation review policy, effective March 1:\n"
+                                "- Send reminders when within 45 days of the review date (replaces the 30-day window)\n"
+                                "- In each reminder, give the review date as month name and day (e.g. January 5)\n\n"
+                                "All other rules are unchanged.\n\n"
+                                "- HR Director"
+                            ),
+                            "label_ids": ["INBOX"],
+                            "is_read": True,
+                            "date": "2026-03-01T08:00:00Z",
+                        },
                     ],
                     "labels": [],
                     "drafts": [],
