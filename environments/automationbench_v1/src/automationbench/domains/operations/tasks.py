@@ -23988,9 +23988,10 @@ def get_ops_contract_renewal_pipeline_task() -> dict:
                     "Anything that auto-renews is fine, just focus on the ones we need to manually process. "
                     "Obviously ignore contracts that have already been taken care of.\n\n"
                     "Send DocuSign renewal agreements out to the vendor contacts for anything that qualifies. "
-                    "Use the renewal template - there should be one in DocuSign.\n\n"
+                    "Use the renewal template - there should be one in DocuSign, named 'Vendor Contract Renewal'.\n\n"
                     "Loop in the procurement team (procurement@ourcompany.example.com) with a summary of what's "
-                    "coming up. Today is Feb 9, 2026."
+                    "coming up, listing each contract you sent a renewal agreement for with its vendor, expiry "
+                    "date and annual value as shown in the tracker. Today is Feb 9, 2026."
                 ),
             },
         ],
