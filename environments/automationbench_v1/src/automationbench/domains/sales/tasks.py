@@ -16205,7 +16205,10 @@ def get_linkedin_signal_monitoring_task() -> dict:
                 "content": (
                     "Monitor LinkedIn for buying signals from target accounts, such as executive hires, "
                     "company growth, funding announcements, or tech stack changes. For each signal detected, "
-                    "create a Salesforce task capturing the details, update the account priority to reflect the "
+                    "create a Salesforce task capturing the details (start the task subject with the signal type, "
+                    "for example \"Executive hire\" or \"Funding announcement\", followed by the person's name "
+                    "as shown on their LinkedIn profile for a hire, or the company name otherwise), "
+                    "update the account priority to reflect the "
                     "signal strength, and post an alert to #buying-signals."
                     " Include the names of affected entities in your message(s)."
                 ),
