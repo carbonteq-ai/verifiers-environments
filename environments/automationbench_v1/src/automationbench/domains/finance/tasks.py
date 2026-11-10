@@ -14484,7 +14484,7 @@ def get_fin_vendor_statement_recon_task() -> dict:
                 "role": "user",
                 "content": (
                     "Reconcile the vendor statements we received against our AP records. "
-                    "Identify discrepancies and email each vendor with unresolved items. "
+                    "Identify discrepancies and email each vendor with unresolved items, stating the discrepancy amount (the difference between their statement balance and our AP balance). "
                     "Send the reconciliation summary to controller@company.example.com. "
                     ""
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s)."
