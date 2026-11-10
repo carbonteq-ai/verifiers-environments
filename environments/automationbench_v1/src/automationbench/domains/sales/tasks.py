@@ -9866,7 +9866,7 @@ def get_calendly_no_show_followup_task() -> dict:
                             "id": "msg_policy_001",
                             "channel_id": "C_SALES_ALERTS",
                             "user_id": "U001",
-                            "text": "No-Show Follow-Up Procedure: Create task with subject 'Follow up on missed call - <EventName>'. Set priority to High if any open opportunity on the account is >= $50,000, otherwise Normal. Include the scheduled time and total account pipeline value in the description.",
+                            "text": "No-Show Follow-Up Procedure: Mark the invitee as a no-show in Calendly for the missed event. Create task with subject 'Follow up on missed call - <EventName>', linked to the invitee's Salesforce contact. Set priority to High if any open opportunity on the account is >= $50,000, otherwise Normal. Include the scheduled time and total account pipeline value in the description.",
                             "ts": "1770072000.000001",
                         },
                         # Older conflicting policy (superseded by pinned msg)
