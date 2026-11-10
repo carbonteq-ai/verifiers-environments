@@ -8406,7 +8406,7 @@ def get_hr_notion_meeting_notes_task() -> dict:
                 "content": (
                     "Log the HR committee meeting decisions from today's notes into Notion. "
                     "Create a page for each decision and email action item owners with their "
-                    "assignments. Use Notion, Gmail, and Google Sheets."
+                    "assignments. Skip items marked Tabled (no decision was made). Use Notion, Gmail, and Google Sheets."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
             },
