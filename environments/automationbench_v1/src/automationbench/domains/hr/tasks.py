@@ -3451,7 +3451,7 @@ def get_hr_employee_directory_update_task() -> dict:
                 "content": (
                     "Update the company employee directory with recent changes. Process new hires, "
                     "terminations, and role changes. Post the updated directory summary to "
-                    "#hr-general. Use Google Sheets and Slack."
+                    "#hr-general, including the number of changes processed. Use Google Sheets and Slack."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s)."
                 ),
             },
