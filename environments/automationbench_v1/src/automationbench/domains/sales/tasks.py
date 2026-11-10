@@ -29449,8 +29449,8 @@ def get_gcal_deal_milestone_tracker_task() -> dict:
                     "Use our stage mapping: Discovery/Intro meetings = 'Discovery', "
                     "Demo/Technical meetings = 'Demo', Proposal/Pricing meetings = 'Proposal', "
                     "Executive/Contract meetings = 'Negotiation'. "
-                    "Log any stage changes with a note and post a milestone summary to "
-                    "#pipeline-updates."
+                    "Log any stage changes with a note and post a summary headed "
+                    "'Milestone Summary' to #pipeline-updates."
                 ),
             },
         ],
