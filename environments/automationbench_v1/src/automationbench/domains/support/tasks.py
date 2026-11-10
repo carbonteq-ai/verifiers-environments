@@ -14223,7 +14223,8 @@ def get_support_hiver_csat_analysis_task() -> dict:
                     "assignments and the roster to figure out per-agent performance (count only surveys on closed "
                     "conversations). Anyone falling short of expectations should be called out (Status 'flagged'). Log "
                     "everything to the results sheet, email the summary to the support "
-                    "ops team, and post highlights to our metrics channel.\n\nUse Gmail for all email sends."
+                    "ops team, and post highlights to our metrics channel. Include the Report_Reference from the "
+                    "Report Config sheet in the email and the Slack post.\n\nUse Gmail for all email sends."
                     "Include the relevant amounts from the source data in your message(s)."
                 ),
             },
