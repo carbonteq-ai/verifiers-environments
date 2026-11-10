@@ -7727,7 +7727,7 @@ def get_hr_monday_pip_tracking_task() -> dict:
                                         {
                                             "row_id": 3,
                                             "cells": {
-                                                "Step": "If a PIP has passed its end date without resolution (Status still 'Active'), escalate to the Escalation Contact immediately."
+                                                "Step": "If a PIP has passed its end date without resolution (Status still 'Active'), the PIP has expired: escalate to the Escalation Contact immediately and state in the email that the PIP has expired."
                                             },
                                         },
                                         {
