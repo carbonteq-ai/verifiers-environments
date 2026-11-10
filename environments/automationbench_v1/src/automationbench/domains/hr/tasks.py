@@ -22967,7 +22967,7 @@ def get_task_5135() -> dict:
                                 "company-wide workforce freeze issued by the CEO or "
                                 "COO - in a freeze period, do NOT run any of the "
                                 "steps above; simply hold the queue and notify "
-                                "HR leadership on Slack.\n\n"
+                                "HR leadership on Slack that processing is paused.\n\n"
                                 "- HR Director"
                             ),
                             "label_ids": ["INBOX"],
