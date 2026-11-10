@@ -41074,7 +41074,9 @@ def get_support_zendesk_escalation_waterfall_task() -> dict:
                     "Process the tickets marked for review in Zendesk. Check the escalation tracker "
                     "(spreadsheet 'ss_escalation', worksheet 'ws_history') for prior escalations and "
                     "advance tickets to the next tier if they're ready. Log updates to the tracker "
-                    "worksheet 'ws_log' and summarize in #support-escalations. Include the Batch_Reference from ws_config in the summary."
+                    "worksheet 'ws_log' and summarize in #support-escalations. Include the Batch_Reference from ws_config in the summary. "
+                    "A ticket already at Max_Tier (ws_config) cannot advance: leave it in its group, tag it 'max-tier' "
+                    "and add a comment saying it is already at the maximum tier."
                 ),
             },
         ],
