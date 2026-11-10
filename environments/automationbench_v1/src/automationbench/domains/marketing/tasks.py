@@ -28052,7 +28052,10 @@ def get_campaign_roi_analysis_task() -> dict:
                                 "Also check the budget limits worksheet (ws_budget) to see if "
                                 "there is room to scale high-performing channels.\n\n"
                                 "One more thing: include the total number of campaigns analyzed "
-                                "in the summary (this helps with audit tracking).\n\n"
+                                "in the summary, written as 'N campaigns analyzed' (this helps with audit tracking). "
+                                "Only rows on our marketing channels count as campaigns: LinkedIn, Google Ads, "
+                                "Facebook, Twitter, Display Network, Email, Social, Print, Podcast, Instagram and "
+                                "Display. Rows on any other channel are not part of this analysis.\n\n"
                                 "Thanks,\nMarketing Ops"
                             ),
                             "is_read": False,
