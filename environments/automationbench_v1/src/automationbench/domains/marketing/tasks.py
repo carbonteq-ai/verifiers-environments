@@ -28824,7 +28824,7 @@ def get_landing_page_conversion_task() -> dict:
                             "from_": "me",
                             "to": ["web-team@company.example.com"],
                             "subject": "Re: Dec Landing Page Analysis",
-                            "body_plain": "Here's the December analysis. Framework I used:\n- Pages with CVR < 3% AND > 2000 visits = needs optimization (high traffic, low conversion)\n- Include ALL qualifying pages: both underperformers and top performers for comparison\n- Check notes column for data quality issues and exclusions\n- Calculate actual CVR from conversions/visits when CVR field looks suspicious\n- Flag 0% CVR pages as critical priority\n- Send to web-team@company.example.com only",
+                            "body_plain": "Here's the December analysis. Framework I used:\n- Pages with CVR < 3% AND > 2000 visits = needs optimization (high traffic, low conversion)\n- Include ALL qualifying pages: both underperformers and top performers for comparison\n- Check notes column for data quality issues and exclusions\n- Calculate actual CVR from conversions/visits when CVR field looks suspicious\n- Flag 0% CVR pages as critical priority\n- Include total visits and total conversions across all valid pages (every page with numeric visit data, minus pages excluded per the notes)\n- Send to web-team@company.example.com only",
                             "label_ids": ["INBOX"],
                             "is_read": True,
                             "date": "2025-12-20T10:00:00Z",
