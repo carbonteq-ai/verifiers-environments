@@ -55258,7 +55258,7 @@ def get_support_zendesk_freshdesk_reconciliation_task() -> dict:
                                             "row_id": 5,
                                             "cells": {
                                                 "Rule": "Exclude Internal",
-                                                "Condition": "Requester email domain contains 'internal.company.com'",
+                                                "Condition": "Requester email domain contains 'internal.company.example.com'",
                                                 "Action": "Skip reconciliation entirely.",
                                             },
                                         },
@@ -55267,7 +55267,7 @@ def get_support_zendesk_freshdesk_reconciliation_task() -> dict:
                                             "cells": {
                                                 "Rule": "Discrepancy Handling",
                                                 "Condition": "Matched tickets have different status or priority",
-                                                "Action": "Log discrepancy to ws_discrepancies sheet. Add internal note to both tickets.",
+                                                "Action": "Log discrepancy to ws_discrepancies sheet. Add an internal note to both tickets that calls it a discrepancy (e.g. 'Sync discrepancy: <field> <Zendesk value> vs <Freshdesk value>'). In the reconciliation report, list them under a 'Discrepancies' heading.",
                                             },
                                         },
                                         {
