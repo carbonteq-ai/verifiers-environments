@@ -22624,7 +22624,9 @@ def get_support_zendesk_gdpr_purge_task() -> dict:
                     "everything to ws_compliance_log and post a summary to #privacy-ops. Anonymize with the subject prefix from "
                     "ws_config, tag each anonymized ticket 'gdpr-purged', and include the ws_config batch reference in the summary. "
                     "Log a ws_compliance_log row for every request, including requests with no matching Zendesk "
-                    "user and requests on legal hold, and mention the legal hold in the #privacy-ops summary."
+                    "user and requests on legal hold, and mention the legal hold in the #privacy-ops summary. "
+                    "In the summary, state the number of accounts purged and the number of requests with no "
+                    "matching Zendesk account."
                     "Include the names of affected entities and the relevant amounts in your message(s)."
                 ),
             },
