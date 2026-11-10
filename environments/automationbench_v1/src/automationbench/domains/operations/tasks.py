@@ -12631,7 +12631,7 @@ def get_ops_mailchimp_subscriber_sync_task() -> dict:
                     "Add eligible subscribers to our aud_newsletter audience in Mailchimp and tag them.\n\n"
                     "Make sure you're following the latest sync eligibility rules — I know legal and privacy "
                     "have flagged a few things recently that affect which registrations we can process.\n\n"
-                    "When you're done, drop a message in #marketing-ops with the names of subscribers synced and the total count."
+                    "When you're done, drop a message in #marketing-ops with the names and companies of subscribers synced and the total count."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
             },
