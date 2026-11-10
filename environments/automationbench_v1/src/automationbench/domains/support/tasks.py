@@ -9603,7 +9603,9 @@ def get_support_zoho_calendar_callbacks_task() -> dict:
             {
                 "role": "user",
                 "content": (
-                    "Schedule callbacks for Zoho Desk tickets that need them. Use the "
+                    "Schedule callbacks for Zoho Desk tickets that need them (a ticket needs a "
+                    "callback when its status is On Hold and its classification is "
+                    "callback-requested). Use the "
                     "cal_callbacks calendar, check the scheduling notes spreadsheet "
                     "(spreadsheet ID: ss_sched_notes) for any exclusions before booking, "
                     "make sure you're not double-booking anyone, and update the tickets "
