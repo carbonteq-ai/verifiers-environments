@@ -37573,7 +37573,7 @@ def get_support_helpcrunch_trial_nurture_task() -> dict:
                     "nurture spreadsheet (ss_nurture) for milestone "
                     "definitions and email templates. Send every active (non-converted) trial the template "
                     "email for its last completed milestone, stuck ones included, and also follow up with stuck "
-                    "trials appropriately. Today is 2026-02-07.\n\nUse Gmail for all email sends."
+                    "trials appropriately (title each follow-up task \"Stuck trial follow-up: <customer's full name>\"). Today is 2026-02-07.\n\nUse Gmail for all email sends."
                 ),
             },
         ],
