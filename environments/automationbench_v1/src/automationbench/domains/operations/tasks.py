@@ -10155,7 +10155,7 @@ def get_ops_zoom_board_meeting_task() -> dict:
                     "- Create a 3-hour password-protected Zoom meeting 'Q1 2026 Board Meeting' starting at 09:00 UTC on the meeting date\n"
                     "- Send the 'Board Meeting Consent' via DocuSign to each board member\n"
                     "- Add it to Monday board brd_exec with the date (meeting_date), status 'In Progress' (prep_status), and attendee count (attendees)\n"
-                    "- Create an agenda page in Notion under pg_board with meeting details, attendees, and standard agenda items\n"
+                    "- Create an agenda page titled 'Q1 2026 Board Meeting - Agenda' in Notion under pg_board with meeting details, attendees, and standard agenda items\n"
                     "- Post to #executive with the date, attendee count, and link to the agenda"
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
