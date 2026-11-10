@@ -1571,9 +1571,10 @@ def get_ad_platform_audit_task() -> dict:
                                 "  a) Their total lifetime spend is under $5,000, OR\n"
                                 "  b) Finance has provided explicit written sign-off.\n"
                                 "If neither condition is met, do NOT delete the campaign. Leave it as-is "
-                                "and note the request in your summary.\n\n"
+                                "and note the request and the campaign's lifetime spend in your summary.\n\n"
                                 "SECTION 3 - REPORTING\n"
-                                "Include the average CTR across all paused campaigns in your summary "
+                                "Include the average CTR across all paused campaigns and the minimum "
+                                "days-running threshold you applied in your summary "
                                 "email so the analytics team can benchmark.\n\n"
                                 "Thanks,\nJessica Tran\nDirector, Paid Media"
                             ),
