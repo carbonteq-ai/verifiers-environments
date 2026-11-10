@@ -11027,6 +11027,12 @@ def get_support_helpscout_daily_digest_task() -> dict:
                     "Time for the daily support digest. Pull the current HelpScout "
                     "conversation data and distribute the summary to the right "
                     "channels and people."
+                    " Routing: #support-daily gets the open (active or pending) conversations"
+                    " that are unassigned; #escalations gets only the active conversations"
+                    " tagged 'escalated'; list each conversation by its subject. Email the"
+                    " digest to the team lead, listing every open (active or pending)"
+                    " conversation by subject with its status and marking which ones are"
+                    " escalated."
                     "\n\nToday is February 07, 2026.\n\nUse Gmail for all email sends."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round)."
                 ),
