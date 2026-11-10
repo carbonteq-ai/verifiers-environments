@@ -17047,7 +17047,8 @@ def get_ops_buffer_engagement_optimization_task() -> dict:
                     "(if there are ties, prefer earlier times). "
                     "Create a Notion page called 'Posting Schedule Optimization' with the schedule "
                     "recommendations, log the analysis to ss_social_analytics (ws_timing), and share "
-                    "the best times, times to avoid, and a recommended weekly schedule in #social-strategy.\n\n"
+                    "the best times, times to avoid, and a recommended weekly schedule in #social-strategy. "
+                    "Give engagement rates as percentages (an engagement_rate of 0.05 is 5%).\n\n"
                     "Today is 2026-01-28."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s)."
                 ),
