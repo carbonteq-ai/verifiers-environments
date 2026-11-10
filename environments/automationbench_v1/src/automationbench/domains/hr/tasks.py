@@ -630,7 +630,7 @@ def get_hr_feedback_logging_task() -> dict:
                             "id": "sm_fb_01",
                             "channel_id": "C_MGRFB",
                             "user_id": "U_LISA",
-                            "text": "FEEDBACK | Employee: Alice Park | Rating: Exceeds Expectations | Notes: Shipped the auth migration 2 weeks early. Great ownership.",
+                            "text": "FEEDBACK | Employee: Alice Park | Rating: Exceeds Expectations | Notes: Shipped the auth migration 2 weeks early. Great ownership. | Manager: Lisa Wang",
                             "ts": "2026-03-10T14:00:00Z",
                         },
                         {
@@ -644,7 +644,7 @@ def get_hr_feedback_logging_task() -> dict:
                             "id": "sm_fb_03",
                             "channel_id": "C_MGRFB",
                             "user_id": "U_CARLOS",
-                            "text": "FEEDBACK | Employee: Carol Diaz | Rating: Meets Expectations | Notes: Consistent delivery on campaign analytics. Could take more initiative on cross-team projects.",
+                            "text": "FEEDBACK | Employee: Carol Diaz | Rating: Meets Expectations | Notes: Consistent delivery on campaign analytics. Could take more initiative on cross-team projects. | Manager: Carlos Reyes",
                             "ts": "2026-03-11T09:00:00Z",
                         },
                         {
@@ -658,7 +658,7 @@ def get_hr_feedback_logging_task() -> dict:
                             "id": "sm_fb_05",
                             "channel_id": "C_MGRFB",
                             "user_id": "U_LISA",
-                            "text": "FEEDBACK | Employee: Bob Chen | Rating: Needs Improvement | Notes: Missed two sprint commitments. Setting up a PIP discussion.",
+                            "text": "FEEDBACK | Employee: Bob Chen | Rating: Needs Improvement | Notes: Missed two sprint commitments. Setting up a PIP discussion. | Manager: Lisa Wang",
                             "ts": "2026-03-11T10:00:00Z",
                         },
                         {
