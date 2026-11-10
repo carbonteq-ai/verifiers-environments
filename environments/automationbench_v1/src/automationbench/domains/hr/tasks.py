@@ -19527,7 +19527,9 @@ def get_task_5122() -> dict:
                                 "Team,\n\n"
                                 "The Legal department is currently involved in sensitive restructuring "
                                 "discussions. Exclude ALL Legal department employees from this survey "
-                                "cycle. They will receive a separate, customized survey next month.\n\n"
+                                "cycle. They will receive a separate, customized survey next month. "
+                                "This applies only to employees whose Department is Legal; Legal "
+                                "Operations is a separate department and still receives the survey.\n\n"
                                 "- CEO"
                             ),
                             "label_ids": ["INBOX"],
