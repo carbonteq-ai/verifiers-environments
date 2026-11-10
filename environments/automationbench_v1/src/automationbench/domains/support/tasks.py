@@ -20724,8 +20724,9 @@ def get_support_helpscout_reamaze_migration_task() -> dict:
                     "conversations over. The migration playbook (spreadsheet 'ss_migration', "
                     "worksheets 'ws_status_map' and 'ws_category_map') has how things should "
                     "translate. Leave an internal note on each migrated HelpScout conversation "
-                    "stating it was 'migrated' to Re:amaze, then close it in HelpScout. Make sure nothing gets lost in the "
-                    "move and post progress to #migration-status."
+                    "stating it was 'migrated' to Re:amaze, then close it in HelpScout. Create a Re:amaze contact "
+                    "for each migrated conversation's customer who does not already have one. Make sure nothing gets lost in the "
+                    "move and post a progress update that uses the word 'migration' to #migration-status."
                     "Include the names of affected entities in your message(s)."
                 ),
             },
