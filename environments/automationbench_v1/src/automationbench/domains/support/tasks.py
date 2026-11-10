@@ -17944,7 +17944,9 @@ def get_support_freshdesk_zoho_migration_task() -> dict:
                     "We need to archive our resolved Freshdesk tickets over to Zoho Desk. "
                     "The migration spec (spreadsheet 'ss_archive', worksheets 'ws_archive_rules', "
                     "'ws_field_translations', and 'ws_migration_log') covers what goes where -- "
-                    "preserve the history and post stats to #migration-tracker."
+                    "preserve the history and post stats to #migration-tracker. "
+                    "On each Freshdesk ticket you archive, add the tag 'archived' and a note saying "
+                    "it was migrated to Zoho Desk."
                     "\n\nToday is 2026-02-07."
                     "Include the names of affected entities in your message(s)."
                 ),
