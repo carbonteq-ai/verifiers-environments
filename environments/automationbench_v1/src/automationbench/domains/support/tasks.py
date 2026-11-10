@@ -28923,7 +28923,11 @@ def get_support_helpscout_customer_merge_task() -> dict:
                     "Can you go through them and clean up the ones that are actually the "
                     "same person? Leave a trail so we know what happened, and update "
                     "#data-quality."
-                    "Include the relevant amounts from the source data in your message(s)."
+                    "Include the relevant amounts from the source data in your message(s). "
+                    "Leave the trail as a note on each duplicate (secondary) customer's "
+                    "conversation stating which email was merged into which; do not add notes "
+                    "to the primary customers' conversations. In the #data-quality update, "
+                    "state how many duplicate pairs were merged."
                 ),
             },
         ],
