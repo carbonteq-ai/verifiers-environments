@@ -22,13 +22,22 @@ from typing import Any, Literal
 
 import verifiers.v1 as vf
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic_core import to_jsonable_python
 
 RAW_ACTION_KIND = "automationbench_raw_action"
 
 
 def canonical_json(value: Any) -> str:
+    # Tool arguments arrive pydantic-parsed (a datetime for a datetime-typed parameter).
+    # json.dumps consults ``default`` only for values it cannot encode itself, so
+    # JSON-native values keep byte-identical output and digests.
     return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+        default=to_jsonable_python,
     )
 
 

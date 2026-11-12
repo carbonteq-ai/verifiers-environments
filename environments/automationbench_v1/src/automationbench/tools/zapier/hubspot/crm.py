@@ -159,17 +159,30 @@ def hubspot_update_contact(
     if linkedin_url:
         contact.linkedin_url = linkedin_url
 
-    # Update additional properties
+    # Update additional properties. Keys that are declared contact fields
+    # (e.g. payment_retry_count, notes, payment_status) update the field itself so
+    # later reads and assertions see the new value; other keys go to `properties`.
+    def _apply_contact_props(props: dict) -> None:
+        declared = set(HubSpotContact.model_fields) - {"id", "properties", "created_at", "updated_at"}
+        for k, v in props.items():
+            if k in declared:
+                try:
+                    validated = HubSpotContact.model_validate({**contact.model_dump(), k: v})
+                    setattr(contact, k, getattr(validated, k))
+                    continue
+                except Exception:
+                    pass
+            contact.properties[k] = str(v)
+
     if additional_properties_json:
         try:
             parsed = json.loads(additional_properties_json)
-            # Coerce all values to strings for Pydantic validation
-            additional_properties = {k: str(v) for k, v in parsed.items()}
-            contact.properties.update(additional_properties)
+            if isinstance(parsed, dict):
+                _apply_contact_props(parsed)
         except json.JSONDecodeError:
             pass
     if properties and isinstance(properties, dict):
-        contact.properties.update(cast(dict[str, str], {k: str(v) for k, v in properties.items()}))
+        _apply_contact_props(properties)
 
     contact.updated_at = _sim.now()
 

