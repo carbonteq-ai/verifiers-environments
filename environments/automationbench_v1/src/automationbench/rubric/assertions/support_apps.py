@@ -8,6 +8,8 @@ Covers: Zendesk, Freshdesk, Intercom, HelpScout, Gorgias, Re:amaze, Zoho Desk, H
 
 from __future__ import annotations
 
+import re
+
 from automationbench.rubric.registry import AssertionRegistry, negative_assertion
 from automationbench.schema.world import WorldState
 
@@ -1155,7 +1157,9 @@ def zendesk_organization_details_contains(world: WorldState, assertion: dict) ->
             continue
         if name and org.name.lower() != name.lower():
             continue
-        if org.details and value_contains.lower() in org.details.lower():
+        if org.details and re.sub(r"(\d),(\d)", r"\1\2", value_contains.lower()) in re.sub(
+            r"(\d),(\d)", r"\1\2", org.details.lower()
+        ):
             return True
     return False
 

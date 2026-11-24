@@ -36,6 +36,8 @@ def _strip_currency(value: str) -> str:
     stripped = value.strip().lstrip("$€£¥₹")
     # Remove comma thousands separators
     stripped = stripped.replace(",", "")
+    # Treat a trailing percent sign as formatting: "100%" == "100"
+    stripped = stripped.rstrip("%").strip()
     return stripped
 
 

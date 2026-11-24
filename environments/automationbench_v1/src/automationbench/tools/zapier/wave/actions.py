@@ -118,6 +118,7 @@ def wave_find_customer(
     business: Optional[str] = None,
     email: Optional[str] = None,
     name: Optional[str] = None,
+    customer_id: Optional[str] = None,
 ) -> str:
     """
     Find or create a customer in Wave.
@@ -125,11 +126,14 @@ def wave_find_customer(
     Args:
         email: Customer email to search for.
         name: Customer name to search for.
+        customer_id: Customer ID to look up (e.g. the customer__id shown on an invoice).
 
     Returns:
         JSON string with found customer or empty result.
     """
-    customer = world.wave.find_customer(email=email, name=name)
+    customer = (
+        world.wave.get_customer_by_id(customer_id) if customer_id else None
+    ) or world.wave.find_customer(email=email, name=name)
     if customer:
         d = customer.to_display_dict()
         d["_zap_data_was_found"] = True

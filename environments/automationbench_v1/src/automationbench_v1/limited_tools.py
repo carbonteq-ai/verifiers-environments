@@ -8,10 +8,10 @@ import json
 import re
 import types
 from collections.abc import Callable
-from typing import Any, Union, cast, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Union, cast, get_args, get_origin, get_type_hints
 
 import verifiers.v1 as vf
-from pydantic import ConfigDict, create_model
+from pydantic import BeforeValidator, ConfigDict, create_model
 
 from automationbench.tools import ALL_TOOLS
 
@@ -113,7 +113,19 @@ def enrich_tool_definitions(definitions: list[dict[str, Any]]) -> list[dict[str,
 # as JSON get the JSON text back. The others are comma-separated lists
 # (``tags``, ``label_ids``, ``keywords``): a list becomes "a,b", and an empty
 # list means the argument was not given.
-_DECODED = str | dict[str, Any] | list[Any] | None
+#
+# A bare number is accepted the same way: the tool-call parser turns ``row_id:
+# 2`` into the integer 2 because the schema above has no plain string type, and
+# the read tools return row ids as integers, so the model copies them. The
+# number is passed on as its text, as AutomationBench's own tools accept it. The
+# schema shown to the model does not change.
+def _number_as_text(value: Any) -> Any:
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return str(value)
+    return value
+
+
+_DECODED = Annotated[str | dict[str, Any] | list[Any] | None, BeforeValidator(_number_as_text)]
 _ARG_LINE = re.compile(r"^\s{4,}(\w+):\s*(.*)$")
 
 

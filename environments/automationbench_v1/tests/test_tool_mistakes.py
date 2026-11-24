@@ -137,3 +137,46 @@ def test_json_string_arguments_reach_the_tool_as_strings_after_mcp_decoding(monk
     assert isinstance(seen["fields_json"], str) and json.loads(cast(str, seen["fields_json"])) == {
         "Name": "Sara Chen"
     }
+
+
+def test_bare_number_reaches_a_string_parameter_as_text(monkeypatch) -> None:
+    # The parser hands ``row_id: 2`` on as the integer 2 because the shown schema
+    # has no plain string type; pydantic then rejected it ("Input should be a
+    # valid string") although the tool accepts row 2. The shown schema is unchanged.
+    seen: list[object] = []
+
+    def update_row(world: WorldState, spreadsheet: str, row_id: str | None = None) -> str:
+        del world
+        seen.append(row_id)
+        return json.dumps({"success": True})
+
+    monkeypatch.setitem(limited_tools._ZAPIER_TOOLS, "google_sheets_update_row", update_row)
+    task = next(
+        iter(
+            AutomationBenchTaskset(
+                AutomationBenchConfig(
+                    domains=["simple"], task=AutomationBenchTaskConfig(toolset="limited_zapier")
+                )
+            ).load()
+        )
+    )
+    [toolset] = task.toolsets(AutomationBenchTaskConfig.model_validate(task.config.model_dump()))
+    toolset = cast(AutomationBenchLimitedToolset, toolset)
+    object.__setattr__(toolset.config, "allowed_tools", ("google_sheets_update_row",))
+    toolset._inert_state = AutomationBenchState(
+        world=task.data.initial_state, initial_state=task.data.initial_state
+    )
+
+    metadata = func_metadata(toolset._tool_wrapper("google_sheets_update_row", update_row))
+    assert metadata.arg_model.model_json_schema()["properties"]["row_id"]["anyOf"] == [
+        {"type": "string"},
+        {"additionalProperties": True, "type": "object"},
+        {"items": {}, "type": "array"},
+        {"type": "null"},
+    ]
+    for sent in (2, "2"):
+        arguments = metadata.arg_model.model_validate({"spreadsheet": "AR", "row_id": sent})
+        toolset.invoke("google_sheets_update_row", **arguments.model_dump_one_level())
+    assert seen == ["2", "2"]
+    with pytest.raises(Exception):  # booleans are not numbers here; they fail as before
+        metadata.arg_model.model_validate({"spreadsheet": "AR", "row_id": True})
